@@ -140,6 +140,54 @@
                 {{ t.runtime_spam_max }}
                 <input id="rt-spam-max-messages" type="number" min="2" max="30" value="{{ runtime_config.spam_max_messages }}" />
               </label>
+              <label>
+                {{ t.runtime_join_fail_action }}
+                <select id="rt-join-verify-fail-action">
+                  <option value="kick" {% if runtime_config.join_verify_fail_action == "kick" %}selected{% endif %}>{{ t.action_kick }}</option>
+                  <option value="ban" {% if runtime_config.join_verify_fail_action == "ban" %}selected{% endif %}>{{ t.action_ban }}</option>
+                  <option value="mute" {% if runtime_config.join_verify_fail_action == "mute" %}selected{% endif %}>{{ t.action_mute }}</option>
+                </select>
+              </label>
+              <label>
+                {{ t.runtime_join_fail_mute_minutes }}
+                <input id="rt-join-verify-fail-mute-minutes" type="number" min="1" max="10080" value="{{ runtime_config.join_verify_fail_mute_minutes }}" />
+              </label>
+              <label>
+                {{ t.runtime_join_fail_ban_minutes }}
+                <input id="rt-join-verify-fail-ban-minutes" type="number" min="1" max="10080" value="{{ runtime_config.join_verify_fail_ban_minutes }}" />
+              </label>
+              <label>
+                {{ t.runtime_ad_block_action }}
+                <select id="rt-ad-block-action">
+                  <option value="kick" {% if runtime_config.ad_block_action == "kick" %}selected{% endif %}>{{ t.action_kick }}</option>
+                  <option value="ban" {% if runtime_config.ad_block_action == "ban" %}selected{% endif %}>{{ t.action_ban }}</option>
+                  <option value="mute" {% if runtime_config.ad_block_action == "mute" %}selected{% endif %}>{{ t.action_mute }}</option>
+                </select>
+              </label>
+              <label>
+                {{ t.runtime_ad_block_mute_minutes }}
+                <input id="rt-ad-block-mute-minutes" type="number" min="1" max="10080" value="{{ runtime_config.ad_block_mute_minutes }}" />
+              </label>
+              <label>
+                {{ t.runtime_ad_block_ban_minutes }}
+                <input id="rt-ad-block-ban-minutes" type="number" min="1" max="10080" value="{{ runtime_config.ad_block_ban_minutes }}" />
+              </label>
+              <label>
+                {{ t.runtime_anti_spam_action }}
+                <select id="rt-anti-spam-action">
+                  <option value="kick" {% if runtime_config.anti_spam_action == "kick" %}selected{% endif %}>{{ t.action_kick }}</option>
+                  <option value="ban" {% if runtime_config.anti_spam_action == "ban" %}selected{% endif %}>{{ t.action_ban }}</option>
+                  <option value="mute" {% if runtime_config.anti_spam_action == "mute" %}selected{% endif %}>{{ t.action_mute }}</option>
+                </select>
+              </label>
+              <label>
+                {{ t.runtime_anti_spam_mute_minutes }}
+                <input id="rt-anti-spam-mute-minutes" type="number" min="1" max="10080" value="{{ runtime_config.anti_spam_mute_minutes }}" />
+              </label>
+              <label>
+                {{ t.runtime_anti_spam_ban_minutes }}
+                <input id="rt-anti-spam-ban-minutes" type="number" min="1" max="10080" value="{{ runtime_config.anti_spam_ban_minutes }}" />
+              </label>
               <label class="full-width">
                 {{ t.runtime_ad_regex }}
                 <input id="rt-ad-regex" type="text" value="{{ runtime_config.ad_regex }}" />

@@ -21,6 +21,15 @@ class RuntimeConfig:
     join_verify_timeout_sec: int
     spam_window_sec: int
     spam_max_messages: int
+    join_verify_fail_action: str
+    join_verify_fail_mute_minutes: int
+    join_verify_fail_ban_minutes: int
+    ad_block_action: str
+    ad_block_mute_minutes: int
+    ad_block_ban_minutes: int
+    anti_spam_action: str
+    anti_spam_mute_minutes: int
+    anti_spam_ban_minutes: int
     ad_regex: str
     updated_at: datetime | None = None
 
@@ -66,10 +75,32 @@ CONFIG_DEFAULTS: dict[str, str] = {
     "join_verify_timeout_sec": "180",
     "spam_window_sec": "10",
     "spam_max_messages": "6",
+    "join_verify_fail_action": "kick",
+    "join_verify_fail_mute_minutes": "30",
+    "join_verify_fail_ban_minutes": "1440",
+    "ad_block_action": "mute",
+    "ad_block_mute_minutes": "30",
+    "ad_block_ban_minutes": "1440",
+    "anti_spam_action": "mute",
+    "anti_spam_mute_minutes": "30",
+    "anti_spam_ban_minutes": "1440",
     "ad_regex": r"(t\.me/|telegram\.me/|vx|wechat|free|bet|promo)",
 }
 
-INT_KEYS = {"deepseek_timeout_sec", "join_verify_timeout_sec", "spam_window_sec", "spam_max_messages"}
+ACTION_VALUES = {"kick", "ban", "mute"}
+INT_KEYS = {
+    "deepseek_timeout_sec",
+    "join_verify_timeout_sec",
+    "spam_window_sec",
+    "spam_max_messages",
+    "join_verify_fail_mute_minutes",
+    "join_verify_fail_ban_minutes",
+    "ad_block_mute_minutes",
+    "ad_block_ban_minutes",
+    "anti_spam_mute_minutes",
+    "anti_spam_ban_minutes",
+}
+ACTION_KEYS = {"join_verify_fail_action", "ad_block_action", "anti_spam_action"}
 _CACHE_TTL_SEC = 2.0
 _runtime_cache: RuntimeConfig | None = None
 _runtime_cache_at: float = 0.0
@@ -85,6 +116,13 @@ def _normalize_int(raw: str, default: int, min_value: int, max_value: int) -> in
     if value > max_value:
         return max_value
     return value
+
+
+def _normalize_action(raw: str, default: str = "mute") -> str:
+    value = (raw or "").strip().lower()
+    if value in ACTION_VALUES:
+        return value
+    return default
 
 
 async def _ensure_defaults(db: AsyncSession) -> None:
@@ -118,6 +156,12 @@ def _build_runtime(data: dict[str, str], updated_at: datetime | None) -> Runtime
     join_timeout = _normalize_int(data.get("join_verify_timeout_sec", ""), 180, 30, 3600)
     spam_window = _normalize_int(data.get("spam_window_sec", ""), 10, 2, 120)
     spam_max = _normalize_int(data.get("spam_max_messages", ""), 6, 2, 30)
+    join_fail_mute = _normalize_int(data.get("join_verify_fail_mute_minutes", ""), 30, 1, 10080)
+    join_fail_ban = _normalize_int(data.get("join_verify_fail_ban_minutes", ""), 1440, 1, 10080)
+    ad_mute = _normalize_int(data.get("ad_block_mute_minutes", ""), 30, 1, 10080)
+    ad_ban = _normalize_int(data.get("ad_block_ban_minutes", ""), 1440, 1, 10080)
+    spam_mute = _normalize_int(data.get("anti_spam_mute_minutes", ""), 30, 1, 10080)
+    spam_ban = _normalize_int(data.get("anti_spam_ban_minutes", ""), 1440, 1, 10080)
 
     return RuntimeConfig(
         telegram_bot_token=(data.get("telegram_bot_token", "") or "").strip(),
@@ -130,6 +174,15 @@ def _build_runtime(data: dict[str, str], updated_at: datetime | None) -> Runtime
         join_verify_timeout_sec=join_timeout,
         spam_window_sec=spam_window,
         spam_max_messages=spam_max,
+        join_verify_fail_action=_normalize_action(data.get("join_verify_fail_action", ""), "kick"),
+        join_verify_fail_mute_minutes=join_fail_mute,
+        join_verify_fail_ban_minutes=join_fail_ban,
+        ad_block_action=_normalize_action(data.get("ad_block_action", ""), "mute"),
+        ad_block_mute_minutes=ad_mute,
+        ad_block_ban_minutes=ad_ban,
+        anti_spam_action=_normalize_action(data.get("anti_spam_action", ""), "mute"),
+        anti_spam_mute_minutes=spam_mute,
+        anti_spam_ban_minutes=spam_ban,
         ad_regex=(data.get("ad_regex", "") or CONFIG_DEFAULTS["ad_regex"]).strip(),
         updated_at=updated_at,
     )
@@ -170,6 +223,8 @@ async def update_runtime_config(db: AsyncSession, payload: dict[str, str | int])
                 normalized = str(int(value))
             except Exception:
                 normalized = CONFIG_DEFAULTS[key]
+        elif key in ACTION_KEYS:
+            normalized = _normalize_action(str(value), CONFIG_DEFAULTS[key])
         else:
             normalized = str(value).strip()
         row = rows.get(key)

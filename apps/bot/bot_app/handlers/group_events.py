@@ -9,8 +9,14 @@ from apps.api.app.services.group_service import ensure_group
 from apps.api.app.services.log_service import add_log
 from apps.api.app.services.auto_reply_service import match_auto_reply
 from apps.api.app.services.moderation.auto_recover import add_mute_sanction
-from apps.api.app.services.moderation.join_verification import build_answer_options, create_challenge, verify_challenge
+from apps.api.app.services.moderation.join_verification import (
+    build_answer_options,
+    create_challenge,
+    get_challenge,
+    verify_challenge,
+)
 from apps.api.app.services.runtime_config_service import get_runtime_config
+from apps.bot.bot_app.moderation_actions import ModerationActionConfig, apply_moderation_action
 from apps.bot.bot_app.state import deepseek_client, policy_engine
 
 router = Router()
@@ -159,8 +165,25 @@ async def verify_button_handler(callback: CallbackQuery) -> None:
     user_id = callback.from_user.id
     async with SessionLocal() as db:
         await ensure_group(db, chat_id, callback.message.chat.title or "")
+        runtime = await get_runtime_config(db)
         ok = await verify_challenge(db, chat_id, user_id, selected_answer)
         if not ok:
+            challenge = await get_challenge(db, chat_id, user_id)
+            if challenge is not None and not challenge.passed:
+                await apply_moderation_action(
+                    callback.bot,
+                    db,
+                    chat_id,
+                    user_id,
+                    callback.from_user.username or "",
+                    "join_verify_failed",
+                    ModerationActionConfig(
+                        action=runtime.join_verify_fail_action,
+                        mute_minutes=runtime.join_verify_fail_mute_minutes,
+                        ban_minutes=runtime.join_verify_fail_ban_minutes,
+                    ),
+                )
+                challenge.passed = True
             await add_log(db, chat_id, user_id, callback.from_user.username or "", "join_verify_failed", "button")
             await callback.answer("答案错误或验证已过期", show_alert=True)
             return
@@ -202,12 +225,6 @@ async def group_text_handler(message: Message) -> None:
             if decision.keyword_rule and decision.keyword_rule.action == "mute":
                 mute_minutes = decision.keyword_rule.mute_minutes
                 reason = f"{reason}:{decision.keyword_rule.keyword}"
-            elif decision.reason in {"ad_block", "anti_spam"}:
-                mute_minutes = 30
-
-            if decision.reason in {"ad_block", "anti_spam"} or (
-                decision.keyword_rule and decision.keyword_rule.action == "mute"
-            ):
                 await message.bot.restrict_chat_member(
                     chat_id=chat.id,
                     user_id=user.id,
@@ -215,7 +232,34 @@ async def group_text_handler(message: Message) -> None:
                     until_date=datetime.now(timezone.utc) + timedelta(minutes=mute_minutes),
                 )
                 await add_mute_sanction(db, chat.id, user.id, reason, mute_minutes)
-
+            elif decision.reason == "ad_block":
+                await apply_moderation_action(
+                    message.bot,
+                    db,
+                    chat.id,
+                    user.id,
+                    user.username or "",
+                    reason,
+                    ModerationActionConfig(
+                        action=runtime.ad_block_action,
+                        mute_minutes=runtime.ad_block_mute_minutes,
+                        ban_minutes=runtime.ad_block_ban_minutes,
+                    ),
+                )
+            elif decision.reason == "anti_spam":
+                await apply_moderation_action(
+                    message.bot,
+                    db,
+                    chat.id,
+                    user.id,
+                    user.username or "",
+                    reason,
+                    ModerationActionConfig(
+                        action=runtime.anti_spam_action,
+                        mute_minutes=runtime.anti_spam_mute_minutes,
+                        ban_minutes=runtime.anti_spam_ban_minutes,
+                    ),
+                )
             await add_log(db, chat.id, user.id, user.username or "", "message_blocked", reason)
             return
 

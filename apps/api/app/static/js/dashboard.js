@@ -33,6 +33,15 @@ const rtDeepseekTimeoutSec = document.getElementById("rt-deepseek-timeout-sec");
 const rtJoinVerifyTimeoutSec = document.getElementById("rt-join-verify-timeout-sec");
 const rtSpamWindowSec = document.getElementById("rt-spam-window-sec");
 const rtSpamMaxMessages = document.getElementById("rt-spam-max-messages");
+const rtJoinVerifyFailAction = document.getElementById("rt-join-verify-fail-action");
+const rtJoinVerifyFailMuteMinutes = document.getElementById("rt-join-verify-fail-mute-minutes");
+const rtJoinVerifyFailBanMinutes = document.getElementById("rt-join-verify-fail-ban-minutes");
+const rtAdBlockAction = document.getElementById("rt-ad-block-action");
+const rtAdBlockMuteMinutes = document.getElementById("rt-ad-block-mute-minutes");
+const rtAdBlockBanMinutes = document.getElementById("rt-ad-block-ban-minutes");
+const rtAntiSpamAction = document.getElementById("rt-anti-spam-action");
+const rtAntiSpamMuteMinutes = document.getElementById("rt-anti-spam-mute-minutes");
+const rtAntiSpamBanMinutes = document.getElementById("rt-anti-spam-ban-minutes");
 const rtAdRegex = document.getElementById("rt-ad-regex");
 
 const upgradeFill = document.getElementById("upgrade-fill");
@@ -594,6 +603,15 @@ function buildRuntimePayload() {
     join_verify_timeout_sec: Number(rtJoinVerifyTimeoutSec?.value || 180),
     spam_window_sec: Number(rtSpamWindowSec?.value || 10),
     spam_max_messages: Number(rtSpamMaxMessages?.value || 6),
+    join_verify_fail_action: rtJoinVerifyFailAction?.value || "kick",
+    join_verify_fail_mute_minutes: Number(rtJoinVerifyFailMuteMinutes?.value || 30),
+    join_verify_fail_ban_minutes: Number(rtJoinVerifyFailBanMinutes?.value || 1440),
+    ad_block_action: rtAdBlockAction?.value || "mute",
+    ad_block_mute_minutes: Number(rtAdBlockMuteMinutes?.value || 30),
+    ad_block_ban_minutes: Number(rtAdBlockBanMinutes?.value || 1440),
+    anti_spam_action: rtAntiSpamAction?.value || "mute",
+    anti_spam_mute_minutes: Number(rtAntiSpamMuteMinutes?.value || 30),
+    anti_spam_ban_minutes: Number(rtAntiSpamBanMinutes?.value || 1440),
     ad_regex: rtAdRegex?.value || "",
   };
 }
