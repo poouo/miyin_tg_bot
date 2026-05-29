@@ -1,8 +1,9 @@
+import json
 from functools import lru_cache
-from typing import List
+from typing import Annotated, List
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -14,7 +15,7 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str = ""
     telegram_bot_username: str = ""
-    telegram_admin_ids: List[int] = Field(default_factory=list)
+    telegram_admin_ids: Annotated[List[int], NoDecode] = Field(default_factory=list)
 
     database_url: str = "sqlite+aiosqlite:///./data/miyin.db"
     deepseek_api_key: str = ""
@@ -35,12 +36,23 @@ class Settings(BaseSettings):
 
     @field_validator("telegram_admin_ids", mode="before")
     @classmethod
-    def parse_admin_ids(cls, value: str | List[int]) -> List[int]:
+    def parse_admin_ids(cls, value: str | List[int] | None) -> List[int]:
         if isinstance(value, list):
-            return value
+            return [int(item) for item in value]
         if not value:
             return []
-        return [int(item.strip()) for item in value.split(",") if item.strip()]
+        if isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                return []
+            # Support both JSON array: [123,456] and CSV: 123,456
+            if raw.startswith("[") and raw.endswith("]"):
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    return [int(item) for item in parsed]
+                raise ValueError("telegram_admin_ids JSON must be an array")
+            return [int(item.strip()) for item in raw.split(",") if item.strip()]
+        return [int(value)]
 
 
 @lru_cache
