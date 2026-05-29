@@ -7,10 +7,6 @@ const actionStatus = document.getElementById("action-status");
 const navItems = Array.from(document.querySelectorAll(".nav-item"));
 const sections = Array.from(document.querySelectorAll(".section"));
 
-const securityOutput = document.getElementById("security-output");
-const runtimeOutput = document.getElementById("runtime-output");
-const deepseekOutput = document.getElementById("deepseek-output");
-const passwordOutput = document.getElementById("password-output");
 const btnCheck = document.getElementById("check-update");
 const btnTrigger = document.getElementById("trigger-update");
 const btnSaveSecurity = document.getElementById("save-security");
@@ -42,55 +38,55 @@ const upgradeFill = document.getElementById("upgrade-fill");
 const upgradeStatus = document.getElementById("upgrade-status");
 
 const arChatId = document.getElementById("ar-chat-id");
-const arKeyword = document.getElementById("ar-keyword");
-const arReplyText = document.getElementById("ar-reply-text");
-const arDeleteAfter = document.getElementById("ar-delete-after");
-const arEnabled = document.getElementById("ar-enabled");
-const arAddRule = document.getElementById("ar-add-rule");
-const arCancelEdit = document.getElementById("ar-cancel-edit");
+const arOpenAdd = document.getElementById("ar-open-add");
 const arRefresh = document.getElementById("ar-refresh");
 const arTableBody = document.getElementById("ar-table-body");
-const arOutput = document.getElementById("ar-output");
+const arModal = document.getElementById("ar-modal");
+const arModalTitle = document.getElementById("ar-modal-title");
+const arModalKeyword = document.getElementById("ar-modal-keyword");
+const arModalReplyText = document.getElementById("ar-modal-reply-text");
+const arModalDeleteAfter = document.getElementById("ar-modal-delete-after");
+const arModalEnabled = document.getElementById("ar-modal-enabled");
+const arModalSave = document.getElementById("ar-modal-save");
+const arModalCancel = document.getElementById("ar-modal-cancel");
 
 const akChatId = document.getElementById("ak-chat-id");
-const akKeyword = document.getElementById("ak-keyword");
-const akEnabled = document.getElementById("ak-enabled");
-const akAddKeyword = document.getElementById("ak-add-keyword");
-const akCancelEdit = document.getElementById("ak-cancel-edit");
+const akOpenAdd = document.getElementById("ak-open-add");
 const akRefresh = document.getElementById("ak-refresh");
 const akTableBody = document.getElementById("ak-table-body");
-const akOutput = document.getElementById("ak-output");
+const akModal = document.getElementById("ak-modal");
+const akModalTitle = document.getElementById("ak-modal-title");
+const akModalKeyword = document.getElementById("ak-modal-keyword");
+const akModalEnabled = document.getElementById("ak-modal-enabled");
+const akModalSave = document.getElementById("ak-modal-save");
+const akModalCancel = document.getElementById("ak-modal-cancel");
 
 const evChatId = document.getElementById("ev-chat-id");
 const evRefresh = document.getElementById("ev-refresh");
 const evTableBody = document.getElementById("ev-table-body");
-const groupsTableBody = document.getElementById("groups-table-body");
-const groupsOutput = document.getElementById("groups-output");
+
+const gsChatId = document.getElementById("gs-chat-id");
+const gsJoinVerify = document.getElementById("gs-join-verify");
+const gsKeywordFilter = document.getElementById("gs-keyword-filter");
+const gsAdBlock = document.getElementById("gs-ad-block");
+const gsAntiSpam = document.getElementById("gs-anti-spam");
+const gsAutoRecover = document.getElementById("gs-auto-recover");
+const gsAi = document.getElementById("gs-ai");
+const gsSave = document.getElementById("gs-save");
+const gsRefresh = document.getElementById("gs-refresh");
 
 const i18nEl = document.getElementById("i18n-data");
 const i18n = i18nEl ? JSON.parse(i18nEl.textContent || "{}") : {};
 
 let updatePollTimer = null;
 const ACTIVE_SECTION_KEY = "miyin.dashboard.activeSection";
+let actionStatusTimer = null;
 let arEditingRuleId = null;
 let akEditingKeywordId = null;
-let actionStatusTimer = null;
+const groupConfigCache = new Map();
 
 function t(key, fallback) {
   return i18n[key] || fallback || key;
-}
-
-function print(el, data) {
-  if (el) {
-    el.textContent = JSON.stringify(data, null, 2);
-  }
-  if (Array.isArray(data)) return;
-  if (!data || typeof data !== "object") return;
-  if (data.ok === false) {
-    showStatus(data.message || data.detail || data.error || t("operation_failed", "Operation failed"), true);
-    return;
-  }
-  showStatus(t("saved", "Saved"), false);
 }
 
 function escapeHtml(text) {
@@ -102,36 +98,34 @@ function escapeHtml(text) {
     .replaceAll("'", "&#39;");
 }
 
-function resetAutoReplyEditor() {
-  arEditingRuleId = null;
-  if (arAddRule) arAddRule.textContent = t("auto_reply_add", "Add Auto Reply");
-  if (arCancelEdit) arCancelEdit.style.display = "none";
-  if (arKeyword) arKeyword.value = "";
-  if (arReplyText) arReplyText.value = "";
-  if (arDeleteAfter) arDeleteAfter.value = "0";
-  if (arEnabled) arEnabled.checked = true;
-}
-
-function resetAdKeywordEditor() {
-  akEditingKeywordId = null;
-  if (akAddKeyword) akAddKeyword.textContent = t("ad_keyword_add", "Add Ad Keyword");
-  if (akCancelEdit) akCancelEdit.style.display = "none";
-  if (akKeyword) akKeyword.value = "";
-  if (akEnabled) akEnabled.checked = true;
-}
-
 function showStatus(message, isError = false) {
   if (!actionStatus) return;
-  actionStatus.textContent = message;
+  actionStatus.textContent = message || "";
   actionStatus.classList.toggle("error", Boolean(isError));
   if (actionStatusTimer) {
     window.clearTimeout(actionStatusTimer);
   }
+  if (!message) return;
   actionStatusTimer = window.setTimeout(() => {
     if (!actionStatus) return;
     actionStatus.textContent = "";
     actionStatus.classList.remove("error");
-  }, 2200);
+  }, 2400);
+}
+
+async function requestJson(url, options = {}) {
+  try {
+    const res = await fetch(url, options);
+    const data = await res.json();
+    return { ok: res.ok, status: res.status, data };
+  } catch (err) {
+    return { ok: false, status: 0, data: { ok: false, error: String(err) } };
+  }
+}
+
+function parseApiMessage(payload) {
+  if (!payload || typeof payload !== "object") return "";
+  return payload.message || payload.detail || payload.error || "";
 }
 
 function setUpgradeStatus(progress, text, type = "normal") {
@@ -179,244 +173,31 @@ document.addEventListener("click", (event) => {
   closeMobileSidebar();
 });
 
-async function handleSectionEnter(target) {
-  if (target === "auto-replies") {
-    await loadAutoReplies();
-  }
-  if (target === "ad-keywords") {
-    await loadAdKeywords();
-  }
-  if (target === "member-events") {
-    await loadMemberEvents();
-  }
+function openModal(modal) {
+  if (!modal) return;
+  modal.hidden = false;
 }
 
-navItems.forEach((item) => {
-  item.addEventListener("click", async () => {
-    const target = item.dataset.target;
-    if (!target) return;
-    const section = document.getElementById(target);
-    if (!section) return;
-    setActiveNav(target);
-    setActiveSection(target);
-    try {
-      window.localStorage.setItem(ACTIVE_SECTION_KEY, target);
-    } catch (err) {
-      // ignore
-    }
-    if (workspaceEl) {
-      workspaceEl.scrollTop = 0;
-    }
-    await handleSectionEnter(target);
-    closeMobileSidebar();
-  });
-});
-
-let initialTarget = navItems.find((item) => item.classList.contains("active"))?.dataset.target || "overview";
-try {
-  const stored = window.localStorage.getItem(ACTIVE_SECTION_KEY) || "";
-  if (stored && navItems.some((item) => item.dataset.target === stored)) {
-    initialTarget = stored;
-  }
-} catch (err) {
-  // ignore
-}
-setActiveNav(initialTarget);
-setActiveSection(initialTarget);
-handleSectionEnter(initialTarget);
-
-async function pollOnlineUpdateStatus() {
-  try {
-    const res = await fetch("/api/v1/updates/online-status");
-    const data = await res.json();
-    if (!data.ok) {
-      setUpgradeStatus(0, t("update_status_load_failed"), "failed");
-      stopPolling();
-      if (btnTrigger) btnTrigger.disabled = false;
-      return;
-    }
-
-    const state = data.state || "idle";
-    const progress = data.progress || 0;
-    const message = data.message || t("update_status_working");
-
-    if (state === "running") {
-      setUpgradeStatus(progress, message, "normal");
-      if (btnTrigger) btnTrigger.disabled = true;
-      return;
-    }
-
-    if (state === "success") {
-      setUpgradeStatus(100, t("update_success_refreshing"), "success");
-      stopPolling();
-      if (btnTrigger) btnTrigger.disabled = false;
-      setTimeout(() => window.location.reload(), 1800);
-      return;
-    }
-
-    if (state === "failed") {
-      setUpgradeStatus(progress, t("update_failed_retry"), "failed");
-      stopPolling();
-      if (btnTrigger) btnTrigger.disabled = false;
-      return;
-    }
-
-    setUpgradeStatus(0, t("update_ready"), "normal");
-    stopPolling();
-    if (btnTrigger) btnTrigger.disabled = false;
-  } catch (err) {
-    setUpgradeStatus(0, t("update_network_error"), "failed");
-    stopPolling();
-    if (btnTrigger) btnTrigger.disabled = false;
-  }
+function closeModal(modal) {
+  if (!modal) return;
+  modal.hidden = true;
 }
 
-function startPolling() {
-  if (updatePollTimer) return;
-  updatePollTimer = setInterval(pollOnlineUpdateStatus, 1500);
+function resetAutoReplyModal() {
+  arEditingRuleId = null;
+  if (arModalTitle) arModalTitle.textContent = t("auto_reply_add", "Add Auto Reply");
+  if (arModalKeyword) arModalKeyword.value = "";
+  if (arModalReplyText) arModalReplyText.value = "";
+  if (arModalDeleteAfter) arModalDeleteAfter.value = "0";
+  if (arModalEnabled) arModalEnabled.checked = true;
 }
 
-function stopPolling() {
-  if (!updatePollTimer) return;
-  clearInterval(updatePollTimer);
-  updatePollTimer = null;
+function resetAdKeywordModal() {
+  akEditingKeywordId = null;
+  if (akModalTitle) akModalTitle.textContent = t("ad_keyword_add", "Add Ad Keyword");
+  if (akModalKeyword) akModalKeyword.value = "";
+  if (akModalEnabled) akModalEnabled.checked = true;
 }
-
-btnCheck?.addEventListener("click", async () => {
-  setUpgradeStatus(0, t("update_checking"));
-  try {
-    const res = await fetch("/api/v1/updates/check");
-    const data = await res.json();
-    if (!data.ok) {
-      setUpgradeStatus(0, t("update_check_failed"), "failed");
-      return;
-    }
-    if (data.has_update) {
-      setUpgradeStatus(0, t("update_available_click"));
-    } else {
-      setUpgradeStatus(100, t("update_uptodate"), "success");
-    }
-  } catch (err) {
-    setUpgradeStatus(0, t("update_check_failed"), "failed");
-  }
-});
-
-btnTrigger?.addEventListener("click", async () => {
-  if (btnTrigger) btnTrigger.disabled = true;
-  setUpgradeStatus(2, t("update_starting"));
-  try {
-    const res = await fetch("/api/v1/updates/online", { method: "POST" });
-    const data = await res.json();
-    if (!data.ok) {
-      setUpgradeStatus(0, data.message || t("update_start_failed"), "failed");
-      if (btnTrigger) btnTrigger.disabled = false;
-      return;
-    }
-    startPolling();
-    await pollOnlineUpdateStatus();
-  } catch (err) {
-    setUpgradeStatus(0, t("update_start_failed"), "failed");
-    if (btnTrigger) btnTrigger.disabled = false;
-  }
-});
-
-function buildRuntimePayload() {
-  return {
-    telegram_bot_token: rtTelegramBotToken?.value || "",
-    telegram_bot_username: rtTelegramBotUsername?.value || "",
-    telegram_admin_ids: rtTelegramAdminIds?.value || "",
-    deepseek_api_key: rtDeepseekApiKey?.value || "",
-    deepseek_base_url: rtDeepseekBaseUrl?.value || "https://api.deepseek.com",
-    deepseek_model: rtDeepseekModel?.value || "deepseek-chat",
-    deepseek_timeout_sec: Number(rtDeepseekTimeoutSec?.value || 30),
-    join_verify_timeout_sec: Number(rtJoinVerifyTimeoutSec?.value || 180),
-    spam_window_sec: Number(rtSpamWindowSec?.value || 10),
-    spam_max_messages: Number(rtSpamMaxMessages?.value || 6),
-    ad_regex: rtAdRegex?.value || "",
-  };
-}
-
-async function saveRuntime(outputEl) {
-  if (outputEl) outputEl.textContent = t("security_saving");
-  const payload = {
-    ...buildRuntimePayload(),
-  };
-
-  try {
-    const res = await fetch("/api/v1/runtime", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    print(outputEl, data);
-  } catch (err) {
-    print(outputEl, { ok: false, error: String(err) });
-  }
-}
-
-btnSaveRuntime?.addEventListener("click", async () => {
-  await saveRuntime(runtimeOutput);
-});
-
-btnSaveDeepseek?.addEventListener("click", async () => {
-  await saveRuntime(deepseekOutput);
-});
-
-btnSaveSecurity?.addEventListener("click", async () => {
-  if (securityOutput) securityOutput.textContent = t("security_saving");
-  const payload = {
-    login_ban_enabled: Boolean(loginBanEnabled?.checked),
-    login_max_attempts: Number(loginMaxAttempts?.value || 5),
-    login_ban_minutes: Number(loginBanMinutes?.value || 5),
-    web_language: (webLanguage?.value || "zh").toLowerCase(),
-  };
-
-  try {
-    const res = await fetch("/api/v1/security/login", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    print(securityOutput, data);
-    if (data.web_language) {
-      setTimeout(() => window.location.reload(), 300);
-    }
-  } catch (err) {
-    print(securityOutput, { ok: false, error: String(err) });
-  }
-});
-
-btnSavePassword?.addEventListener("click", async () => {
-  const payload = {
-    current_password: currentPassword?.value || "",
-    new_password: newPassword?.value || "",
-    confirm_password: confirmPassword?.value || "",
-  };
-
-  try {
-    const res = await fetch("/api/v1/security/password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-
-    if (!res.ok) {
-      const detail = data?.detail || t("password_change_failed");
-      showStatus(`${t("password_change_failed")}: ${detail}`, true);
-      return;
-    }
-
-    showStatus(t("password_changed"), false);
-    if (currentPassword) currentPassword.value = "";
-    if (newPassword) newPassword.value = "";
-    if (confirmPassword) confirmPassword.value = "";
-  } catch (err) {
-    showStatus(`${t("password_change_failed")}: ${String(err)}`, true);
-  }
-});
 
 function renderAutoReplies(items) {
   if (!arTableBody) return;
@@ -449,171 +230,14 @@ async function loadAutoReplies() {
     renderAutoReplies([]);
     return;
   }
-  try {
-    const res = await fetch(`/api/v1/groups/${encodeURIComponent(arChatId.value)}/auto-replies`);
-    const data = await res.json();
-    if (!res.ok) {
-      print(arOutput, data);
-      return;
-    }
-    renderAutoReplies(data);
-  } catch (err) {
-    print(arOutput, { ok: false, error: String(err) });
-  }
-}
-
-arAddRule?.addEventListener("click", async () => {
-  const chatId = arChatId?.value || "";
-  const keyword = arKeyword?.value.trim() || "";
-  const replyText = arReplyText?.value.trim() || "";
-  const deleteAfter = Number(arDeleteAfter?.value || 0);
-  if (!chatId || !keyword || !replyText) {
-    print(arOutput, { ok: false, message: t("fill_required_fields", "Please fill required fields") });
+  const result = await requestJson(`/api/v1/groups/${encodeURIComponent(arChatId.value)}/auto-replies`);
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    renderAutoReplies([]);
     return;
   }
-
-  const payload = {
-    chat_id: Number(chatId),
-    keyword,
-    reply_text: replyText,
-    delete_after_seconds: Math.max(0, deleteAfter),
-    enabled: Boolean(arEnabled?.checked),
-  };
-  try {
-    const isEditing = arEditingRuleId !== null;
-    const url = isEditing
-      ? `/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies/${encodeURIComponent(String(arEditingRuleId))}`
-      : `/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies`;
-    const method = isEditing ? "PATCH" : "POST";
-    const bodyPayload = isEditing
-      ? {
-          keyword: payload.keyword,
-          reply_text: payload.reply_text,
-          delete_after_seconds: payload.delete_after_seconds,
-          enabled: payload.enabled,
-        }
-      : payload;
-
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(bodyPayload),
-    });
-    const data = await res.json();
-    print(arOutput, data);
-    if (!res.ok) return;
-    resetAutoReplyEditor();
-    await loadAutoReplies();
-  } catch (err) {
-    print(arOutput, { ok: false, error: String(err) });
-  }
-});
-
-arCancelEdit?.addEventListener("click", () => {
-  resetAutoReplyEditor();
-});
-
-arRefresh?.addEventListener("click", async () => {
-  await loadAutoReplies();
-});
-
-arChatId?.addEventListener("change", async () => {
-  resetAutoReplyEditor();
-  await loadAutoReplies();
-});
-
-arTableBody?.addEventListener("click", async (event) => {
-  const target = event.target;
-  if (!(target instanceof HTMLButtonElement)) return;
-  const action = target.dataset.action || "";
-  const ruleId = target.dataset.id || "";
-  const chatId = arChatId?.value || "";
-  if (!action || !ruleId || !chatId) return;
-
-  try {
-    if (action === "delete") {
-      const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies/${encodeURIComponent(ruleId)}`, {
-        method: "DELETE",
-      });
-      const data = await res.json();
-      print(arOutput, data);
-      if (!res.ok) return;
-      if (String(arEditingRuleId) === String(ruleId)) {
-        resetAutoReplyEditor();
-      }
-      await loadAutoReplies();
-      return;
-    }
-
-    if (action === "edit") {
-      const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies`);
-      const data = await res.json();
-      if (!res.ok) {
-        print(arOutput, data);
-        return;
-      }
-      const found = Array.isArray(data) ? data.find((item) => String(item.id) === String(ruleId)) : null;
-      if (!found) {
-        print(arOutput, { ok: false, message: t("rule_not_found", "Rule not found") });
-        return;
-      }
-      arEditingRuleId = found.id;
-      if (arKeyword) arKeyword.value = found.keyword || "";
-      if (arReplyText) arReplyText.value = found.reply_text || "";
-      if (arDeleteAfter) arDeleteAfter.value = String(Number(found.delete_after_seconds || 0));
-      if (arEnabled) arEnabled.checked = Boolean(found.enabled);
-      if (arAddRule) arAddRule.textContent = t("auto_reply_update", "Update Rule");
-      if (arCancelEdit) arCancelEdit.style.display = "";
-      return;
-    }
-
-    if (action === "toggle") {
-      const enabled = target.dataset.enabled === "1";
-      const payload = { enabled: !enabled };
-      const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies/${encodeURIComponent(ruleId)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      print(arOutput, data);
-      if (!res.ok) return;
-      await loadAutoReplies();
-    }
-  } catch (err) {
-    print(arOutput, { ok: false, error: String(err) });
-  }
-});
-
-groupsTableBody?.addEventListener("click", async (event) => {
-  const target = event.target;
-  if (!(target instanceof HTMLButtonElement)) return;
-  const action = target.dataset.action || "";
-  if (action !== "save-group-ai") return;
-  const chatId = target.dataset.chatId || "";
-  if (!chatId) return;
-
-  const checkbox = groupsTableBody.querySelector(`.group-ai-toggle[data-chat-id="${chatId}"]`);
-  if (!(checkbox instanceof HTMLInputElement)) return;
-  const payload = { deepseek_enabled: checkbox.checked };
-
-  try {
-    const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    print(groupsOutput, data);
-    if (!res.ok) return;
-    target.textContent = t("saved", "Saved");
-    setTimeout(() => {
-      target.textContent = t("save", "Save");
-    }, 1200);
-  } catch (err) {
-    print(groupsOutput, { ok: false, error: String(err) });
-  }
-});
+  renderAutoReplies(result.data);
+}
 
 function renderAdKeywords(items) {
   if (!akTableBody) return;
@@ -644,138 +268,18 @@ async function loadAdKeywords() {
     renderAdKeywords([]);
     return;
   }
-  try {
-    const res = await fetch(`/api/v1/groups/${encodeURIComponent(akChatId.value)}/ad-keywords`);
-    const data = await res.json();
-    if (!res.ok) {
-      print(akOutput, data);
-      return;
-    }
-    renderAdKeywords(data);
-  } catch (err) {
-    print(akOutput, { ok: false, error: String(err) });
-  }
-}
-
-akAddKeyword?.addEventListener("click", async () => {
-  const chatId = akChatId?.value || "";
-  const keyword = akKeyword?.value.trim() || "";
-  if (!chatId || !keyword) {
-    print(akOutput, { ok: false, message: t("fill_required_fields", "Please fill required fields") });
+  const result = await requestJson(`/api/v1/groups/${encodeURIComponent(akChatId.value)}/ad-keywords`);
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    renderAdKeywords([]);
     return;
   }
-
-  const payload = {
-    chat_id: Number(chatId),
-    keyword,
-    enabled: Boolean(akEnabled?.checked),
-  };
-  try {
-    const isEditing = akEditingKeywordId !== null;
-    const url = isEditing
-      ? `/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords/${encodeURIComponent(String(akEditingKeywordId))}`
-      : `/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords`;
-    const method = isEditing ? "PATCH" : "POST";
-    const bodyPayload = isEditing
-      ? {
-          keyword: payload.keyword,
-          enabled: payload.enabled,
-        }
-      : payload;
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(bodyPayload),
-    });
-    const data = await res.json();
-    print(akOutput, data);
-    if (!res.ok) return;
-
-    resetAdKeywordEditor();
-    await loadAdKeywords();
-  } catch (err) {
-    print(akOutput, { ok: false, error: String(err) });
-  }
-});
-
-akCancelEdit?.addEventListener("click", () => {
-  resetAdKeywordEditor();
-});
-
-akRefresh?.addEventListener("click", async () => {
-  await loadAdKeywords();
-});
-
-akChatId?.addEventListener("change", async () => {
-  resetAdKeywordEditor();
-  await loadAdKeywords();
-});
-
-akTableBody?.addEventListener("click", async (event) => {
-  const target = event.target;
-  if (!(target instanceof HTMLButtonElement)) return;
-  const action = target.dataset.action || "";
-  const keywordId = target.dataset.id || "";
-  const chatId = akChatId?.value || "";
-  if (!action || !keywordId || !chatId) return;
-
-  try {
-    if (action === "delete") {
-      const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords/${encodeURIComponent(keywordId)}`, {
-        method: "DELETE",
-      });
-      const data = await res.json();
-      print(akOutput, data);
-      if (!res.ok) return;
-      if (String(akEditingKeywordId) === String(keywordId)) {
-        resetAdKeywordEditor();
-      }
-      await loadAdKeywords();
-      return;
-    }
-
-    if (action === "edit") {
-      const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords`);
-      const data = await res.json();
-      if (!res.ok) {
-        print(akOutput, data);
-        return;
-      }
-      const found = Array.isArray(data) ? data.find((item) => String(item.id) === String(keywordId)) : null;
-      if (!found) {
-        print(akOutput, { ok: false, message: t("rule_not_found", "Rule not found") });
-        return;
-      }
-      akEditingKeywordId = found.id;
-      if (akKeyword) akKeyword.value = found.keyword || "";
-      if (akEnabled) akEnabled.checked = Boolean(found.enabled);
-      if (akAddKeyword) akAddKeyword.textContent = t("ad_keyword_update", "Update Ad Rule");
-      if (akCancelEdit) akCancelEdit.style.display = "";
-      return;
-    }
-
-    if (action === "toggle") {
-      const enabled = target.dataset.enabled === "1";
-      const payload = { enabled: !enabled };
-      const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords/${encodeURIComponent(keywordId)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      print(akOutput, data);
-      if (!res.ok) return;
-      await loadAdKeywords();
-    }
-  } catch (err) {
-    print(akOutput, { ok: false, error: String(err) });
-  }
-});
+  renderAdKeywords(result.data);
+}
 
 function toEventLabel(eventType) {
   const key = `event_${eventType}`;
-  if (i18n[key]) return i18n[key];
-  return eventType;
+  return i18n[key] || eventType;
 }
 
 function renderMemberEvents(items) {
@@ -784,7 +288,6 @@ function renderMemberEvents(items) {
     evTableBody.innerHTML = `<tr><td colspan="5">${escapeHtml(t("no_data", "No data"))}</td></tr>`;
     return;
   }
-
   evTableBody.innerHTML = items
     .map((item) => {
       const userText = item.username ? `${item.user_id} (@${item.username})` : `${item.user_id}`;
@@ -802,34 +305,500 @@ function renderMemberEvents(items) {
 }
 
 async function loadMemberEvents() {
-  const params = new URLSearchParams();
-  params.set("limit", "200");
-  const chatId = evChatId?.value || "";
-  if (!chatId) {
+  if (!evChatId?.value) {
     renderMemberEvents([]);
     return;
   }
-  params.set("chat_id", chatId);
-
-  try {
-    const res = await fetch(`/api/v1/logs/member-events?${params.toString()}`);
-    const data = await res.json();
-    if (!res.ok) {
-      renderMemberEvents([]);
-      return;
-    }
-    renderMemberEvents(data);
-  } catch (err) {
+  const params = new URLSearchParams();
+  params.set("limit", "200");
+  params.set("chat_id", evChatId.value);
+  const result = await requestJson(`/api/v1/logs/member-events?${params.toString()}`);
+  if (!result.ok) {
     renderMemberEvents([]);
+    return;
+  }
+  renderMemberEvents(result.data);
+}
+
+function applyGroupSettings(chatIdValue) {
+  const chatId = Number(chatIdValue || 0);
+  const config = groupConfigCache.get(chatId);
+  if (!config) return;
+  if (gsJoinVerify) gsJoinVerify.checked = Boolean(config.join_verification_enabled);
+  if (gsKeywordFilter) gsKeywordFilter.checked = Boolean(config.keyword_filter_enabled);
+  if (gsAdBlock) gsAdBlock.checked = Boolean(config.ad_block_enabled);
+  if (gsAntiSpam) gsAntiSpam.checked = Boolean(config.anti_spam_enabled);
+  if (gsAutoRecover) gsAutoRecover.checked = Boolean(config.auto_recover_enabled);
+  if (gsAi) gsAi.checked = Boolean(config.deepseek_enabled);
+}
+
+async function loadGroupConfigs() {
+  const result = await requestJson("/api/v1/groups");
+  if (!result.ok || !Array.isArray(result.data)) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    return;
+  }
+  groupConfigCache.clear();
+  for (const item of result.data) {
+    groupConfigCache.set(Number(item.chat_id), item);
+  }
+  applyGroupSettings(gsChatId?.value || "");
+}
+
+async function saveGroupSettings() {
+  const chatId = gsChatId?.value || "";
+  if (!chatId) {
+    showStatus(t("select_group"), true);
+    return;
+  }
+  const payload = {
+    join_verification_enabled: Boolean(gsJoinVerify?.checked),
+    keyword_filter_enabled: Boolean(gsKeywordFilter?.checked),
+    ad_block_enabled: Boolean(gsAdBlock?.checked),
+    anti_spam_enabled: Boolean(gsAntiSpam?.checked),
+    auto_recover_enabled: Boolean(gsAutoRecover?.checked),
+    deepseek_enabled: Boolean(gsAi?.checked),
+  };
+  const result = await requestJson(`/api/v1/groups/${encodeURIComponent(chatId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    return;
+  }
+  groupConfigCache.set(Number(chatId), result.data);
+  showStatus(t("saved"), false);
+}
+
+async function handleSectionEnter(target) {
+  if (target === "auto-replies") {
+    await loadAutoReplies();
+  } else if (target === "ad-keywords") {
+    await loadAdKeywords();
+  } else if (target === "member-events") {
+    await loadMemberEvents();
+  } else if (target === "group-settings") {
+    await loadGroupConfigs();
   }
 }
 
-evRefresh?.addEventListener("click", async () => {
-  await loadMemberEvents();
+navItems.forEach((item) => {
+  item.addEventListener("click", async () => {
+    const target = item.dataset.target;
+    if (!target) return;
+    if (!document.getElementById(target)) return;
+    setActiveNav(target);
+    setActiveSection(target);
+    try {
+      window.localStorage.setItem(ACTIVE_SECTION_KEY, target);
+    } catch (err) {
+      // ignore
+    }
+    if (workspaceEl) workspaceEl.scrollTop = 0;
+    await handleSectionEnter(target);
+    closeMobileSidebar();
+  });
 });
 
-evChatId?.addEventListener("change", async () => {
-  await loadMemberEvents();
+let initialTarget = navItems.find((item) => item.classList.contains("active"))?.dataset.target || "overview";
+try {
+  const stored = window.localStorage.getItem(ACTIVE_SECTION_KEY) || "";
+  if (stored && navItems.some((item) => item.dataset.target === stored)) {
+    initialTarget = stored;
+  }
+} catch (err) {
+  // ignore
+}
+setActiveNav(initialTarget);
+setActiveSection(initialTarget);
+handleSectionEnter(initialTarget);
+
+async function pollOnlineUpdateStatus() {
+  const result = await requestJson("/api/v1/updates/online-status");
+  if (!result.ok || !result.data?.ok) {
+    setUpgradeStatus(0, t("update_status_load_failed"), "failed");
+    stopPolling();
+    if (btnTrigger) btnTrigger.disabled = false;
+    return;
+  }
+
+  const state = result.data.state || "idle";
+  const progress = result.data.progress || 0;
+  const message = result.data.message || t("update_status_working");
+
+  if (state === "running") {
+    setUpgradeStatus(progress, message, "normal");
+    if (btnTrigger) btnTrigger.disabled = true;
+    return;
+  }
+  if (state === "success") {
+    setUpgradeStatus(100, t("update_success_refreshing"), "success");
+    stopPolling();
+    if (btnTrigger) btnTrigger.disabled = false;
+    setTimeout(() => window.location.reload(), 1800);
+    return;
+  }
+  if (state === "failed") {
+    setUpgradeStatus(progress, t("update_failed_retry"), "failed");
+    stopPolling();
+    if (btnTrigger) btnTrigger.disabled = false;
+    return;
+  }
+
+  setUpgradeStatus(0, t("update_ready"), "normal");
+  stopPolling();
+  if (btnTrigger) btnTrigger.disabled = false;
+}
+
+function startPolling() {
+  if (updatePollTimer) return;
+  updatePollTimer = setInterval(pollOnlineUpdateStatus, 1500);
+}
+
+function stopPolling() {
+  if (!updatePollTimer) return;
+  clearInterval(updatePollTimer);
+  updatePollTimer = null;
+}
+
+btnCheck?.addEventListener("click", async () => {
+  setUpgradeStatus(0, t("update_checking"));
+  const result = await requestJson("/api/v1/updates/check");
+  if (!result.ok || !result.data?.ok) {
+    setUpgradeStatus(0, t("update_check_failed"), "failed");
+    return;
+  }
+  if (result.data.has_update) {
+    setUpgradeStatus(0, t("update_available_click"));
+  } else {
+    setUpgradeStatus(100, t("update_uptodate"), "success");
+  }
 });
+
+btnTrigger?.addEventListener("click", async () => {
+  if (btnTrigger) btnTrigger.disabled = true;
+  setUpgradeStatus(2, t("update_starting"));
+  const result = await requestJson("/api/v1/updates/online", { method: "POST" });
+  if (!result.ok || !result.data?.ok) {
+    setUpgradeStatus(0, parseApiMessage(result.data) || t("update_start_failed"), "failed");
+    if (btnTrigger) btnTrigger.disabled = false;
+    return;
+  }
+  startPolling();
+  await pollOnlineUpdateStatus();
+});
+
+function buildRuntimePayload() {
+  return {
+    telegram_bot_token: rtTelegramBotToken?.value || "",
+    telegram_bot_username: rtTelegramBotUsername?.value || "",
+    telegram_admin_ids: rtTelegramAdminIds?.value || "",
+    deepseek_api_key: rtDeepseekApiKey?.value || "",
+    deepseek_base_url: rtDeepseekBaseUrl?.value || "https://api.deepseek.com",
+    deepseek_model: rtDeepseekModel?.value || "deepseek-chat",
+    deepseek_timeout_sec: Number(rtDeepseekTimeoutSec?.value || 30),
+    join_verify_timeout_sec: Number(rtJoinVerifyTimeoutSec?.value || 180),
+    spam_window_sec: Number(rtSpamWindowSec?.value || 10),
+    spam_max_messages: Number(rtSpamMaxMessages?.value || 6),
+    ad_regex: rtAdRegex?.value || "",
+  };
+}
+
+async function saveRuntime() {
+  const result = await requestJson("/api/v1/runtime", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(buildRuntimePayload()),
+  });
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    return;
+  }
+  showStatus(t("saved"), false);
+}
+
+btnSaveRuntime?.addEventListener("click", saveRuntime);
+btnSaveDeepseek?.addEventListener("click", saveRuntime);
+
+btnSaveSecurity?.addEventListener("click", async () => {
+  const payload = {
+    login_ban_enabled: Boolean(loginBanEnabled?.checked),
+    login_max_attempts: Number(loginMaxAttempts?.value || 5),
+    login_ban_minutes: Number(loginBanMinutes?.value || 5),
+    web_language: (webLanguage?.value || "zh").toLowerCase(),
+  };
+  const result = await requestJson("/api/v1/security/login", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    return;
+  }
+  showStatus(t("saved"), false);
+  if (result.data.web_language) {
+    setTimeout(() => window.location.reload(), 300);
+  }
+});
+
+btnSavePassword?.addEventListener("click", async () => {
+  const payload = {
+    current_password: currentPassword?.value || "",
+    new_password: newPassword?.value || "",
+    confirm_password: confirmPassword?.value || "",
+  };
+  const result = await requestJson("/api/v1/security/password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!result.ok) {
+    showStatus(`${t("password_change_failed")}: ${parseApiMessage(result.data)}`, true);
+    return;
+  }
+  if (currentPassword) currentPassword.value = "";
+  if (newPassword) newPassword.value = "";
+  if (confirmPassword) confirmPassword.value = "";
+  showStatus(t("password_changed"), false);
+});
+
+arOpenAdd?.addEventListener("click", () => {
+  resetAutoReplyModal();
+  openModal(arModal);
+});
+
+arModalCancel?.addEventListener("click", () => closeModal(arModal));
+arModal?.addEventListener("click", (event) => {
+  if (event.target === arModal) closeModal(arModal);
+});
+
+arModalSave?.addEventListener("click", async () => {
+  const chatId = arChatId?.value || "";
+  if (!chatId) {
+    showStatus(t("select_group"), true);
+    return;
+  }
+  const payload = {
+    chat_id: Number(chatId),
+    keyword: (arModalKeyword?.value || "").trim(),
+    reply_text: (arModalReplyText?.value || "").trim(),
+    delete_after_seconds: Number(arModalDeleteAfter?.value || 0),
+    enabled: Boolean(arModalEnabled?.checked),
+  };
+  if (!payload.keyword || !payload.reply_text) {
+    showStatus(t("fill_required_fields"), true);
+    return;
+  }
+
+  const isEditing = arEditingRuleId !== null;
+  const url = isEditing
+    ? `/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies/${encodeURIComponent(String(arEditingRuleId))}`
+    : `/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies`;
+  const method = isEditing ? "PATCH" : "POST";
+  const bodyPayload = isEditing
+    ? {
+        keyword: payload.keyword,
+        reply_text: payload.reply_text,
+        delete_after_seconds: payload.delete_after_seconds,
+        enabled: payload.enabled,
+      }
+    : payload;
+  const result = await requestJson(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(bodyPayload),
+  });
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    return;
+  }
+  closeModal(arModal);
+  showStatus(t("saved"), false);
+  await loadAutoReplies();
+});
+
+arRefresh?.addEventListener("click", loadAutoReplies);
+arChatId?.addEventListener("change", loadAutoReplies);
+
+arTableBody?.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLButtonElement)) return;
+  const action = target.dataset.action || "";
+  const ruleId = target.dataset.id || "";
+  const chatId = arChatId?.value || "";
+  if (!action || !ruleId || !chatId) return;
+
+  if (action === "delete") {
+    const result = await requestJson(
+      `/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies/${encodeURIComponent(ruleId)}`,
+      { method: "DELETE" },
+    );
+    if (!result.ok) {
+      showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+      return;
+    }
+    showStatus(t("saved"), false);
+    await loadAutoReplies();
+    return;
+  }
+
+  if (action === "toggle") {
+    const enabled = target.dataset.enabled === "1";
+    const result = await requestJson(
+      `/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies/${encodeURIComponent(ruleId)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !enabled }),
+      },
+    );
+    if (!result.ok) {
+      showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+      return;
+    }
+    showStatus(t("saved"), false);
+    await loadAutoReplies();
+    return;
+  }
+
+  if (action === "edit") {
+    const result = await requestJson(`/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies`);
+    if (!result.ok || !Array.isArray(result.data)) {
+      showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+      return;
+    }
+    const found = result.data.find((item) => String(item.id) === String(ruleId));
+    if (!found) {
+      showStatus(t("rule_not_found"), true);
+      return;
+    }
+    arEditingRuleId = found.id;
+    if (arModalTitle) arModalTitle.textContent = t("auto_reply_update", "Update Rule");
+    if (arModalKeyword) arModalKeyword.value = found.keyword || "";
+    if (arModalReplyText) arModalReplyText.value = found.reply_text || "";
+    if (arModalDeleteAfter) arModalDeleteAfter.value = String(Number(found.delete_after_seconds || 0));
+    if (arModalEnabled) arModalEnabled.checked = Boolean(found.enabled);
+    openModal(arModal);
+  }
+});
+
+akOpenAdd?.addEventListener("click", () => {
+  resetAdKeywordModal();
+  openModal(akModal);
+});
+
+akModalCancel?.addEventListener("click", () => closeModal(akModal));
+akModal?.addEventListener("click", (event) => {
+  if (event.target === akModal) closeModal(akModal);
+});
+
+akModalSave?.addEventListener("click", async () => {
+  const chatId = akChatId?.value || "";
+  if (!chatId) {
+    showStatus(t("select_group"), true);
+    return;
+  }
+  const payload = {
+    chat_id: Number(chatId),
+    keyword: (akModalKeyword?.value || "").trim(),
+    enabled: Boolean(akModalEnabled?.checked),
+  };
+  if (!payload.keyword) {
+    showStatus(t("fill_required_fields"), true);
+    return;
+  }
+
+  const isEditing = akEditingKeywordId !== null;
+  const url = isEditing
+    ? `/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords/${encodeURIComponent(String(akEditingKeywordId))}`
+    : `/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords`;
+  const method = isEditing ? "PATCH" : "POST";
+  const bodyPayload = isEditing ? { keyword: payload.keyword, enabled: payload.enabled } : payload;
+  const result = await requestJson(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(bodyPayload),
+  });
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    return;
+  }
+  closeModal(akModal);
+  showStatus(t("saved"), false);
+  await loadAdKeywords();
+});
+
+akRefresh?.addEventListener("click", loadAdKeywords);
+akChatId?.addEventListener("change", loadAdKeywords);
+
+akTableBody?.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLButtonElement)) return;
+  const action = target.dataset.action || "";
+  const keywordId = target.dataset.id || "";
+  const chatId = akChatId?.value || "";
+  if (!action || !keywordId || !chatId) return;
+
+  if (action === "delete") {
+    const result = await requestJson(
+      `/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords/${encodeURIComponent(keywordId)}`,
+      { method: "DELETE" },
+    );
+    if (!result.ok) {
+      showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+      return;
+    }
+    showStatus(t("saved"), false);
+    await loadAdKeywords();
+    return;
+  }
+
+  if (action === "toggle") {
+    const enabled = target.dataset.enabled === "1";
+    const result = await requestJson(
+      `/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords/${encodeURIComponent(keywordId)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !enabled }),
+      },
+    );
+    if (!result.ok) {
+      showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+      return;
+    }
+    showStatus(t("saved"), false);
+    await loadAdKeywords();
+    return;
+  }
+
+  if (action === "edit") {
+    const result = await requestJson(`/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords`);
+    if (!result.ok || !Array.isArray(result.data)) {
+      showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+      return;
+    }
+    const found = result.data.find((item) => String(item.id) === String(keywordId));
+    if (!found) {
+      showStatus(t("rule_not_found"), true);
+      return;
+    }
+    akEditingKeywordId = found.id;
+    if (akModalTitle) akModalTitle.textContent = t("ad_keyword_update", "Update Ad Rule");
+    if (akModalKeyword) akModalKeyword.value = found.keyword || "";
+    if (akModalEnabled) akModalEnabled.checked = Boolean(found.enabled);
+    openModal(akModal);
+  }
+});
+
+gsChatId?.addEventListener("change", () => applyGroupSettings(gsChatId.value));
+gsSave?.addEventListener("click", saveGroupSettings);
+gsRefresh?.addEventListener("click", loadGroupConfigs);
+
+evRefresh?.addEventListener("click", loadMemberEvents);
+evChatId?.addEventListener("change", loadMemberEvents);
 
 pollOnlineUpdateStatus();

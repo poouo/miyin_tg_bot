@@ -368,17 +368,6 @@ button:disabled {
   cursor: not-allowed;
 }
 
-pre {
-  margin: 10px 0 0;
-  min-height: 70px;
-  padding: 11px;
-  border-radius: 12px;
-  overflow: auto;
-  background: rgba(13, 27, 40, 0.86);
-  color: #f4f8ff;
-  font-size: 12px;
-}
-
 .upgrade-track {
   width: 100%;
   margin-top: 10px;
@@ -433,6 +422,33 @@ td {
 th {
   color: #3a5568;
   font-weight: 640;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(9, 24, 36, 0.3);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  padding: 16px;
+}
+
+.modal-card {
+  width: min(640px, 96vw);
+  border-radius: 18px;
+  padding: 14px;
+}
+
+.modal-card h3 {
+  margin: 0;
+}
+
+.modal-card .actions {
+  margin-top: 14px;
 }
 
 @keyframes page-fade {

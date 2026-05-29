@@ -25,6 +25,7 @@
           <button class="nav-item" type="button" data-target="runtime">{{ t.nav_runtime }}</button>
           <button class="nav-item" type="button" data-target="deepseek">{{ t.nav_deepseek }}</button>
           <button class="nav-item" type="button" data-target="groups">{{ t.nav_groups }}</button>
+          <button class="nav-item" type="button" data-target="group-settings">{{ t.nav_group_settings }}</button>
         </div>
         <div class="nav-group">
           <p class="nav-group-title">{{ t.nav_group_moderation }}</p>
@@ -149,27 +150,9 @@
               {% endfor %}
             </select>
           </label>
-          <label>
-            {{ t.auto_reply_keyword }}
-            <input id="ar-keyword" type="text" maxlength="255" />
-            <small>{{ t.auto_reply_keyword_hint }}</small>
-          </label>
-          <label class="full-width">
-            {{ t.auto_reply_content }}
-            <textarea id="ar-reply-text" rows="3" maxlength="4000"></textarea>
-          </label>
-          <label>
-            {{ t.auto_reply_delete_after }}
-            <input id="ar-delete-after" type="number" min="0" max="86400" value="0" />
-          </label>
-          <label>
-            <input id="ar-enabled" type="checkbox" checked />
-            {{ t.auto_reply_enabled }}
-          </label>
         </div>
         <div class="actions">
-          <button id="ar-add-rule" type="button">{{ t.auto_reply_add }}</button>
-          <button id="ar-cancel-edit" type="button" style="display:none;">{{ t.cancel_edit }}</button>
+          <button id="ar-open-add" type="button">{{ t.auto_reply_add }}</button>
           <button id="ar-refresh" type="button">{{ t.refresh }}</button>
         </div>
         <div class="table-wrap">
@@ -204,19 +187,9 @@
               {% endfor %}
             </select>
           </label>
-          <label>
-            {{ t.ad_keyword_label }}
-            <input id="ak-keyword" type="text" maxlength="255" />
-            <small>{{ t.ad_keyword_hint }}</small>
-          </label>
-          <label>
-            <input id="ak-enabled" type="checkbox" checked />
-            {{ t.ad_keyword_enabled }}
-          </label>
         </div>
         <div class="actions">
-          <button id="ak-add-keyword" type="button">{{ t.ad_keyword_add }}</button>
-          <button id="ak-cancel-edit" type="button" style="display:none;">{{ t.cancel_edit }}</button>
+          <button id="ak-open-add" type="button">{{ t.ad_keyword_add }}</button>
           <button id="ak-refresh" type="button">{{ t.refresh }}</button>
         </div>
         <div class="table-wrap">
@@ -270,6 +243,33 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <section id="group-settings" class="glass panel section">
+        <h3>{{ t.group_settings_title }}</h3>
+        <p>{{ t.group_settings_desc }}</p>
+        <div class="form-grid two-col">
+          <label>
+            {{ t.select_group }}
+            <select id="gs-chat-id">
+              {% for group in groups %}
+              <option value="{{ group.chat_id }}">{{ group.title or group.chat_id }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+        <div class="form-grid two-col">
+          <label><input id="gs-join-verify" type="checkbox" /> {{ t.join_verify }}</label>
+          <label><input id="gs-keyword-filter" type="checkbox" /> {{ t.keyword_filter }}</label>
+          <label><input id="gs-ad-block" type="checkbox" /> {{ t.ad_block }}</label>
+          <label><input id="gs-anti-spam" type="checkbox" /> {{ t.anti_spam }}</label>
+          <label><input id="gs-auto-recover" type="checkbox" /> {{ t.auto_recover }}</label>
+          <label><input id="gs-ai" type="checkbox" /> {{ t.ai }}</label>
+        </div>
+        <div class="actions">
+          <button id="gs-save" type="button">{{ t.save_group_settings }}</button>
+          <button id="gs-refresh" type="button">{{ t.refresh }}</button>
         </div>
       </section>
 
@@ -349,10 +349,9 @@
                 <th>{{ t.anti_spam }}</th>
                 <th>{{ t.auto_recover }}</th>
                 <th>{{ t.ai }}</th>
-                <th>{{ t.actions }}</th>
               </tr>
             </thead>
-            <tbody id="groups-table-body">
+            <tbody>
               {% for group in groups %}
               <tr>
                 <td>{{ group.chat_id }}</td>
@@ -362,19 +361,11 @@
                 <td>{{ t.switch_on if group.ad_block_enabled else t.switch_off }}</td>
                 <td>{{ t.switch_on if group.anti_spam_enabled else t.switch_off }}</td>
                 <td>{{ t.switch_on if group.auto_recover_enabled else t.switch_off }}</td>
-                <td>
-                  <label class="inline-check">
-                    <input type="checkbox" class="group-ai-toggle" data-chat-id="{{ group.chat_id }}" {% if group.deepseek_enabled %}checked{% endif %} />
-                    <span>{{ t.group_ai_switch }}</span>
-                  </label>
-                </td>
-                <td>
-                  <button class="table-btn" type="button" data-action="save-group-ai" data-chat-id="{{ group.chat_id }}">{{ t.save }}</button>
-                </td>
+                <td>{{ t.switch_on if group.deepseek_enabled else t.switch_off }}</td>
               </tr>
               {% else %}
               <tr>
-                <td colspan="9">{{ t.no_group_data }}</td>
+                <td colspan="8">{{ t.no_group_data }}</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -383,6 +374,56 @@
       </section>
     </section>
   </main>
+
+  <div id="ar-modal" class="modal-backdrop" hidden>
+    <div class="glass modal-card">
+      <h3 id="ar-modal-title">{{ t.auto_reply_add }}</h3>
+      <div class="form-grid">
+        <label>
+          {{ t.auto_reply_keyword }}
+          <input id="ar-modal-keyword" type="text" maxlength="255" />
+          <small>{{ t.auto_reply_keyword_hint }}</small>
+        </label>
+        <label class="full-width">
+          {{ t.auto_reply_content }}
+          <textarea id="ar-modal-reply-text" rows="4" maxlength="4000"></textarea>
+        </label>
+        <label>
+          {{ t.auto_reply_delete_after }}
+          <input id="ar-modal-delete-after" type="number" min="0" max="86400" value="0" />
+        </label>
+        <label>
+          <input id="ar-modal-enabled" type="checkbox" checked />
+          {{ t.auto_reply_enabled }}
+        </label>
+      </div>
+      <div class="actions">
+        <button id="ar-modal-save" type="button">{{ t.save }}</button>
+        <button id="ar-modal-cancel" type="button">{{ t.cancel_edit }}</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="ak-modal" class="modal-backdrop" hidden>
+    <div class="glass modal-card">
+      <h3 id="ak-modal-title">{{ t.ad_keyword_add }}</h3>
+      <div class="form-grid">
+        <label>
+          {{ t.ad_keyword_label }}
+          <input id="ak-modal-keyword" type="text" maxlength="255" />
+          <small>{{ t.ad_keyword_hint }}</small>
+        </label>
+        <label>
+          <input id="ak-modal-enabled" type="checkbox" checked />
+          {{ t.ad_keyword_enabled }}
+        </label>
+      </div>
+      <div class="actions">
+        <button id="ak-modal-save" type="button">{{ t.save }}</button>
+        <button id="ak-modal-cancel" type="button">{{ t.cancel_edit }}</button>
+      </div>
+    </div>
+  </div>
 
   <script id="i18n-data" type="application/json">{{ t_json | safe }}</script>
   <script src="/static/js/dashboard.js"></script>
