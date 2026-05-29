@@ -1,5 +1,6 @@
 const bodyEl = document.body;
 const sidebar = document.getElementById("sidebar");
+const sidebarOverlay = document.getElementById("sidebar-overlay");
 const workspaceEl = document.querySelector(".workspace");
 const menuToggle = document.getElementById("mobile-menu-toggle");
 const workspaceTitle = document.getElementById("workspace-title");
@@ -49,6 +50,7 @@ const arModalDeleteAfter = document.getElementById("ar-modal-delete-after");
 const arModalEnabled = document.getElementById("ar-modal-enabled");
 const arModalSave = document.getElementById("ar-modal-save");
 const arModalCancel = document.getElementById("ar-modal-cancel");
+const arModalClose = document.getElementById("ar-modal-close");
 
 const akChatId = document.getElementById("ak-chat-id");
 const akOpenAdd = document.getElementById("ak-open-add");
@@ -60,6 +62,7 @@ const akModalKeyword = document.getElementById("ak-modal-keyword");
 const akModalEnabled = document.getElementById("ak-modal-enabled");
 const akModalSave = document.getElementById("ak-modal-save");
 const akModalCancel = document.getElementById("ak-modal-cancel");
+const akModalClose = document.getElementById("ak-modal-close");
 
 const evChatId = document.getElementById("ev-chat-id");
 const evRefresh = document.getElementById("ev-refresh");
@@ -147,7 +150,8 @@ function setActiveNav(target) {
   });
   const active = navItems.find((item) => item.dataset.target === target);
   if (active && workspaceTitle) {
-    workspaceTitle.textContent = active.textContent || "";
+    const label = active.querySelector(".nav-item-label");
+    workspaceTitle.textContent = (label && label.textContent) || active.textContent || "";
   }
 }
 
@@ -159,10 +163,13 @@ function setActiveSection(target) {
 
 function closeMobileSidebar() {
   bodyEl.classList.remove("sidebar-open");
+  if (sidebarOverlay) sidebarOverlay.hidden = true;
 }
 
 menuToggle?.addEventListener("click", () => {
-  bodyEl.classList.toggle("sidebar-open");
+  const willOpen = !bodyEl.classList.contains("sidebar-open");
+  bodyEl.classList.toggle("sidebar-open", willOpen);
+  if (sidebarOverlay) sidebarOverlay.hidden = !willOpen;
 });
 
 document.addEventListener("click", (event) => {
@@ -173,14 +180,26 @@ document.addEventListener("click", (event) => {
   closeMobileSidebar();
 });
 
+sidebarOverlay?.addEventListener("click", closeMobileSidebar);
+
+window.addEventListener("resize", () => {
+  if (window.innerWidth > 900) {
+    closeMobileSidebar();
+  }
+});
+
 function openModal(modal) {
   if (!modal) return;
   modal.hidden = false;
+  bodyEl.classList.add("modal-open");
 }
 
 function closeModal(modal) {
   if (!modal) return;
   modal.hidden = true;
+  if (!document.querySelector(".modal-backdrop:not([hidden])")) {
+    bodyEl.classList.remove("modal-open");
+  }
 }
 
 function resetAutoReplyModal() {
@@ -571,6 +590,7 @@ arOpenAdd?.addEventListener("click", () => {
 });
 
 arModalCancel?.addEventListener("click", () => closeModal(arModal));
+arModalClose?.addEventListener("click", () => closeModal(arModal));
 arModal?.addEventListener("click", (event) => {
   if (event.target === arModal) closeModal(arModal);
 });
@@ -691,6 +711,7 @@ akOpenAdd?.addEventListener("click", () => {
 });
 
 akModalCancel?.addEventListener("click", () => closeModal(akModal));
+akModalClose?.addEventListener("click", () => closeModal(akModal));
 akModal?.addEventListener("click", (event) => {
   if (event.target === akModal) closeModal(akModal);
 });
@@ -800,5 +821,14 @@ gsRefresh?.addEventListener("click", loadGroupConfigs);
 
 evRefresh?.addEventListener("click", loadMemberEvents);
 evChatId?.addEventListener("change", loadMemberEvents);
+
+if (arModal) arModal.hidden = true;
+if (akModal) akModal.hidden = true;
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  if (arModal && !arModal.hidden) closeModal(arModal);
+  if (akModal && !akModal.hidden) closeModal(akModal);
+});
 
 pollOnlineUpdateStatus();

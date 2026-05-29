@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="{{ lang }}">
 <head>
   <meta charset="UTF-8" />
@@ -7,76 +7,124 @@
   <link rel="stylesheet" href="/static/css/dashboard.css" />
 </head>
 <body>
-  <div class="bg-orb orb-1"></div>
-  <div class="bg-orb orb-2"></div>
-  <div class="bg-orb orb-3"></div>
+  <div class="bg-layer bg-layer-a"></div>
+  <div class="bg-layer bg-layer-b"></div>
+  <div class="bg-layer bg-layer-c"></div>
 
   <main class="shell">
-    <aside class="glass sidebar" id="sidebar">
-      <div class="brand">
-        <h1>Miyin TG</h1>
-        <p>{{ t.admin_dashboard }}</p>
-      </div>
-
-      <nav class="nav-list">
-        <div class="nav-group">
-          <p class="nav-group-title">{{ t.nav_group_control }}</p>
-          <button class="nav-item active" type="button" data-target="overview">{{ t.nav_overview }}</button>
-          <button class="nav-item" type="button" data-target="runtime">{{ t.nav_runtime }}</button>
-          <button class="nav-item" type="button" data-target="deepseek">{{ t.nav_deepseek }}</button>
-          <button class="nav-item" type="button" data-target="groups">{{ t.nav_groups }}</button>
-          <button class="nav-item" type="button" data-target="group-settings">{{ t.nav_group_settings }}</button>
-        </div>
-        <div class="nav-group">
-          <p class="nav-group-title">{{ t.nav_group_moderation }}</p>
-          <button class="nav-item" type="button" data-target="auto-replies">{{ t.nav_auto_replies }}</button>
-          <button class="nav-item" type="button" data-target="ad-keywords">{{ t.nav_ad_keywords }}</button>
-          <button class="nav-item" type="button" data-target="member-events">{{ t.nav_member_events }}</button>
-        </div>
-        <div class="nav-group">
-          <p class="nav-group-title">{{ t.nav_group_security }}</p>
-          <button class="nav-item" type="button" data-target="update">{{ t.nav_update }}</button>
-          <button class="nav-item" type="button" data-target="security">{{ t.nav_security }}</button>
-          <button class="nav-item" type="button" data-target="password">{{ t.nav_password }}</button>
-        </div>
-      </nav>
-
-      <form action="/auth/logout" method="post" class="sidebar-footer">
-        <button type="submit" class="warning">{{ t.logout }}</button>
-      </form>
-    </aside>
-
-    <section class="workspace">
-      <header class="glass topbar">
-        <button id="mobile-menu-toggle" class="menu-toggle" type="button">Menu</button>
-        <div class="title-wrap">
-          <h2 id="workspace-title">{{ t.nav_overview }}</h2>
-          <p>{{ t.dashboard_subtitle }}</p>
-          <p id="action-status" class="action-status"></p>
+    <aside class="sidebar glass-panel" id="sidebar" data-mobile-sidebar="true">
+      <header class="sidebar-header" data-sidebar="header">
+        <div class="brand-mark">M</div>
+        <div class="brand-copy">
+          <h1>Miyin TG</h1>
+          <p>{{ t.admin_dashboard }}</p>
         </div>
       </header>
 
-      <section id="overview" class="glass panel section">
-        <h3>{{ t.nav_overview }}</h3>
+      <nav class="sidebar-scroll nav-list">
+        <div class="nav-group">
+          <p class="nav-group-title">{{ t.nav_group_control }}</p>
+          <button class="nav-item active" type="button" data-target="overview">
+            <span class="nav-item-icon">DB</span>
+            <span class="nav-item-label">{{ t.nav_overview }}</span>
+          </button>
+          <button class="nav-item" type="button" data-target="runtime">
+            <span class="nav-item-icon">BT</span>
+            <span class="nav-item-label">{{ t.nav_runtime }}</span>
+          </button>
+          <button class="nav-item" type="button" data-target="deepseek">
+            <span class="nav-item-icon">AI</span>
+            <span class="nav-item-label">{{ t.nav_deepseek }}</span>
+          </button>
+          <button class="nav-item" type="button" data-target="groups">
+            <span class="nav-item-icon">GS</span>
+            <span class="nav-item-label">{{ t.nav_groups }}</span>
+          </button>
+          <button class="nav-item" type="button" data-target="group-settings">
+            <span class="nav-item-icon">GC</span>
+            <span class="nav-item-label">{{ t.nav_group_settings }}</span>
+          </button>
+        </div>
+
+        <div class="nav-group">
+          <p class="nav-group-title">{{ t.nav_group_moderation }}</p>
+          <button class="nav-item" type="button" data-target="auto-replies">
+            <span class="nav-item-icon">AR</span>
+            <span class="nav-item-label">{{ t.nav_auto_replies }}</span>
+          </button>
+          <button class="nav-item" type="button" data-target="ad-keywords">
+            <span class="nav-item-icon">AD</span>
+            <span class="nav-item-label">{{ t.nav_ad_keywords }}</span>
+          </button>
+          <button class="nav-item" type="button" data-target="member-events">
+            <span class="nav-item-icon">EV</span>
+            <span class="nav-item-label">{{ t.nav_member_events }}</span>
+          </button>
+        </div>
+
+        <div class="nav-group">
+          <p class="nav-group-title">{{ t.nav_group_security }}</p>
+          <button class="nav-item" type="button" data-target="update">
+            <span class="nav-item-icon">UP</span>
+            <span class="nav-item-label">{{ t.nav_update }}</span>
+          </button>
+          <button class="nav-item" type="button" data-target="security">
+            <span class="nav-item-icon">SC</span>
+            <span class="nav-item-label">{{ t.nav_security }}</span>
+          </button>
+          <button class="nav-item" type="button" data-target="password">
+            <span class="nav-item-icon">PW</span>
+            <span class="nav-item-label">{{ t.nav_password }}</span>
+          </button>
+        </div>
+      </nav>
+
+      <footer class="sidebar-footer" data-sidebar="footer">
+        <form action="/auth/logout" method="post">
+          <button type="submit" class="btn danger full">{{ t.logout }}</button>
+        </form>
+      </footer>
+    </aside>
+
+    <div id="sidebar-overlay" class="sidebar-overlay" hidden></div>
+
+    <section class="workspace" data-mobile-main="true">
+      <header class="topbar glass-surface">
+        <button id="mobile-menu-toggle" class="icon-btn" type="button" aria-label="Open menu">
+          <span class="icon-lines"></span>
+        </button>
+        <div class="title-wrap">
+          <h2 id="workspace-title">{{ t.nav_overview }}</h2>
+          <p>{{ t.dashboard_subtitle }}</p>
+        </div>
+        <p id="action-status" class="action-status"></p>
+      </header>
+
+      <section id="overview" class="glass-panel panel section">
+        <div class="panel-head">
+          <h3>{{ t.nav_overview }}</h3>
+        </div>
         <div class="cards">
-          <div class="glass card">
+          <article class="glass-surface card stagger-card">
             <h4>{{ t.groups }}</h4>
             <span>{{ stats.group_count }}</span>
-          </div>
-          <div class="glass card">
+          </article>
+          <article class="glass-surface card stagger-card">
             <h4>{{ t.keyword_rules }}</h4>
             <span>{{ stats.keyword_count }}</span>
-          </div>
-          <div class="glass card">
+          </article>
+          <article class="glass-surface card stagger-card">
             <h4>{{ t.moderation_logs }}</h4>
             <span>{{ stats.log_count }}</span>
-          </div>
+          </article>
         </div>
       </section>
 
-      <section id="runtime" class="glass panel section">
-        <h3>{{ t.runtime_title }}</h3>
-        <p>{{ t.runtime_desc }}</p>
+      <section id="runtime" class="glass-panel panel section">
+        <div class="panel-head">
+          <h3>{{ t.runtime_title }}</h3>
+          <p>{{ t.runtime_desc }}</p>
+        </div>
         <div class="form-grid two-col">
           <label>
             {{ t.runtime_bot_token }}
@@ -108,13 +156,15 @@
           </label>
         </div>
         <div class="actions">
-          <button id="save-runtime" type="button">{{ t.runtime_save }}</button>
+          <button id="save-runtime" type="button" class="btn">{{ t.runtime_save }}</button>
         </div>
       </section>
 
-      <section id="deepseek" class="glass panel section">
-        <h3>{{ t.deepseek_title }}</h3>
-        <p>{{ t.deepseek_desc }}</p>
+      <section id="deepseek" class="glass-panel panel section">
+        <div class="panel-head">
+          <h3>{{ t.deepseek_title }}</h3>
+          <p>{{ t.deepseek_desc }}</p>
+        </div>
         <div class="form-grid two-col">
           <label>
             {{ t.runtime_deepseek_key }}
@@ -134,13 +184,15 @@
           </label>
         </div>
         <div class="actions">
-          <button id="save-deepseek" type="button">{{ t.deepseek_save }}</button>
+          <button id="save-deepseek" type="button" class="btn">{{ t.deepseek_save }}</button>
         </div>
       </section>
 
-      <section id="auto-replies" class="glass panel section">
-        <h3>{{ t.auto_reply_title }}</h3>
-        <p>{{ t.auto_reply_desc }}</p>
+      <section id="auto-replies" class="glass-panel panel section">
+        <div class="panel-head">
+          <h3>{{ t.auto_reply_title }}</h3>
+          <p>{{ t.auto_reply_desc }}</p>
+        </div>
         <div class="form-grid two-col">
           <label>
             {{ t.select_group }}
@@ -152,8 +204,8 @@
           </label>
         </div>
         <div class="actions">
-          <button id="ar-open-add" type="button">{{ t.auto_reply_add }}</button>
-          <button id="ar-refresh" type="button">{{ t.refresh }}</button>
+          <button id="ar-open-add" type="button" class="btn">{{ t.auto_reply_add }}</button>
+          <button id="ar-refresh" type="button" class="btn subtle">{{ t.refresh }}</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -175,9 +227,11 @@
         </div>
       </section>
 
-      <section id="ad-keywords" class="glass panel section">
-        <h3>{{ t.ad_keywords_title }}</h3>
-        <p>{{ t.ad_keywords_desc }}</p>
+      <section id="ad-keywords" class="glass-panel panel section">
+        <div class="panel-head">
+          <h3>{{ t.ad_keywords_title }}</h3>
+          <p>{{ t.ad_keywords_desc }}</p>
+        </div>
         <div class="form-grid two-col">
           <label>
             {{ t.select_group }}
@@ -189,8 +243,8 @@
           </label>
         </div>
         <div class="actions">
-          <button id="ak-open-add" type="button">{{ t.ad_keyword_add }}</button>
-          <button id="ak-refresh" type="button">{{ t.refresh }}</button>
+          <button id="ak-open-add" type="button" class="btn">{{ t.ad_keyword_add }}</button>
+          <button id="ak-refresh" type="button" class="btn subtle">{{ t.refresh }}</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -210,9 +264,11 @@
         </div>
       </section>
 
-      <section id="member-events" class="glass panel section">
-        <h3>{{ t.member_events_title }}</h3>
-        <p>{{ t.member_events_desc }}</p>
+      <section id="member-events" class="glass-panel panel section">
+        <div class="panel-head">
+          <h3>{{ t.member_events_title }}</h3>
+          <p>{{ t.member_events_desc }}</p>
+        </div>
         <div class="form-grid two-col">
           <label>
             {{ t.select_group }}
@@ -224,7 +280,7 @@
           </label>
         </div>
         <div class="actions">
-          <button id="ev-refresh" type="button">{{ t.refresh }}</button>
+          <button id="ev-refresh" type="button" class="btn subtle">{{ t.refresh }}</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -246,9 +302,11 @@
         </div>
       </section>
 
-      <section id="group-settings" class="glass panel section">
-        <h3>{{ t.group_settings_title }}</h3>
-        <p>{{ t.group_settings_desc }}</p>
+      <section id="group-settings" class="glass-panel panel section">
+        <div class="panel-head">
+          <h3>{{ t.group_settings_title }}</h3>
+          <p>{{ t.group_settings_desc }}</p>
+        </div>
         <div class="form-grid two-col">
           <label>
             {{ t.select_group }}
@@ -259,25 +317,27 @@
             </select>
           </label>
         </div>
-        <div class="form-grid two-col">
-          <label><input id="gs-join-verify" type="checkbox" /> {{ t.join_verify }}</label>
-          <label><input id="gs-keyword-filter" type="checkbox" /> {{ t.keyword_filter }}</label>
-          <label><input id="gs-ad-block" type="checkbox" /> {{ t.ad_block }}</label>
-          <label><input id="gs-anti-spam" type="checkbox" /> {{ t.anti_spam }}</label>
-          <label><input id="gs-auto-recover" type="checkbox" /> {{ t.auto_recover }}</label>
-          <label><input id="gs-ai" type="checkbox" /> {{ t.ai }}</label>
+        <div class="form-grid two-col checks-grid">
+          <label class="check-card"><input id="gs-join-verify" type="checkbox" /> {{ t.join_verify }}</label>
+          <label class="check-card"><input id="gs-keyword-filter" type="checkbox" /> {{ t.keyword_filter }}</label>
+          <label class="check-card"><input id="gs-ad-block" type="checkbox" /> {{ t.ad_block }}</label>
+          <label class="check-card"><input id="gs-anti-spam" type="checkbox" /> {{ t.anti_spam }}</label>
+          <label class="check-card"><input id="gs-auto-recover" type="checkbox" /> {{ t.auto_recover }}</label>
+          <label class="check-card"><input id="gs-ai" type="checkbox" /> {{ t.ai }}</label>
         </div>
         <div class="actions">
-          <button id="gs-save" type="button">{{ t.save_group_settings }}</button>
-          <button id="gs-refresh" type="button">{{ t.refresh }}</button>
+          <button id="gs-save" type="button" class="btn">{{ t.save_group_settings }}</button>
+          <button id="gs-refresh" type="button" class="btn subtle">{{ t.refresh }}</button>
         </div>
       </section>
 
-      <section id="update" class="glass panel section">
-        <h3>{{ t.update_control }}</h3>
+      <section id="update" class="glass-panel panel section">
+        <div class="panel-head">
+          <h3>{{ t.update_control }}</h3>
+        </div>
         <div class="actions">
-          <button id="check-update" type="button">{{ t.check_update }}</button>
-          <button id="trigger-update" type="button">{{ t.online_update }}</button>
+          <button id="check-update" type="button" class="btn subtle">{{ t.check_update }}</button>
+          <button id="trigger-update" type="button" class="btn">{{ t.online_update }}</button>
         </div>
         <div class="upgrade-track">
           <div id="upgrade-fill" class="upgrade-fill"></div>
@@ -285,11 +345,13 @@
         <p id="upgrade-status" class="upgrade-status">{{ t.ready }}.</p>
       </section>
 
-      <section id="security" class="glass panel section">
-        <h3>{{ t.login_protection }}</h3>
-        <p>{{ t.token_expire_desc }}</p>
+      <section id="security" class="glass-panel panel section">
+        <div class="panel-head">
+          <h3>{{ t.login_protection }}</h3>
+          <p>{{ t.token_expire_desc }}</p>
+        </div>
         <div class="form-grid">
-          <label>
+          <label class="check-card">
             <input type="checkbox" id="login-ban-enabled" {% if security.login_ban_enabled %}checked{% endif %} />
             {{ t.enable_temp_ban }}
           </label>
@@ -310,12 +372,14 @@
           </label>
         </div>
         <div class="actions">
-          <button id="save-security" type="button">{{ t.save_login_security }}</button>
+          <button id="save-security" type="button" class="btn">{{ t.save_login_security }}</button>
         </div>
       </section>
 
-      <section id="password" class="glass panel section">
-        <h3>{{ t.password_change }}</h3>
+      <section id="password" class="glass-panel panel section">
+        <div class="panel-head">
+          <h3>{{ t.password_change }}</h3>
+        </div>
         <div class="form-grid">
           <label>
             {{ t.current_password }}
@@ -331,12 +395,14 @@
           </label>
         </div>
         <div class="actions">
-          <button id="save-password" type="button">{{ t.save_password }}</button>
+          <button id="save-password" type="button" class="btn">{{ t.save_password }}</button>
         </div>
       </section>
 
-      <section id="groups" class="glass panel section">
-        <h3>{{ t.connected_groups }}</h3>
+      <section id="groups" class="glass-panel panel section">
+        <div class="panel-head">
+          <h3>{{ t.connected_groups }}</h3>
+        </div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -376,8 +442,11 @@
   </main>
 
   <div id="ar-modal" class="modal-backdrop" hidden>
-    <div class="glass modal-card">
-      <h3 id="ar-modal-title">{{ t.auto_reply_add }}</h3>
+    <div class="modal-card glass-panel" role="dialog" aria-modal="true" aria-labelledby="ar-modal-title">
+      <div class="modal-head">
+        <h3 id="ar-modal-title">{{ t.auto_reply_add }}</h3>
+        <button id="ar-modal-close" class="modal-close" type="button" aria-label="Close">&times;</button>
+      </div>
       <div class="form-grid">
         <label>
           {{ t.auto_reply_keyword }}
@@ -392,35 +461,38 @@
           {{ t.auto_reply_delete_after }}
           <input id="ar-modal-delete-after" type="number" min="0" max="86400" value="0" />
         </label>
-        <label>
+        <label class="check-card">
           <input id="ar-modal-enabled" type="checkbox" checked />
           {{ t.auto_reply_enabled }}
         </label>
       </div>
-      <div class="actions">
-        <button id="ar-modal-save" type="button">{{ t.save }}</button>
-        <button id="ar-modal-cancel" type="button">{{ t.cancel_edit }}</button>
+      <div class="actions modal-actions">
+        <button id="ar-modal-save" type="button" class="btn">{{ t.save }}</button>
+        <button id="ar-modal-cancel" type="button" class="btn subtle">{{ t.cancel_edit }}</button>
       </div>
     </div>
   </div>
 
   <div id="ak-modal" class="modal-backdrop" hidden>
-    <div class="glass modal-card">
-      <h3 id="ak-modal-title">{{ t.ad_keyword_add }}</h3>
+    <div class="modal-card glass-panel" role="dialog" aria-modal="true" aria-labelledby="ak-modal-title">
+      <div class="modal-head">
+        <h3 id="ak-modal-title">{{ t.ad_keyword_add }}</h3>
+        <button id="ak-modal-close" class="modal-close" type="button" aria-label="Close">&times;</button>
+      </div>
       <div class="form-grid">
         <label>
           {{ t.ad_keyword_label }}
           <input id="ak-modal-keyword" type="text" maxlength="255" />
           <small>{{ t.ad_keyword_hint }}</small>
         </label>
-        <label>
+        <label class="check-card">
           <input id="ak-modal-enabled" type="checkbox" checked />
           {{ t.ad_keyword_enabled }}
         </label>
       </div>
-      <div class="actions">
-        <button id="ak-modal-save" type="button">{{ t.save }}</button>
-        <button id="ak-modal-cancel" type="button">{{ t.cancel_edit }}</button>
+      <div class="actions modal-actions">
+        <button id="ak-modal-save" type="button" class="btn">{{ t.save }}</button>
+        <button id="ak-modal-cancel" type="button" class="btn subtle">{{ t.cancel_edit }}</button>
       </div>
     </div>
   </div>
