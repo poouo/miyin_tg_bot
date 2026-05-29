@@ -112,12 +112,39 @@ ensure_venv_support() {
   fi
 }
 
+ensure_build_toolchain() {
+  if ! command -v apt-get >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local py_minor
+  py_minor="$("${PYTHON_BIN}" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")"
+  local py_dev_pkg="python${py_minor}-dev"
+
+  echo "[miyin] ensuring build dependencies for native wheels..."
+  run_privileged apt-get update
+  run_privileged apt-get install -y \
+    build-essential \
+    "${py_dev_pkg}" \
+    pkg-config \
+    libffi-dev \
+    libssl-dev \
+    rustc \
+    cargo || true
+
+  # Fallback for distros without versioned python-dev package.
+  if ! dpkg -s "${py_dev_pkg}" >/dev/null 2>&1; then
+    run_privileged apt-get install -y python3-dev || true
+  fi
+}
+
 ensure_repo
 ensure_runtime_dirs
 cd "${APP_DIR}"
 
 ensure_supported_python
 ensure_venv_support
+ensure_build_toolchain
 
 need_recreate_venv=false
 if [[ ! -d "${VENV_DIR}" ]] || [[ ! -x "${VENV_DIR}/bin/python" ]] || [[ ! -x "${VENV_DIR}/bin/pip" ]]; then
@@ -136,7 +163,7 @@ if [[ "${need_recreate_venv}" == "true" ]]; then
 fi
 
 "${VENV_DIR}/bin/python" -m pip install --upgrade pip
-"${VENV_DIR}/bin/python" -m pip install -r "${APP_DIR}/requirements.txt"
+"${VENV_DIR}/bin/python" -m pip install --prefer-binary -r "${APP_DIR}/requirements.txt"
 
 if [[ ! -f "${APP_DIR}/.env" ]]; then
   cp "${APP_DIR}/.env.example" "${APP_DIR}/.env"
@@ -149,4 +176,3 @@ start_update_checker
 echo "[miyin] local install done"
 echo "[miyin] web: http://<server-ip>:9800"
 echo "[miyin] update status file: ${UPDATE_STATUS_FILE}"
-
