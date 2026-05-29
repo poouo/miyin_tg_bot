@@ -1,11 +1,15 @@
-from datetime import datetime
+﻿from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
+
+AutoReplyParseMode = Literal["plain", "markdownv2", "html"]
 
 
 class AutoReplyRuleBase(BaseModel):
     keyword: str = Field(min_length=1, max_length=255)
     reply_text: str = Field(min_length=1, max_length=4000)
+    parse_mode: AutoReplyParseMode = "plain"
     delete_after_seconds: int = Field(default=0, ge=0, le=86400)
     enabled: bool = True
 
@@ -25,6 +29,7 @@ class AutoReplyRuleCreate(AutoReplyRuleBase):
 class AutoReplyRuleUpdate(BaseModel):
     keyword: str | None = Field(default=None, min_length=1, max_length=255)
     reply_text: str | None = Field(default=None, min_length=1, max_length=4000)
+    parse_mode: AutoReplyParseMode | None = None
     delete_after_seconds: int | None = Field(default=None, ge=0, le=86400)
     enabled: bool | None = None
 

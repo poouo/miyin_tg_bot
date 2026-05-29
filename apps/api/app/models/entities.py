@@ -39,6 +39,7 @@ class AutoReplyRule(Base, TimestampMixin):
     chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
     keyword: Mapped[str] = mapped_column(String(255), index=True)
     reply_text: Mapped[str] = mapped_column(Text, default="")
+    parse_mode: Mapped[str] = mapped_column(String(16), default="plain")
     delete_after_seconds: Mapped[int] = mapped_column(Integer, default=0)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 

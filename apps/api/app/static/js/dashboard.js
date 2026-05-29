@@ -46,11 +46,17 @@ const arModal = document.getElementById("ar-modal");
 const arModalTitle = document.getElementById("ar-modal-title");
 const arModalKeyword = document.getElementById("ar-modal-keyword");
 const arModalReplyText = document.getElementById("ar-modal-reply-text");
+const arModalParseMode = document.getElementById("ar-modal-parse-mode");
 const arModalDeleteAfter = document.getElementById("ar-modal-delete-after");
 const arModalEnabled = document.getElementById("ar-modal-enabled");
+const arModalPreview = document.getElementById("ar-modal-preview");
 const arModalSave = document.getElementById("ar-modal-save");
 const arModalCancel = document.getElementById("ar-modal-cancel");
 const arModalClose = document.getElementById("ar-modal-close");
+const arPreviewModal = document.getElementById("ar-preview-modal");
+const arPreviewContent = document.getElementById("ar-preview-content");
+const arPreviewClose = document.getElementById("ar-preview-close");
+const arPreviewOk = document.getElementById("ar-preview-ok");
 
 const akChatId = document.getElementById("ak-chat-id");
 const akOpenAdd = document.getElementById("ak-open-add");
@@ -99,6 +105,67 @@ function escapeHtml(text) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function formatParseMode(mode) {
+  const normalized = String(mode || "plain").toLowerCase();
+  if (normalized === "markdownv2") return t("auto_reply_parse_mode_markdownv2", "MarkdownV2");
+  if (normalized === "html") return t("auto_reply_parse_mode_html", "HTML");
+  return t("auto_reply_parse_mode_plain", "Plain Text");
+}
+
+function sanitizeHtml(raw) {
+  const template = document.createElement("template");
+  template.innerHTML = raw || "";
+  const blockedTags = new Set(["script", "style", "iframe", "object", "embed", "link", "meta"]);
+  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_ELEMENT);
+  const toRemove = [];
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (!(node instanceof Element)) continue;
+    if (blockedTags.has(node.tagName.toLowerCase())) {
+      toRemove.push(node);
+      continue;
+    }
+    for (const attr of Array.from(node.attributes)) {
+      const name = attr.name.toLowerCase();
+      const value = attr.value.trim().toLowerCase();
+      if (name.startsWith("on")) node.removeAttribute(attr.name);
+      if ((name === "href" || name === "src") && value.startsWith("javascript:")) {
+        node.removeAttribute(attr.name);
+      }
+    }
+  }
+  toRemove.forEach((node) => node.remove());
+  return template.innerHTML;
+}
+
+function renderMarkdownV2Preview(rawText) {
+  let text = escapeHtml(String(rawText || ""));
+  text = text.replace(/\\([_\*\[\]\(\)~`>#+\-=|{}.!\\])/g, "$1");
+  text = text.replace(/\r\n/g, "\n");
+  text = text.replace(/```([\s\S]*?)```/g, "<pre><code>$1</code></pre>");
+  text = text.replace(/`([^`]+?)`/g, "<code>$1</code>");
+  text = text.replace(/\*\*([\s\S]+?)\*\*/g, "<strong>$1</strong>");
+  text = text.replace(/\*([^\n*][\s\S]*?)\*/g, "<strong>$1</strong>");
+  text = text.replace(/__([\s\S]+?)__/g, "<u>$1</u>");
+  text = text.replace(/_([^\n_][\s\S]*?)_/g, "<em>$1</em>");
+  text = text.replace(/~([^\n~][\s\S]*?)~/g, "<s>$1</s>");
+  text = text.replace(/\|\|([\s\S]+?)\|\|/g, '<span class="preview-spoiler">$1</span>');
+  text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  text = text.replace(/\n/g, "<br>");
+  return text;
+}
+
+function buildAutoReplyPreviewHtml(content, parseMode) {
+  const mode = String(parseMode || "plain").toLowerCase();
+  if (mode === "html") {
+    return sanitizeHtml(content);
+  }
+  if (mode === "markdownv2") {
+    return renderMarkdownV2Preview(content);
+  }
+  return escapeHtml(content).replace(/\n/g, "<br>");
 }
 
 function showStatus(message, isError = false) {
@@ -207,6 +274,7 @@ function resetAutoReplyModal() {
   if (arModalTitle) arModalTitle.textContent = t("auto_reply_add", "Add Auto Reply");
   if (arModalKeyword) arModalKeyword.value = "";
   if (arModalReplyText) arModalReplyText.value = "";
+  if (arModalParseMode) arModalParseMode.value = "plain";
   if (arModalDeleteAfter) arModalDeleteAfter.value = "0";
   if (arModalEnabled) arModalEnabled.checked = true;
 }
@@ -221,7 +289,7 @@ function resetAdKeywordModal() {
 function renderAutoReplies(items) {
   if (!arTableBody) return;
   if (!Array.isArray(items) || !items.length) {
-    arTableBody.innerHTML = `<tr><td colspan="5">${escapeHtml(t("no_data", "No data"))}</td></tr>`;
+    arTableBody.innerHTML = `<tr><td colspan="6">${escapeHtml(t("no_data", "No data"))}</td></tr>`;
     return;
   }
 
@@ -230,14 +298,17 @@ function renderAutoReplies(items) {
       const statusText = item.enabled ? t("switch_on", "on") : t("switch_off", "off");
       const toggleText = item.enabled ? t("disable", "Disable") : t("enable", "Enable");
       return `<tr>
-        <td>${escapeHtml(item.keyword)}</td>
-        <td>${escapeHtml(item.reply_text)}</td>
-        <td>${Number(item.delete_after_seconds || 0)}</td>
-        <td>${escapeHtml(statusText)}</td>
+        <td><div class="cell-keyword">${escapeHtml(item.keyword)}</div></td>
+        <td><div class="cell-reply">${escapeHtml(item.reply_text)}</div></td>
+        <td><div class="cell-center">${escapeHtml(formatParseMode(item.parse_mode))}</div></td>
+        <td><div class="cell-center">${Number(item.delete_after_seconds || 0)}</div></td>
+        <td><div class="cell-center">${escapeHtml(statusText)}</div></td>
         <td>
-          <button class="table-btn" type="button" data-action="edit" data-id="${item.id}">${escapeHtml(t("edit", "Edit"))}</button>
-          <button class="table-btn" type="button" data-action="toggle" data-id="${item.id}" data-enabled="${item.enabled ? 1 : 0}">${escapeHtml(toggleText)}</button>
-          <button class="table-btn warning" type="button" data-action="delete" data-id="${item.id}">${escapeHtml(t("delete", "Delete"))}</button>
+          <div class="row-actions">
+            <button class="table-btn" type="button" data-action="edit" data-id="${item.id}">${escapeHtml(t("edit", "Edit"))}</button>
+            <button class="table-btn" type="button" data-action="toggle" data-id="${item.id}" data-enabled="${item.enabled ? 1 : 0}">${escapeHtml(toggleText)}</button>
+            <button class="table-btn warning" type="button" data-action="delete" data-id="${item.id}">${escapeHtml(t("delete", "Delete"))}</button>
+          </div>
         </td>
       </tr>`;
     })
@@ -270,12 +341,14 @@ function renderAdKeywords(items) {
       const statusText = item.enabled ? t("switch_on", "on") : t("switch_off", "off");
       const toggleText = item.enabled ? t("disable", "Disable") : t("enable", "Enable");
       return `<tr>
-        <td>${escapeHtml(item.keyword)}</td>
-        <td>${escapeHtml(statusText)}</td>
+        <td><div class="cell-keyword">${escapeHtml(item.keyword)}</div></td>
+        <td><div class="cell-center">${escapeHtml(statusText)}</div></td>
         <td>
-          <button class="table-btn" type="button" data-action="edit" data-id="${item.id}">${escapeHtml(t("edit", "Edit"))}</button>
-          <button class="table-btn" type="button" data-action="toggle" data-id="${item.id}" data-enabled="${item.enabled ? 1 : 0}">${escapeHtml(toggleText)}</button>
-          <button class="table-btn warning" type="button" data-action="delete" data-id="${item.id}">${escapeHtml(t("delete", "Delete"))}</button>
+          <div class="row-actions">
+            <button class="table-btn" type="button" data-action="edit" data-id="${item.id}">${escapeHtml(t("edit", "Edit"))}</button>
+            <button class="table-btn" type="button" data-action="toggle" data-id="${item.id}" data-enabled="${item.enabled ? 1 : 0}">${escapeHtml(toggleText)}</button>
+            <button class="table-btn warning" type="button" data-action="delete" data-id="${item.id}">${escapeHtml(t("delete", "Delete"))}</button>
+          </div>
         </td>
       </tr>`;
     })
@@ -589,10 +662,30 @@ arOpenAdd?.addEventListener("click", () => {
   openModal(arModal);
 });
 
+function openAutoReplyPreview() {
+  const content = arModalReplyText?.value || "";
+  const parseMode = (arModalParseMode?.value || "plain").toLowerCase();
+  if (!content.trim()) {
+    showStatus(t("fill_required_fields"), true);
+    return;
+  }
+  if (arPreviewContent) {
+    arPreviewContent.innerHTML = buildAutoReplyPreviewHtml(content, parseMode);
+  }
+  openModal(arPreviewModal);
+}
+
+arModalPreview?.addEventListener("click", openAutoReplyPreview);
+
 arModalCancel?.addEventListener("click", () => closeModal(arModal));
 arModalClose?.addEventListener("click", () => closeModal(arModal));
 arModal?.addEventListener("click", (event) => {
   if (event.target === arModal) closeModal(arModal);
+});
+arPreviewClose?.addEventListener("click", () => closeModal(arPreviewModal));
+arPreviewOk?.addEventListener("click", () => closeModal(arPreviewModal));
+arPreviewModal?.addEventListener("click", (event) => {
+  if (event.target === arPreviewModal) closeModal(arPreviewModal);
 });
 
 arModalSave?.addEventListener("click", async () => {
@@ -605,6 +698,7 @@ arModalSave?.addEventListener("click", async () => {
     chat_id: Number(chatId),
     keyword: (arModalKeyword?.value || "").trim(),
     reply_text: (arModalReplyText?.value || "").trim(),
+    parse_mode: (arModalParseMode?.value || "plain").toLowerCase(),
     delete_after_seconds: Number(arModalDeleteAfter?.value || 0),
     enabled: Boolean(arModalEnabled?.checked),
   };
@@ -619,9 +713,10 @@ arModalSave?.addEventListener("click", async () => {
     : `/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies`;
   const method = isEditing ? "PATCH" : "POST";
   const bodyPayload = isEditing
-    ? {
+      ? {
         keyword: payload.keyword,
         reply_text: payload.reply_text,
+        parse_mode: payload.parse_mode,
         delete_after_seconds: payload.delete_after_seconds,
         enabled: payload.enabled,
       }
@@ -699,6 +794,7 @@ arTableBody?.addEventListener("click", async (event) => {
     if (arModalTitle) arModalTitle.textContent = t("auto_reply_update", "Update Rule");
     if (arModalKeyword) arModalKeyword.value = found.keyword || "";
     if (arModalReplyText) arModalReplyText.value = found.reply_text || "";
+    if (arModalParseMode) arModalParseMode.value = (found.parse_mode || "plain").toLowerCase();
     if (arModalDeleteAfter) arModalDeleteAfter.value = String(Number(found.delete_after_seconds || 0));
     if (arModalEnabled) arModalEnabled.checked = Boolean(found.enabled);
     openModal(arModal);
@@ -824,11 +920,13 @@ evChatId?.addEventListener("change", loadMemberEvents);
 
 if (arModal) arModal.hidden = true;
 if (akModal) akModal.hidden = true;
+if (arPreviewModal) arPreviewModal.hidden = true;
 
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   if (arModal && !arModal.hidden) closeModal(arModal);
   if (akModal && !akModal.hidden) closeModal(akModal);
+  if (arPreviewModal && !arPreviewModal.hidden) closeModal(arPreviewModal);
 });
 
 pollOnlineUpdateStatus();

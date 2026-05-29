@@ -222,7 +222,18 @@ async def group_text_handler(message: Message) -> None:
         if group.auto_recover_enabled:
             auto_reply = await match_auto_reply(db, chat.id, text)
             if auto_reply:
-                sent = await message.reply(auto_reply.reply_text[:3800])
+                reply_text = auto_reply.reply_text[:3800]
+                parse_mode = (getattr(auto_reply, "parse_mode", "plain") or "plain").lower()
+                reply_kwargs: dict = {}
+                if parse_mode == "markdownv2":
+                    reply_kwargs["parse_mode"] = "MarkdownV2"
+                elif parse_mode == "html":
+                    reply_kwargs["parse_mode"] = "HTML"
+                try:
+                    sent = await message.reply(reply_text, **reply_kwargs)
+                except Exception:
+                    # Fallback to plain text when format content is invalid.
+                    sent = await message.reply(reply_text)
                 await add_log(
                     db,
                     chat.id,
