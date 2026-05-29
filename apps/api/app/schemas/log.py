@@ -15,3 +15,6 @@ class ModerationLogRead(BaseModel):
     class Config:
         from_attributes = True
 
+
+class ModerationLogWithGroupRead(ModerationLogRead):
+    group_title: str = ""

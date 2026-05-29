@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.app.models.entities import KeywordRule
+from apps.api.app.services.ad_keyword_service import match_ad_keyword
 from apps.api.app.services.group_service import get_group
 from apps.api.app.services.moderation.ad_block import AdBlockGuard
 from apps.api.app.services.moderation.anti_spam import AntiSpamGuard
@@ -28,8 +29,11 @@ class ModerationPolicyEngine:
             return ModerationDecision(blocked=False)
         runtime = await get_runtime_config(db)
 
-        if config.ad_block_enabled and self.ad_guard.is_ad(text, runtime.ad_regex):
-            return ModerationDecision(blocked=True, reason="ad_block")
+        if config.ad_block_enabled:
+            if self.ad_guard.is_ad(text, runtime.ad_regex):
+                return ModerationDecision(blocked=True, reason="ad_block")
+            if await match_ad_keyword(db, chat_id, text):
+                return ModerationDecision(blocked=True, reason="ad_block")
 
         if config.keyword_filter_enabled:
             keyword_rule = await match_keyword_rule(db, chat_id, text)

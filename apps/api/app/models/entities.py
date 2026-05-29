@@ -32,6 +32,27 @@ class KeywordRule(Base, TimestampMixin):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class AutoReplyRule(Base, TimestampMixin):
+    __tablename__ = "auto_reply_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    keyword: Mapped[str] = mapped_column(String(255), index=True)
+    reply_text: Mapped[str] = mapped_column(Text, default="")
+    delete_after_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class AdKeyword(Base, TimestampMixin):
+    __tablename__ = "ad_keywords"
+    __table_args__ = (UniqueConstraint("chat_id", "keyword", name="uq_ad_keyword_chat_keyword"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    keyword: Mapped[str] = mapped_column(String(255), index=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
 class ModerationLog(Base):
     __tablename__ = "moderation_logs"
 

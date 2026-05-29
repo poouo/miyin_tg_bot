@@ -1,11 +1,13 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 from aiogram import F, Router
-from aiogram.types import CallbackQuery, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, ChatMemberUpdated, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from apps.api.app.core.db import SessionLocal
 from apps.api.app.services.group_service import ensure_group
 from apps.api.app.services.log_service import add_log
+from apps.api.app.services.auto_reply_service import match_auto_reply
 from apps.api.app.services.moderation.auto_recover import add_mute_sanction
 from apps.api.app.services.moderation.join_verification import build_answer_options, create_challenge, verify_challenge
 from apps.api.app.services.runtime_config_service import get_runtime_config
@@ -28,6 +30,24 @@ MEMBER_UNRESTRICT_PERMISSIONS = ChatPermissions(
 )
 
 
+@router.my_chat_member(F.chat.type.in_({"group", "supergroup"}))
+async def bot_membership_handler(event: ChatMemberUpdated) -> None:
+    status = getattr(event.new_chat_member, "status", "")
+    if status in {"left", "kicked"}:
+        return
+
+    async with SessionLocal() as db:
+        await ensure_group(db, event.chat.id, event.chat.title or "")
+        await add_log(
+            db,
+            event.chat.id,
+            0,
+            "",
+            "group_registered",
+            f"bot_status={status}",
+        )
+
+
 def _build_verify_keyboard(target_user_id: int, options: list[str]) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     row: list[InlineKeyboardButton] = []
@@ -46,6 +66,14 @@ def _build_verify_keyboard(target_user_id: int, options: list[str]) -> InlineKey
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+async def _delete_message_later(bot, chat_id: int, message_id: int, seconds: int) -> None:
+    await asyncio.sleep(seconds)
+    try:
+        await bot.delete_message(chat_id=chat_id, message_id=message_id)
+    except Exception:
+        return
+
+
 @router.message(F.chat.type.in_({"group", "supergroup"}), F.new_chat_members)
 async def new_member_handler(message: Message) -> None:
     chat = message.chat
@@ -61,6 +89,14 @@ async def new_member_handler(message: Message) -> None:
         for member in message.new_chat_members:
             if member.is_bot:
                 continue
+            await add_log(
+                db,
+                chat.id,
+                member.id,
+                member.username or "",
+                "member_joined",
+                member.full_name,
+            )
             await message.bot.restrict_chat_member(
                 chat_id=chat.id,
                 user_id=member.id,
@@ -76,6 +112,26 @@ async def new_member_handler(message: Message) -> None:
                 reply_markup=_build_verify_keyboard(member.id, options),
             )
             await add_log(db, chat.id, member.id, member.username or "", "join_verify_created", challenge.question)
+
+
+@router.message(F.chat.type.in_({"group", "supergroup"}), F.left_chat_member)
+async def left_member_handler(message: Message) -> None:
+    if message.left_chat_member is None:
+        return
+    member = message.left_chat_member
+    if member.is_bot:
+        return
+
+    async with SessionLocal() as db:
+        await ensure_group(db, message.chat.id, message.chat.title or "")
+        await add_log(
+            db,
+            message.chat.id,
+            member.id,
+            member.username or "",
+            "member_left",
+            member.full_name,
+        )
 
 
 @router.callback_query(F.data.startswith("verify:"))
@@ -105,6 +161,7 @@ async def verify_button_handler(callback: CallbackQuery) -> None:
         await ensure_group(db, chat_id, callback.message.chat.title or "")
         ok = await verify_challenge(db, chat_id, user_id, selected_answer)
         if not ok:
+            await add_log(db, chat_id, user_id, callback.from_user.username or "", "join_verify_failed", "button")
             await callback.answer("答案错误或验证已过期", show_alert=True)
             return
 
@@ -161,6 +218,29 @@ async def group_text_handler(message: Message) -> None:
 
             await add_log(db, chat.id, user.id, user.username or "", "message_blocked", reason)
             return
+
+        if group.auto_recover_enabled:
+            auto_reply = await match_auto_reply(db, chat.id, text)
+            if auto_reply:
+                sent = await message.reply(auto_reply.reply_text[:3800])
+                await add_log(
+                    db,
+                    chat.id,
+                    user.id,
+                    user.username or "",
+                    "auto_reply_triggered",
+                    auto_reply.keyword,
+                )
+                if auto_reply.delete_after_seconds > 0:
+                    asyncio.create_task(
+                        _delete_message_later(
+                            message.bot,
+                            chat.id,
+                            sent.message_id,
+                            auto_reply.delete_after_seconds,
+                        )
+                    )
+                return
 
         bot_mention = runtime.telegram_bot_username.strip()
         has_mention = bool(bot_mention) and f"@{bot_mention.lower()}" in text.lower()

@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from apps.api.app.core.db import get_db
 from apps.api.app.schemas.runtime_config import RuntimeConfigRead, RuntimeConfigUpdate
 from apps.api.app.services.runtime_config_service import get_runtime_config, update_runtime_config
+from apps.bot.bot_app.dispatcher import request_bot_reload
 
 router = APIRouter(prefix="/runtime", tags=["runtime"])
 
@@ -34,4 +35,5 @@ async def get_runtime(db: AsyncSession = Depends(get_db)) -> RuntimeConfigRead:
 @router.put("", response_model=RuntimeConfigRead)
 async def put_runtime(payload: RuntimeConfigUpdate, db: AsyncSession = Depends(get_db)) -> RuntimeConfigRead:
     config = await update_runtime_config(db, payload.model_dump())
+    await request_bot_reload("runtime_config_updated")
     return _to_read_model(config)

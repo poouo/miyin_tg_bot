@@ -1,5 +1,6 @@
 const bodyEl = document.body;
 const sidebar = document.getElementById("sidebar");
+const workspaceEl = document.querySelector(".workspace");
 const menuToggle = document.getElementById("mobile-menu-toggle");
 const workspaceTitle = document.getElementById("workspace-title");
 const navItems = Array.from(document.querySelectorAll(".nav-item"));
@@ -8,6 +9,7 @@ const sections = Array.from(document.querySelectorAll(".section"));
 const securityOutput = document.getElementById("security-output");
 const runtimeOutput = document.getElementById("runtime-output");
 const deepseekOutput = document.getElementById("deepseek-output");
+const passwordOutput = document.getElementById("password-output");
 const btnCheck = document.getElementById("check-update");
 const btnTrigger = document.getElementById("trigger-update");
 const btnSaveSecurity = document.getElementById("save-security");
@@ -22,7 +24,6 @@ const webLanguage = document.getElementById("web-language");
 const currentPassword = document.getElementById("current-password");
 const newPassword = document.getElementById("new-password");
 const confirmPassword = document.getElementById("confirm-password");
-const passwordOutput = document.getElementById("password-output");
 
 const rtTelegramBotToken = document.getElementById("rt-telegram-bot-token");
 const rtTelegramBotUsername = document.getElementById("rt-telegram-bot-username");
@@ -39,19 +40,50 @@ const rtAdRegex = document.getElementById("rt-ad-regex");
 const upgradeFill = document.getElementById("upgrade-fill");
 const upgradeStatus = document.getElementById("upgrade-status");
 
+const arChatId = document.getElementById("ar-chat-id");
+const arKeyword = document.getElementById("ar-keyword");
+const arReplyText = document.getElementById("ar-reply-text");
+const arDeleteAfter = document.getElementById("ar-delete-after");
+const arEnabled = document.getElementById("ar-enabled");
+const arAddRule = document.getElementById("ar-add-rule");
+const arRefresh = document.getElementById("ar-refresh");
+const arTableBody = document.getElementById("ar-table-body");
+const arOutput = document.getElementById("ar-output");
+
+const akChatId = document.getElementById("ak-chat-id");
+const akKeyword = document.getElementById("ak-keyword");
+const akEnabled = document.getElementById("ak-enabled");
+const akAddKeyword = document.getElementById("ak-add-keyword");
+const akRefresh = document.getElementById("ak-refresh");
+const akTableBody = document.getElementById("ak-table-body");
+const akOutput = document.getElementById("ak-output");
+
+const evChatId = document.getElementById("ev-chat-id");
+const evRefresh = document.getElementById("ev-refresh");
+const evTableBody = document.getElementById("ev-table-body");
+
 const i18nEl = document.getElementById("i18n-data");
 const i18n = i18nEl ? JSON.parse(i18nEl.textContent || "{}") : {};
+
+let updatePollTimer = null;
+const ACTIVE_SECTION_KEY = "miyin.dashboard.activeSection";
 
 function t(key, fallback) {
   return i18n[key] || fallback || key;
 }
 
-let updatePollTimer = null;
-const ACTIVE_SECTION_KEY = "miyin.dashboard.activeSection";
-
 function print(el, data) {
   if (!el) return;
   el.textContent = JSON.stringify(data, null, 2);
+}
+
+function escapeHtml(text) {
+  return String(text || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function setUpgradeStatus(progress, text, type = "normal") {
@@ -99,8 +131,20 @@ document.addEventListener("click", (event) => {
   closeMobileSidebar();
 });
 
+async function handleSectionEnter(target) {
+  if (target === "auto-replies") {
+    await loadAutoReplies();
+  }
+  if (target === "ad-keywords") {
+    await loadAdKeywords();
+  }
+  if (target === "member-events") {
+    await loadMemberEvents();
+  }
+}
+
 navItems.forEach((item) => {
-  item.addEventListener("click", () => {
+  item.addEventListener("click", async () => {
     const target = item.dataset.target;
     if (!target) return;
     const section = document.getElementById(target);
@@ -112,6 +156,10 @@ navItems.forEach((item) => {
     } catch (err) {
       // ignore
     }
+    if (workspaceEl) {
+      workspaceEl.scrollTop = 0;
+    }
+    await handleSectionEnter(target);
     closeMobileSidebar();
   });
 });
@@ -127,6 +175,7 @@ try {
 }
 setActiveNav(initialTarget);
 setActiveSection(initialTarget);
+handleSectionEnter(initialTarget);
 
 async function pollOnlineUpdateStatus() {
   try {
@@ -322,6 +371,306 @@ btnSavePassword?.addEventListener("click", async () => {
   } catch (err) {
     passwordOutput.textContent = `${t("password_change_failed")}: ${String(err)}`;
   }
+});
+
+function renderAutoReplies(items) {
+  if (!arTableBody) return;
+  if (!Array.isArray(items) || !items.length) {
+    arTableBody.innerHTML = `<tr><td colspan="5">${escapeHtml(t("no_data", "No data"))}</td></tr>`;
+    return;
+  }
+
+  arTableBody.innerHTML = items
+    .map((item) => {
+      const statusText = item.enabled ? t("switch_on", "on") : t("switch_off", "off");
+      const toggleText = item.enabled ? t("disable", "Disable") : t("enable", "Enable");
+      return `<tr>
+        <td>${escapeHtml(item.keyword)}</td>
+        <td>${escapeHtml(item.reply_text)}</td>
+        <td>${Number(item.delete_after_seconds || 0)}</td>
+        <td>${escapeHtml(statusText)}</td>
+        <td>
+          <button class="table-btn" type="button" data-action="toggle" data-id="${item.id}" data-enabled="${item.enabled ? 1 : 0}">${escapeHtml(toggleText)}</button>
+          <button class="table-btn warning" type="button" data-action="delete" data-id="${item.id}">${escapeHtml(t("delete", "Delete"))}</button>
+        </td>
+      </tr>`;
+    })
+    .join("");
+}
+
+async function loadAutoReplies() {
+  if (!arChatId?.value) {
+    renderAutoReplies([]);
+    return;
+  }
+  try {
+    const res = await fetch(`/api/v1/groups/${encodeURIComponent(arChatId.value)}/auto-replies`);
+    const data = await res.json();
+    if (!res.ok) {
+      print(arOutput, data);
+      return;
+    }
+    renderAutoReplies(data);
+  } catch (err) {
+    print(arOutput, { ok: false, error: String(err) });
+  }
+}
+
+arAddRule?.addEventListener("click", async () => {
+  const chatId = arChatId?.value || "";
+  const keyword = arKeyword?.value.trim() || "";
+  const replyText = arReplyText?.value.trim() || "";
+  const deleteAfter = Number(arDeleteAfter?.value || 0);
+  if (!chatId || !keyword || !replyText) {
+    print(arOutput, { ok: false, message: t("fill_required_fields", "Please fill required fields") });
+    return;
+  }
+
+  const payload = {
+    chat_id: Number(chatId),
+    keyword,
+    reply_text: replyText,
+    delete_after_seconds: Math.max(0, deleteAfter),
+    enabled: Boolean(arEnabled?.checked),
+  };
+  try {
+    const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    print(arOutput, data);
+    if (!res.ok) return;
+
+    if (arKeyword) arKeyword.value = "";
+    if (arReplyText) arReplyText.value = "";
+    if (arDeleteAfter) arDeleteAfter.value = "0";
+    if (arEnabled) arEnabled.checked = true;
+    await loadAutoReplies();
+  } catch (err) {
+    print(arOutput, { ok: false, error: String(err) });
+  }
+});
+
+arRefresh?.addEventListener("click", async () => {
+  await loadAutoReplies();
+});
+
+arChatId?.addEventListener("change", async () => {
+  await loadAutoReplies();
+});
+
+arTableBody?.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLButtonElement)) return;
+  const action = target.dataset.action || "";
+  const ruleId = target.dataset.id || "";
+  const chatId = arChatId?.value || "";
+  if (!action || !ruleId || !chatId) return;
+
+  try {
+    if (action === "delete") {
+      const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies/${encodeURIComponent(ruleId)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      print(arOutput, data);
+      if (!res.ok) return;
+      await loadAutoReplies();
+      return;
+    }
+
+    if (action === "toggle") {
+      const enabled = target.dataset.enabled === "1";
+      const payload = { enabled: !enabled };
+      const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies/${encodeURIComponent(ruleId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      print(arOutput, data);
+      if (!res.ok) return;
+      await loadAutoReplies();
+    }
+  } catch (err) {
+    print(arOutput, { ok: false, error: String(err) });
+  }
+});
+
+function renderAdKeywords(items) {
+  if (!akTableBody) return;
+  if (!Array.isArray(items) || !items.length) {
+    akTableBody.innerHTML = `<tr><td colspan="3">${escapeHtml(t("no_data", "No data"))}</td></tr>`;
+    return;
+  }
+
+  akTableBody.innerHTML = items
+    .map((item) => {
+      const statusText = item.enabled ? t("switch_on", "on") : t("switch_off", "off");
+      const toggleText = item.enabled ? t("disable", "Disable") : t("enable", "Enable");
+      return `<tr>
+        <td>${escapeHtml(item.keyword)}</td>
+        <td>${escapeHtml(statusText)}</td>
+        <td>
+          <button class="table-btn" type="button" data-action="toggle" data-id="${item.id}" data-enabled="${item.enabled ? 1 : 0}">${escapeHtml(toggleText)}</button>
+          <button class="table-btn warning" type="button" data-action="delete" data-id="${item.id}">${escapeHtml(t("delete", "Delete"))}</button>
+        </td>
+      </tr>`;
+    })
+    .join("");
+}
+
+async function loadAdKeywords() {
+  if (!akChatId?.value) {
+    renderAdKeywords([]);
+    return;
+  }
+  try {
+    const res = await fetch(`/api/v1/groups/${encodeURIComponent(akChatId.value)}/ad-keywords`);
+    const data = await res.json();
+    if (!res.ok) {
+      print(akOutput, data);
+      return;
+    }
+    renderAdKeywords(data);
+  } catch (err) {
+    print(akOutput, { ok: false, error: String(err) });
+  }
+}
+
+akAddKeyword?.addEventListener("click", async () => {
+  const chatId = akChatId?.value || "";
+  const keyword = akKeyword?.value.trim() || "";
+  if (!chatId || !keyword) {
+    print(akOutput, { ok: false, message: t("fill_required_fields", "Please fill required fields") });
+    return;
+  }
+
+  const payload = {
+    chat_id: Number(chatId),
+    keyword,
+    enabled: Boolean(akEnabled?.checked),
+  };
+  try {
+    const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    print(akOutput, data);
+    if (!res.ok) return;
+
+    if (akKeyword) akKeyword.value = "";
+    if (akEnabled) akEnabled.checked = true;
+    await loadAdKeywords();
+  } catch (err) {
+    print(akOutput, { ok: false, error: String(err) });
+  }
+});
+
+akRefresh?.addEventListener("click", async () => {
+  await loadAdKeywords();
+});
+
+akChatId?.addEventListener("change", async () => {
+  await loadAdKeywords();
+});
+
+akTableBody?.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLButtonElement)) return;
+  const action = target.dataset.action || "";
+  const keywordId = target.dataset.id || "";
+  const chatId = akChatId?.value || "";
+  if (!action || !keywordId || !chatId) return;
+
+  try {
+    if (action === "delete") {
+      const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords/${encodeURIComponent(keywordId)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      print(akOutput, data);
+      if (!res.ok) return;
+      await loadAdKeywords();
+      return;
+    }
+
+    if (action === "toggle") {
+      const enabled = target.dataset.enabled === "1";
+      const payload = { enabled: !enabled };
+      const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords/${encodeURIComponent(keywordId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      print(akOutput, data);
+      if (!res.ok) return;
+      await loadAdKeywords();
+    }
+  } catch (err) {
+    print(akOutput, { ok: false, error: String(err) });
+  }
+});
+
+function toEventLabel(eventType) {
+  const key = `event_${eventType}`;
+  if (i18n[key]) return i18n[key];
+  return eventType;
+}
+
+function renderMemberEvents(items) {
+  if (!evTableBody) return;
+  if (!Array.isArray(items) || !items.length) {
+    evTableBody.innerHTML = `<tr><td colspan="5">${escapeHtml(t("no_data", "No data"))}</td></tr>`;
+    return;
+  }
+
+  evTableBody.innerHTML = items
+    .map((item) => {
+      const userText = item.username ? `${item.user_id} (@${item.username})` : `${item.user_id}`;
+      const groupText = item.group_title ? `${item.group_title} (${item.chat_id})` : `${item.chat_id}`;
+      const time = item.created_at ? new Date(item.created_at).toLocaleString() : "";
+      return `<tr>
+        <td>${escapeHtml(time)}</td>
+        <td>${escapeHtml(groupText)}</td>
+        <td>${escapeHtml(toEventLabel(item.event_type))}</td>
+        <td>${escapeHtml(userText)}</td>
+        <td>${escapeHtml(item.detail || "")}</td>
+      </tr>`;
+    })
+    .join("");
+}
+
+async function loadMemberEvents() {
+  const params = new URLSearchParams();
+  params.set("limit", "200");
+  const chatId = evChatId?.value || "";
+  if (chatId) params.set("chat_id", chatId);
+
+  try {
+    const res = await fetch(`/api/v1/logs/member-events?${params.toString()}`);
+    const data = await res.json();
+    if (!res.ok) {
+      renderMemberEvents([]);
+      return;
+    }
+    renderMemberEvents(data);
+  } catch (err) {
+    renderMemberEvents([]);
+  }
+}
+
+evRefresh?.addEventListener("click", async () => {
+  await loadMemberEvents();
+});
+
+evChatId?.addEventListener("change", async () => {
+  await loadMemberEvents();
 });
 
 pollOnlineUpdateStatus();

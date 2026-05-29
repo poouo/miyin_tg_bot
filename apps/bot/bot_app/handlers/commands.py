@@ -39,6 +39,13 @@ async def is_group_manager(message: Message) -> bool:
     return getattr(member, "status", "") in MANAGER_ROLES
 
 
+async def register_group_if_needed(message: Message) -> None:
+    if message.chat.type not in {"group", "supergroup"}:
+        return
+    async with SessionLocal() as db:
+        await ensure_group(db, message.chat.id, message.chat.title or "")
+
+
 def parse_target_user_id(message: Message, command: CommandObject) -> int | None:
     if message.reply_to_message and message.reply_to_message.from_user:
         return message.reply_to_message.from_user.id
@@ -70,11 +77,13 @@ def parse_minutes(command: CommandObject, default_minutes: int) -> int:
 
 @router.message(Command("start"))
 async def start_handler(message: Message) -> None:
+    await register_group_if_needed(message)
     await message.reply("Miyin TG Bot is running.")
 
 
 @router.message(Command("ping"))
 async def ping_handler(message: Message) -> None:
+    await register_group_if_needed(message)
     await message.reply("pong")
 
 
@@ -88,6 +97,7 @@ async def ask_handler(message: Message, command: CommandObject) -> None:
     chat = message.chat
     async with SessionLocal() as db:
         if chat.type in {"group", "supergroup"}:
+            await ensure_group(db, chat.id, chat.title or "")
             group = await get_group(db, chat.id)
             if group and not group.deepseek_enabled:
                 await message.reply("AI is disabled in this group.")

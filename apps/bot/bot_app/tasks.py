@@ -42,12 +42,11 @@ async def kick_unverified_task(bot: Bot) -> None:
                         challenge.chat_id,
                         challenge.user_id,
                         "",
-                        "join_verify_failed",
-                        "验证超时，自动移出群组",
+                        "join_verify_timeout",
+                        "join verification timed out, user removed",
                     )
                     challenge.passed = True
                 await db.commit()
         except Exception:
             pass
         await asyncio.sleep(15)
-

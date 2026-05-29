@@ -156,12 +156,11 @@ body {
 }
 
 .sidebar-footer {
-  margin-top: 10px;
+  margin-top: auto;
   border-top: 1px solid rgba(255, 255, 255, 0.6);
   padding-top: 10px;
   background: rgba(246, 251, 255, 0.75);
-  position: sticky;
-  bottom: 0;
+  flex: 0 0 auto;
 }
 
 .workspace {
@@ -274,12 +273,19 @@ body {
 }
 
 .form-grid input,
-.form-grid select {
+.form-grid select,
+.form-grid textarea {
   border: 1px solid rgba(255, 255, 255, 0.7);
   background: var(--surface);
   border-radius: 10px;
   padding: 9px 10px;
   color: var(--ink);
+}
+
+.form-grid textarea {
+  resize: vertical;
+  min-height: 84px;
+  font-family: inherit;
 }
 
 .form-grid input[type="checkbox"] {
@@ -314,6 +320,18 @@ button:hover {
 button.warning {
   width: 100%;
   background: linear-gradient(145deg, #c36a16 0%, #e09a36 100%);
+}
+
+.table-btn {
+  width: auto;
+  padding: 7px 11px;
+  border-radius: 10px;
+  font-size: 12px;
+  margin-right: 6px;
+}
+
+.table-btn.warning {
+  width: auto;
 }
 
 button:disabled {
@@ -460,6 +478,11 @@ th {
 
   button {
     width: 100%;
+  }
+
+  .table-btn,
+  .table-btn.warning {
+    width: auto;
   }
 
   .actions {

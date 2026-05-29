@@ -27,6 +27,12 @@
           <button class="nav-item" type="button" data-target="groups">{{ t.nav_groups }}</button>
         </div>
         <div class="nav-group">
+          <p class="nav-group-title">{{ t.nav_group_moderation }}</p>
+          <button class="nav-item" type="button" data-target="auto-replies">{{ t.nav_auto_replies }}</button>
+          <button class="nav-item" type="button" data-target="ad-keywords">{{ t.nav_ad_keywords }}</button>
+          <button class="nav-item" type="button" data-target="member-events">{{ t.nav_member_events }}</button>
+        </div>
+        <div class="nav-group">
           <p class="nav-group-title">{{ t.nav_group_security }}</p>
           <button class="nav-item" type="button" data-target="update">{{ t.nav_update }}</button>
           <button class="nav-item" type="button" data-target="security">{{ t.nav_security }}</button>
@@ -130,6 +136,141 @@
           <button id="save-deepseek" type="button">{{ t.deepseek_save }}</button>
         </div>
         <pre id="deepseek-output">{{ t.ready }}.</pre>
+      </section>
+
+      <section id="auto-replies" class="glass panel section">
+        <h3>{{ t.auto_reply_title }}</h3>
+        <p>{{ t.auto_reply_desc }}</p>
+        <div class="form-grid two-col">
+          <label>
+            {{ t.select_group }}
+            <select id="ar-chat-id">
+              {% for group in groups %}
+              <option value="{{ group.chat_id }}">{{ group.title or group.chat_id }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            {{ t.auto_reply_keyword }}
+            <input id="ar-keyword" type="text" maxlength="255" />
+          </label>
+          <label class="full-width">
+            {{ t.auto_reply_content }}
+            <textarea id="ar-reply-text" rows="3" maxlength="4000"></textarea>
+          </label>
+          <label>
+            {{ t.auto_reply_delete_after }}
+            <input id="ar-delete-after" type="number" min="0" max="86400" value="0" />
+          </label>
+          <label>
+            <input id="ar-enabled" type="checkbox" checked />
+            {{ t.auto_reply_enabled }}
+          </label>
+        </div>
+        <div class="actions">
+          <button id="ar-add-rule" type="button">{{ t.auto_reply_add }}</button>
+          <button id="ar-refresh" type="button">{{ t.refresh }}</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ t.auto_reply_keyword }}</th>
+                <th>{{ t.auto_reply_content }}</th>
+                <th>{{ t.auto_reply_delete_after }}</th>
+                <th>{{ t.status }}</th>
+                <th>{{ t.actions }}</th>
+              </tr>
+            </thead>
+            <tbody id="ar-table-body">
+              <tr>
+                <td colspan="5">{{ t.no_data }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <pre id="ar-output">{{ t.ready }}.</pre>
+      </section>
+
+      <section id="ad-keywords" class="glass panel section">
+        <h3>{{ t.ad_keywords_title }}</h3>
+        <p>{{ t.ad_keywords_desc }}</p>
+        <div class="form-grid two-col">
+          <label>
+            {{ t.select_group }}
+            <select id="ak-chat-id">
+              {% for group in groups %}
+              <option value="{{ group.chat_id }}">{{ group.title or group.chat_id }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            {{ t.ad_keyword_label }}
+            <input id="ak-keyword" type="text" maxlength="255" />
+          </label>
+          <label>
+            <input id="ak-enabled" type="checkbox" checked />
+            {{ t.ad_keyword_enabled }}
+          </label>
+        </div>
+        <div class="actions">
+          <button id="ak-add-keyword" type="button">{{ t.ad_keyword_add }}</button>
+          <button id="ak-refresh" type="button">{{ t.refresh }}</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ t.ad_keyword_label }}</th>
+                <th>{{ t.status }}</th>
+                <th>{{ t.actions }}</th>
+              </tr>
+            </thead>
+            <tbody id="ak-table-body">
+              <tr>
+                <td colspan="3">{{ t.no_data }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <pre id="ak-output">{{ t.ready }}.</pre>
+      </section>
+
+      <section id="member-events" class="glass panel section">
+        <h3>{{ t.member_events_title }}</h3>
+        <p>{{ t.member_events_desc }}</p>
+        <div class="form-grid two-col">
+          <label>
+            {{ t.select_group }}
+            <select id="ev-chat-id">
+              <option value="">{{ t.all_groups }}</option>
+              {% for group in groups %}
+              <option value="{{ group.chat_id }}">{{ group.title or group.chat_id }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="ev-refresh" type="button">{{ t.refresh }}</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ t.time }}</th>
+                <th>{{ t.group }}</th>
+                <th>{{ t.event_type }}</th>
+                <th>{{ t.user }}</th>
+                <th>{{ t.detail }}</th>
+              </tr>
+            </thead>
+            <tbody id="ev-table-body">
+              <tr>
+                <td colspan="5">{{ t.no_data }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section id="update" class="glass panel section">
