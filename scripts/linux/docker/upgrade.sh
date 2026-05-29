@@ -4,15 +4,23 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-/opt/miyin_tg_bot}"
 BRANCH="${BRANCH:-main}"
 
+run_privileged() {
+  if [[ "${EUID}" -eq 0 ]]; then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
 if [[ ! -d "${APP_DIR}/.git" ]]; then
-  echo "未找到项目目录 ${APP_DIR}，请先执行 install.sh"
+  echo "project directory not found: ${APP_DIR}, run install.sh first"
   exit 1
 fi
 
 cd "${APP_DIR}"
-sudo git fetch origin "${BRANCH}"
-sudo git checkout "${BRANCH}"
-sudo git pull --ff-only origin "${BRANCH}"
-sudo docker compose up -d --build
+run_privileged git fetch origin "${BRANCH}"
+run_privileged git checkout "${BRANCH}"
+run_privileged git pull --ff-only origin "${BRANCH}"
+run_privileged docker compose up -d --build
 echo "[miyin] docker upgrade done"
 
