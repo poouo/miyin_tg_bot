@@ -1,6 +1,11 @@
 from fastapi import APIRouter
 
-from apps.api.app.services.update_service import check_update, read_background_status, trigger_online_update
+from apps.api.app.services.update_service import (
+    check_update,
+    get_online_update_status,
+    read_background_status,
+    trigger_online_update,
+)
 
 router = APIRouter(prefix="/updates", tags=["updates"])
 
@@ -13,6 +18,11 @@ async def check_repo_update() -> dict:
 @router.post("/online")
 async def start_online_update() -> dict:
     return trigger_online_update()
+
+
+@router.get("/online-status")
+async def online_update_status() -> dict:
+    return get_online_update_status()
 
 
 @router.get("/background-status")

@@ -2,6 +2,8 @@
 
 Telegram group management bot for Linux with Web admin, DeepSeek AI replies, and moderation automation.
 
+Current release version: `V1.0.00`
+
 ## Features
 
 - Join verification challenge
@@ -14,9 +16,10 @@ Telegram group management bot for Linux with Web admin, DeepSeek AI replies, and
 - Web password login
 - Admin token validity: 10 days
 - Login brute-force protection (enable/disable + attempts + ban minutes)
+- Manual management commands restricted to group owner/admin only
 - Docker one-container deployment (SQLite)
 - Local one-click deploy/upgrade/uninstall
-- Background update check + online update trigger
+- Version-based update check + online update trigger
 
 ## Quick Start
 
@@ -76,9 +79,19 @@ bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scri
 - `GET /api/v1/security/login`
 - `PUT /api/v1/security/login`
 
+## Group management commands
+
+- `/ban`, `/unban`, `/mute`, `/unmute` are only accepted from group owner/admin.
+- Non-admin users sending those management commands are ignored.
+
 ## Update APIs
 
 - `GET /api/v1/updates/background-status`
 - `GET /api/v1/updates/check`
 - `POST /api/v1/updates/online`
 
+## Version update policy
+
+- Project version is stored in root `VERSION` file (current: `V1.0.00`).
+- Update checks compare local `VERSION` and remote `VERSION` from GitHub branch.
+- If remote version is newer, `has_update=true`.

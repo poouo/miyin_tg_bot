@@ -5,6 +5,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/_common.sh"
 
 CHECK_INTERVAL_SEC="${CHECK_INTERVAL_SEC:-600}"
+VERSION_FILE="${APP_DIR}/VERSION"
+
+version_key() {
+  local v="${1#V}"
+  v="${v#v}"
+  if [[ "${v}" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+    printf "%06d%06d%06d" "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
+    return 0
+  fi
+  return 1
+}
 
 ensure_runtime_dirs
 cd "${APP_DIR}"
@@ -12,8 +23,8 @@ cd "${APP_DIR}"
 while true; do
   status="ok"
   message=""
-  local_commit=""
-  remote_commit=""
+  local_version=""
+  remote_version=""
   has_update="false"
   checked_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
@@ -22,10 +33,26 @@ while true; do
     message="not a git repo"
   else
     if git fetch origin "${BRANCH}" >/dev/null 2>&1; then
-      local_commit="$(git rev-parse HEAD 2>/dev/null || true)"
-      remote_commit="$(git rev-parse "origin/${BRANCH}" 2>/dev/null || true)"
-      if [[ -n "${local_commit}" && -n "${remote_commit}" && "${local_commit}" != "${remote_commit}" ]]; then
-        has_update="true"
+      if [[ -f "${VERSION_FILE}" ]]; then
+        local_version="$(tr -d '\r\n' < "${VERSION_FILE}")"
+      else
+        status="error"
+        message="VERSION file not found"
+      fi
+
+      remote_version="$(git show "origin/${BRANCH}:VERSION" 2>/dev/null | tr -d '\r\n' || true)"
+
+      if [[ "${status}" == "ok" && -n "${local_version}" && -n "${remote_version}" ]]; then
+        if local_key="$(version_key "${local_version}")" && remote_key="$(version_key "${remote_version}")"; then
+          if [[ "${remote_key}" > "${local_key}" ]]; then
+            has_update="true"
+          fi
+        elif [[ "${local_version}" != "${remote_version}" ]]; then
+          has_update="true"
+        fi
+      elif [[ "${status}" == "ok" && -z "${remote_version}" ]]; then
+        status="error"
+        message="failed to read remote VERSION"
       fi
     else
       status="error"
@@ -38,9 +65,10 @@ while true; do
   "status": "${status}",
   "message": "${message}",
   "branch": "${BRANCH}",
-  "local_commit": "${local_commit}",
-  "remote_commit": "${remote_commit}",
+  "local_version": "${local_version}",
+  "remote_version": "${remote_version}",
   "has_update": ${has_update},
+  "compare_mode": "version",
   "checked_at": "${checked_at}"
 }
 EOF
