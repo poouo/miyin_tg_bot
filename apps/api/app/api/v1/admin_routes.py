@@ -19,6 +19,7 @@ from apps.api.app.services.security_service import (
 from apps.api.app.services.stats_service import dashboard_stats
 from apps.api.app.services.runtime_config_service import get_runtime_config
 from apps.api.app.services.web_language_service import read_web_language
+from apps.api.app.services.community_feature_service import DISABLEABLE_COMMANDS
 from packages.shared.shared.config.settings import settings
 
 router = APIRouter(tags=["admin"])
@@ -107,6 +108,7 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)) -> Respons
         "groups": groups,
         "security": security,
         "runtime_config": runtime_config,
+        "disableable_commands": sorted(DISABLEABLE_COMMANDS),
         **_build_i18n_context(lang),
     }
     return templates.TemplateResponse(request=request, name="dashboard.html", context=context)

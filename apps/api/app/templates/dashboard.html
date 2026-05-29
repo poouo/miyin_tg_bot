@@ -49,6 +49,10 @@
             <span class="nav-item-icon"><i class="ri-spam-2-line"></i></span>
             <span class="nav-item-label">{{ t.nav_ad_keywords }}</span>
           </button>
+          <button class="nav-item" type="button" data-target="community">
+            <span class="nav-item-icon"><i class="ri-community-line"></i></span>
+            <span class="nav-item-label">{{ t.nav_community_features }}</span>
+          </button>
           <button class="nav-item" type="button" data-target="member-events">
             <span class="nav-item-icon"><i class="ri-list-check-2"></i></span>
             <span class="nav-item-label">{{ t.nav_member_events }}</span>
@@ -366,6 +370,248 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <section id="community" class="glass-panel panel section">
+        <div class="panel-head">
+          <h3>{{ t.community_title }}</h3>
+          <p>{{ t.community_desc }}</p>
+        </div>
+        <div class="form-grid two-col">
+          <label>
+            {{ t.select_group }}
+            <select id="cm-chat-id">
+              {% for group in groups %}
+              <option value="{{ group.chat_id }}">{{ group.title or group.chat_id }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+
+        <div class="settings-stack community-stack">
+          <article class="glass-surface settings-block stagger-card">
+            <div class="settings-block-head">
+              <h4>{{ t.community_rules_title }}</h4>
+              <p>{{ t.community_rules_desc }}</p>
+            </div>
+            <div class="form-grid">
+              <label class="full-width">
+                {{ t.community_rules_text }}
+                <textarea id="cm-rules-text" rows="6"></textarea>
+              </label>
+            </div>
+          </article>
+
+          <article class="glass-surface settings-block stagger-card">
+            <div class="settings-block-head">
+              <h4>{{ t.community_welcome_title }}</h4>
+              <p>{{ t.community_template_hint }}</p>
+            </div>
+            <div class="form-grid two-col checks-grid">
+              <label class="check-card"><input id="cm-welcome-enabled" type="checkbox" /> {{ t.community_welcome_enabled }}</label>
+              <label class="check-card"><input id="cm-goodbye-enabled" type="checkbox" /> {{ t.community_goodbye_enabled }}</label>
+              <label class="check-card"><input id="cm-clean-welcome" type="checkbox" /> {{ t.community_clean_welcome }}</label>
+            </div>
+            <div class="form-grid two-col">
+              <label>
+                {{ t.community_welcome_text }}
+                <textarea id="cm-welcome-text" rows="4"></textarea>
+              </label>
+              <label>
+                {{ t.community_goodbye_text }}
+                <textarea id="cm-goodbye-text" rows="4"></textarea>
+              </label>
+            </div>
+          </article>
+
+          <div class="community-grid">
+            <article class="glass-surface settings-block stagger-card">
+              <div class="settings-block-head">
+                <h4>{{ t.community_warnings_title }}</h4>
+                <p>{{ t.community_warnings_desc }}</p>
+              </div>
+              <div class="form-grid two-col">
+                <label>
+                  {{ t.community_warn_limit }}
+                  <input id="cm-warn-limit" type="number" min="1" max="20" value="3" />
+                </label>
+                <label>
+                  {{ t.policy_action }}
+                  <select id="cm-warn-action">
+                    <option value="mute">{{ t.action_mute }}</option>
+                    <option value="kick">{{ t.action_kick }}</option>
+                    <option value="ban">{{ t.action_ban }}</option>
+                  </select>
+                </label>
+                <label>
+                  {{ t.community_warn_mute_minutes }}
+                  <input id="cm-warn-mute-minutes" type="number" min="1" max="10080" value="60" />
+                </label>
+                <label>
+                  {{ t.community_warn_ban_minutes }}
+                  <input id="cm-warn-ban-minutes" type="number" min="1" max="10080" value="1440" />
+                </label>
+                <label class="check-card full-width"><input id="cm-reports-enabled" type="checkbox" /> {{ t.community_reports_enabled }}</label>
+              </div>
+            </article>
+
+            <article class="glass-surface settings-block stagger-card">
+              <div class="settings-block-head">
+                <h4>{{ t.community_locks_title }}</h4>
+                <p>{{ t.community_locks_desc }}</p>
+              </div>
+              <div class="form-grid two-col checks-grid">
+                <label class="check-card"><input id="cm-lock-links" type="checkbox" /> {{ t.lock_links }}</label>
+                <label class="check-card"><input id="cm-lock-forwards" type="checkbox" /> {{ t.lock_forwards }}</label>
+                <label class="check-card"><input id="cm-lock-media" type="checkbox" /> {{ t.lock_media }}</label>
+                <label class="check-card"><input id="cm-lock-stickers" type="checkbox" /> {{ t.lock_stickers }}</label>
+                <label class="check-card"><input id="cm-lock-commands" type="checkbox" /> {{ t.lock_commands }}</label>
+              </div>
+            </article>
+
+            <article class="glass-surface settings-block stagger-card">
+              <div class="settings-block-head">
+                <h4>{{ t.community_log_title }}</h4>
+                <p>{{ t.community_log_desc }}</p>
+              </div>
+              <div class="form-grid">
+                <label class="check-card"><input id="cm-log-enabled" type="checkbox" /> {{ t.community_log_enabled }}</label>
+                <label>
+                  {{ t.community_log_chat_id }}
+                  <input id="cm-log-chat-id" type="number" value="0" />
+                </label>
+              </div>
+            </article>
+
+            <article class="glass-surface settings-block stagger-card">
+              <div class="settings-block-head">
+                <h4>{{ t.community_disabled_commands_title }}</h4>
+                <p>{{ t.community_disabled_commands_desc }}</p>
+              </div>
+              <div class="command-grid">
+                {% for command in disableable_commands %}
+                <label class="check-card"><input class="cm-disabled-command" type="checkbox" value="{{ command }}" /> /{{ command }}</label>
+                {% endfor %}
+              </div>
+            </article>
+          </div>
+
+          <article class="glass-surface settings-block stagger-card">
+            <div class="settings-block-head">
+              <h4>{{ t.community_notes_title }}</h4>
+              <p>{{ t.community_notes_desc }}</p>
+            </div>
+            <div class="form-grid two-col">
+              <label>
+                {{ t.note_name }}
+                <input id="cm-note-name" type="text" maxlength="64" />
+              </label>
+              <label>
+                {{ t.auto_reply_parse_mode }}
+                <select id="cm-note-parse-mode">
+                  <option value="plain">{{ t.auto_reply_parse_mode_plain }}</option>
+                  <option value="markdownv2">{{ t.auto_reply_parse_mode_markdownv2 }}</option>
+                  <option value="html">{{ t.auto_reply_parse_mode_html }}</option>
+                </select>
+              </label>
+              <label class="full-width">
+                {{ t.note_text }}
+                <textarea id="cm-note-text" rows="3"></textarea>
+              </label>
+            </div>
+            <div class="actions">
+              <button id="cm-note-save" type="button" class="btn">{{ t.note_save }}</button>
+            </div>
+            <div class="table-wrap compact-table">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>{{ t.note_name }}</th>
+                    <th>{{ t.auto_reply_parse_mode }}</th>
+                    <th>{{ t.actions }}</th>
+                  </tr>
+                </thead>
+                <tbody id="cm-notes-body">
+                  <tr><td colspan="3">{{ t.no_data }}</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <div class="community-grid">
+            <article class="glass-surface settings-block stagger-card">
+              <div class="settings-block-head">
+                <h4>{{ t.community_rss_title }}</h4>
+                <p>{{ t.community_rss_desc }}</p>
+              </div>
+              <div class="form-grid">
+                <label>
+                  {{ t.rss_url }}
+                  <input id="cm-rss-url" type="url" />
+                </label>
+                <label>
+                  {{ t.rss_title }}
+                  <input id="cm-rss-title" type="text" maxlength="255" />
+                </label>
+              </div>
+              <div class="actions">
+                <button id="cm-rss-save" type="button" class="btn">{{ t.rss_add }}</button>
+              </div>
+              <div class="table-wrap compact-table">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>{{ t.rss_title }}</th>
+                      <th>URL</th>
+                      <th>{{ t.actions }}</th>
+                    </tr>
+                  </thead>
+                  <tbody id="cm-rss-body">
+                    <tr><td colspan="3">{{ t.no_data }}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article class="glass-surface settings-block stagger-card">
+              <div class="settings-block-head">
+                <h4>{{ t.community_global_bans_title }}</h4>
+                <p>{{ t.community_global_bans_desc }}</p>
+              </div>
+              <div class="form-grid">
+                <label>
+                  {{ t.user_id }}
+                  <input id="cm-gban-user-id" type="number" />
+                </label>
+                <label>
+                  {{ t.reason }}
+                  <input id="cm-gban-reason" type="text" maxlength="1000" />
+                </label>
+              </div>
+              <div class="actions">
+                <button id="cm-gban-save" type="button" class="btn warning">{{ t.global_ban_add }}</button>
+              </div>
+              <div class="table-wrap compact-table">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>{{ t.user_id }}</th>
+                      <th>{{ t.reason }}</th>
+                      <th>{{ t.actions }}</th>
+                    </tr>
+                  </thead>
+                  <tbody id="cm-gban-body">
+                    <tr><td colspan="3">{{ t.no_data }}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+        </div>
+        <div class="actions sticky-actions">
+          <button id="cm-save" type="button" class="btn">{{ t.save }}</button>
+          <button id="cm-refresh" type="button" class="btn subtle">{{ t.refresh }}</button>
         </div>
       </section>
 

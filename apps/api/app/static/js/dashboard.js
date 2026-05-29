@@ -78,6 +78,42 @@ const banChatId = document.getElementById("ban-chat-id");
 const banRefresh = document.getElementById("ban-refresh");
 const banTableBody = document.getElementById("ban-table-body");
 
+const cmChatId = document.getElementById("cm-chat-id");
+const cmRulesText = document.getElementById("cm-rules-text");
+const cmWelcomeEnabled = document.getElementById("cm-welcome-enabled");
+const cmGoodbyeEnabled = document.getElementById("cm-goodbye-enabled");
+const cmCleanWelcome = document.getElementById("cm-clean-welcome");
+const cmWelcomeText = document.getElementById("cm-welcome-text");
+const cmGoodbyeText = document.getElementById("cm-goodbye-text");
+const cmWarnLimit = document.getElementById("cm-warn-limit");
+const cmWarnAction = document.getElementById("cm-warn-action");
+const cmWarnMuteMinutes = document.getElementById("cm-warn-mute-minutes");
+const cmWarnBanMinutes = document.getElementById("cm-warn-ban-minutes");
+const cmReportsEnabled = document.getElementById("cm-reports-enabled");
+const cmLockLinks = document.getElementById("cm-lock-links");
+const cmLockForwards = document.getElementById("cm-lock-forwards");
+const cmLockMedia = document.getElementById("cm-lock-media");
+const cmLockStickers = document.getElementById("cm-lock-stickers");
+const cmLockCommands = document.getElementById("cm-lock-commands");
+const cmLogEnabled = document.getElementById("cm-log-enabled");
+const cmLogChatId = document.getElementById("cm-log-chat-id");
+const cmDisabledCommands = Array.from(document.querySelectorAll(".cm-disabled-command"));
+const cmSave = document.getElementById("cm-save");
+const cmRefresh = document.getElementById("cm-refresh");
+const cmNoteName = document.getElementById("cm-note-name");
+const cmNoteParseMode = document.getElementById("cm-note-parse-mode");
+const cmNoteText = document.getElementById("cm-note-text");
+const cmNoteSave = document.getElementById("cm-note-save");
+const cmNotesBody = document.getElementById("cm-notes-body");
+const cmRssUrl = document.getElementById("cm-rss-url");
+const cmRssTitle = document.getElementById("cm-rss-title");
+const cmRssSave = document.getElementById("cm-rss-save");
+const cmRssBody = document.getElementById("cm-rss-body");
+const cmGbanUserId = document.getElementById("cm-gban-user-id");
+const cmGbanReason = document.getElementById("cm-gban-reason");
+const cmGbanSave = document.getElementById("cm-gban-save");
+const cmGbanBody = document.getElementById("cm-gban-body");
+
 const gsChatId = document.getElementById("gs-chat-id");
 const gsJoinVerify = document.getElementById("gs-join-verify");
 const gsKeywordFilter = document.getElementById("gs-keyword-filter");
@@ -249,6 +285,13 @@ function setActiveSection(target) {
     const active = section.id === target;
     section.classList.toggle("section-active", active);
     section.hidden = !active;
+    if (active) {
+      section.classList.remove("route-content-enter");
+      void section.offsetWidth;
+      section.classList.add("route-content-enter");
+    } else {
+      section.classList.remove("route-content-enter");
+    }
   });
   if (workspaceEl) workspaceEl.scrollTop = 0;
 }
@@ -501,6 +544,242 @@ async function loadBans() {
   renderBans(result.data);
 }
 
+function getCommunityChatId() {
+  return cmChatId?.value || "";
+}
+
+function applyCommunityConfig(config) {
+  if (!config) return;
+  if (cmRulesText) cmRulesText.value = config.rules_text || "";
+  if (cmWelcomeEnabled) cmWelcomeEnabled.checked = Boolean(config.welcome_enabled);
+  if (cmGoodbyeEnabled) cmGoodbyeEnabled.checked = Boolean(config.goodbye_enabled);
+  if (cmCleanWelcome) cmCleanWelcome.checked = Boolean(config.clean_welcome);
+  if (cmWelcomeText) cmWelcomeText.value = config.welcome_text || "";
+  if (cmGoodbyeText) cmGoodbyeText.value = config.goodbye_text || "";
+  if (cmWarnLimit) cmWarnLimit.value = String(Number(config.warn_limit || 3));
+  if (cmWarnAction) cmWarnAction.value = config.warn_action || "mute";
+  if (cmWarnMuteMinutes) cmWarnMuteMinutes.value = String(Number(config.warn_mute_minutes || 60));
+  if (cmWarnBanMinutes) cmWarnBanMinutes.value = String(Number(config.warn_ban_minutes || 1440));
+  if (cmReportsEnabled) cmReportsEnabled.checked = Boolean(config.reports_enabled);
+  if (cmLockLinks) cmLockLinks.checked = Boolean(config.lock_links);
+  if (cmLockForwards) cmLockForwards.checked = Boolean(config.lock_forwards);
+  if (cmLockMedia) cmLockMedia.checked = Boolean(config.lock_media);
+  if (cmLockStickers) cmLockStickers.checked = Boolean(config.lock_stickers);
+  if (cmLockCommands) cmLockCommands.checked = Boolean(config.lock_commands);
+  if (cmLogEnabled) cmLogEnabled.checked = Boolean(config.log_enabled);
+  if (cmLogChatId) cmLogChatId.value = String(Number(config.log_chat_id || 0));
+  const disabled = new Set(Array.isArray(config.disabled_commands) ? config.disabled_commands : []);
+  cmDisabledCommands.forEach((input) => {
+    input.checked = disabled.has(input.value);
+  });
+}
+
+async function loadCommunityConfig() {
+  const chatId = getCommunityChatId();
+  if (!chatId) return;
+  const result = await requestJson(`/api/v1/community/${encodeURIComponent(chatId)}`);
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    return;
+  }
+  applyCommunityConfig(result.data);
+  await Promise.all([loadCommunityNotes(), loadCommunityRss(), loadGlobalBans()]);
+}
+
+function buildCommunityPayload() {
+  return {
+    rules_text: cmRulesText?.value || "",
+    welcome_enabled: Boolean(cmWelcomeEnabled?.checked),
+    goodbye_enabled: Boolean(cmGoodbyeEnabled?.checked),
+    clean_welcome: Boolean(cmCleanWelcome?.checked),
+    welcome_text: cmWelcomeText?.value || "",
+    goodbye_text: cmGoodbyeText?.value || "",
+    warn_limit: Number(cmWarnLimit?.value || 3),
+    warn_action: cmWarnAction?.value || "mute",
+    warn_mute_minutes: Number(cmWarnMuteMinutes?.value || 60),
+    warn_ban_minutes: Number(cmWarnBanMinutes?.value || 1440),
+    reports_enabled: Boolean(cmReportsEnabled?.checked),
+    lock_links: Boolean(cmLockLinks?.checked),
+    lock_forwards: Boolean(cmLockForwards?.checked),
+    lock_media: Boolean(cmLockMedia?.checked),
+    lock_stickers: Boolean(cmLockStickers?.checked),
+    lock_commands: Boolean(cmLockCommands?.checked),
+    log_enabled: Boolean(cmLogEnabled?.checked),
+    log_chat_id: Number(cmLogChatId?.value || 0),
+    disabled_commands: cmDisabledCommands.filter((input) => input.checked).map((input) => input.value),
+  };
+}
+
+async function saveCommunityConfig() {
+  const chatId = getCommunityChatId();
+  if (!chatId) {
+    showStatus(t("select_group"), true);
+    return;
+  }
+  const result = await requestJson(`/api/v1/community/${encodeURIComponent(chatId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(buildCommunityPayload()),
+  });
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    return;
+  }
+  applyCommunityConfig(result.data);
+  showStatus(t("saved"), false);
+}
+
+function renderCommunityNotes(items) {
+  if (!cmNotesBody) return;
+  if (!Array.isArray(items) || !items.length) {
+    cmNotesBody.innerHTML = `<tr><td colspan="3">${escapeHtml(t("no_data", "No data"))}</td></tr>`;
+    return;
+  }
+  cmNotesBody.innerHTML = items
+    .map(
+      (item) => `<tr>
+        <td>${escapeHtml(item.name)}</td>
+        <td>${escapeHtml(formatParseMode(item.parse_mode))}</td>
+        <td><button class="table-btn warning" type="button" data-action="delete-note" data-name="${escapeHtml(item.name)}">${escapeHtml(t("delete", "Delete"))}</button></td>
+      </tr>`,
+    )
+    .join("");
+}
+
+async function loadCommunityNotes() {
+  const chatId = getCommunityChatId();
+  if (!chatId) {
+    renderCommunityNotes([]);
+    return;
+  }
+  const result = await requestJson(`/api/v1/community/${encodeURIComponent(chatId)}/notes`);
+  renderCommunityNotes(result.ok ? result.data : []);
+}
+
+async function saveCommunityNote() {
+  const chatId = getCommunityChatId();
+  const payload = {
+    name: (cmNoteName?.value || "").trim(),
+    text: (cmNoteText?.value || "").trim(),
+    parse_mode: (cmNoteParseMode?.value || "plain").toLowerCase(),
+  };
+  if (!chatId || !payload.name || !payload.text) {
+    showStatus(t("fill_required_fields"), true);
+    return;
+  }
+  const result = await requestJson(`/api/v1/community/${encodeURIComponent(chatId)}/notes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    return;
+  }
+  if (cmNoteName) cmNoteName.value = "";
+  if (cmNoteText) cmNoteText.value = "";
+  showStatus(t("saved"), false);
+  await loadCommunityNotes();
+}
+
+function renderCommunityRss(items) {
+  if (!cmRssBody) return;
+  if (!Array.isArray(items) || !items.length) {
+    cmRssBody.innerHTML = `<tr><td colspan="3">${escapeHtml(t("no_data", "No data"))}</td></tr>`;
+    return;
+  }
+  cmRssBody.innerHTML = items
+    .map(
+      (item) => `<tr>
+        <td>${escapeHtml(item.title || "-")}</td>
+        <td><div class="cell-reply">${escapeHtml(item.url)}</div></td>
+        <td><button class="table-btn warning" type="button" data-action="delete-rss" data-url="${escapeHtml(item.url)}">${escapeHtml(t("delete", "Delete"))}</button></td>
+      </tr>`,
+    )
+    .join("");
+}
+
+async function loadCommunityRss() {
+  const chatId = getCommunityChatId();
+  if (!chatId) {
+    renderCommunityRss([]);
+    return;
+  }
+  const result = await requestJson(`/api/v1/community/${encodeURIComponent(chatId)}/rss`);
+  renderCommunityRss(result.ok ? result.data : []);
+}
+
+async function saveCommunityRss() {
+  const chatId = getCommunityChatId();
+  const payload = {
+    url: (cmRssUrl?.value || "").trim(),
+    title: (cmRssTitle?.value || "").trim(),
+  };
+  if (!chatId || !payload.url) {
+    showStatus(t("fill_required_fields"), true);
+    return;
+  }
+  const result = await requestJson(`/api/v1/community/${encodeURIComponent(chatId)}/rss`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    return;
+  }
+  if (cmRssUrl) cmRssUrl.value = "";
+  if (cmRssTitle) cmRssTitle.value = "";
+  showStatus(t("saved"), false);
+  await loadCommunityRss();
+}
+
+function renderGlobalBans(items) {
+  if (!cmGbanBody) return;
+  if (!Array.isArray(items) || !items.length) {
+    cmGbanBody.innerHTML = `<tr><td colspan="3">${escapeHtml(t("no_data", "No data"))}</td></tr>`;
+    return;
+  }
+  cmGbanBody.innerHTML = items
+    .map(
+      (item) => `<tr>
+        <td>${escapeHtml(String(item.user_id || ""))}</td>
+        <td>${escapeHtml(item.reason || "")}</td>
+        <td><button class="table-btn" type="button" data-action="delete-gban" data-user-id="${item.user_id}">${escapeHtml(t("unban", "Unban"))}</button></td>
+      </tr>`,
+    )
+    .join("");
+}
+
+async function loadGlobalBans() {
+  const result = await requestJson("/api/v1/community/global-bans/list");
+  renderGlobalBans(result.ok ? result.data : []);
+}
+
+async function saveGlobalBan() {
+  const payload = {
+    user_id: Number(cmGbanUserId?.value || 0),
+    reason: (cmGbanReason?.value || "").trim(),
+  };
+  if (!payload.user_id) {
+    showStatus(t("fill_required_fields"), true);
+    return;
+  }
+  const result = await requestJson("/api/v1/community/global-bans", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    return;
+  }
+  if (cmGbanUserId) cmGbanUserId.value = "";
+  if (cmGbanReason) cmGbanReason.value = "";
+  showStatus(t("saved"), false);
+  await loadGlobalBans();
+}
+
 function applyGroupSettings(chatIdValue) {
   const chatId = Number(chatIdValue || 0);
   const config = groupConfigCache.get(chatId);
@@ -596,6 +875,8 @@ async function handleSectionEnter(target) {
     await loadMemberEvents();
   } else if (target === "bans") {
     await loadBans();
+  } else if (target === "community") {
+    await loadCommunityConfig();
   } else if (target === "group-settings") {
     await loadGroupConfigs();
   }
@@ -1038,6 +1319,68 @@ akTableBody?.addEventListener("click", async (event) => {
 gsChatId?.addEventListener("change", () => applyGroupSettings(gsChatId.value));
 gsSave?.addEventListener("click", saveGroupSettings);
 gsRefresh?.addEventListener("click", loadGroupConfigs);
+
+cmChatId?.addEventListener("change", loadCommunityConfig);
+cmSave?.addEventListener("click", saveCommunityConfig);
+cmRefresh?.addEventListener("click", loadCommunityConfig);
+cmNoteSave?.addEventListener("click", saveCommunityNote);
+cmRssSave?.addEventListener("click", saveCommunityRss);
+cmGbanSave?.addEventListener("click", saveGlobalBan);
+
+cmNotesBody?.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLButtonElement)) return;
+  if (target.dataset.action !== "delete-note") return;
+  const chatId = getCommunityChatId();
+  const name = target.dataset.name || "";
+  if (!chatId || !name) return;
+  const result = await requestJson(
+    `/api/v1/community/${encodeURIComponent(chatId)}/notes/${encodeURIComponent(name)}`,
+    { method: "DELETE" },
+  );
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    return;
+  }
+  showStatus(t("saved"), false);
+  await loadCommunityNotes();
+});
+
+cmRssBody?.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLButtonElement)) return;
+  if (target.dataset.action !== "delete-rss") return;
+  const chatId = getCommunityChatId();
+  const url = target.dataset.url || "";
+  if (!chatId || !url) return;
+  const params = new URLSearchParams({ url });
+  const result = await requestJson(`/api/v1/community/${encodeURIComponent(chatId)}/rss?${params.toString()}`, {
+    method: "DELETE",
+  });
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    return;
+  }
+  showStatus(t("saved"), false);
+  await loadCommunityRss();
+});
+
+cmGbanBody?.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLButtonElement)) return;
+  if (target.dataset.action !== "delete-gban") return;
+  const userId = target.dataset.userId || "";
+  if (!userId) return;
+  const result = await requestJson(`/api/v1/community/global-bans/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+  });
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    return;
+  }
+  showStatus(t("saved"), false);
+  await loadGlobalBans();
+});
 
 evRefresh?.addEventListener("click", loadMemberEvents);
 evChatId?.addEventListener("change", loadMemberEvents);
