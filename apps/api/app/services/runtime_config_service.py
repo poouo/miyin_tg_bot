@@ -66,8 +66,9 @@ CONFIG_DEFAULTS: dict[str, str] = {
     "join_verify_timeout_sec": "180",
     "spam_window_sec": "10",
     "spam_max_messages": "6",
-    "ad_regex": r"(t\.me/|telegram\.me/|vx|wechat|free|bet|promo)",
+    "ad_regex": "",
 }
+LEGACY_DEFAULT_AD_REGEX = r"(t\.me/|telegram\.me/|vx|wechat|free|bet|promo)"
 
 INT_KEYS = {
     "deepseek_timeout_sec",
@@ -100,6 +101,10 @@ async def _ensure_defaults(db: AsyncSession) -> None:
         if key in existing:
             continue
         db.add(AppSetting(key=key, value=default))
+        dirty = True
+    legacy_ad_regex = existing.get("ad_regex")
+    if legacy_ad_regex is not None and legacy_ad_regex.value == LEGACY_DEFAULT_AD_REGEX:
+        legacy_ad_regex.value = ""
         dirty = True
     if dirty:
         await db.commit()
@@ -135,7 +140,7 @@ def _build_runtime(data: dict[str, str], updated_at: datetime | None) -> Runtime
         join_verify_timeout_sec=join_timeout,
         spam_window_sec=spam_window,
         spam_max_messages=spam_max,
-        ad_regex=(data.get("ad_regex", "") or CONFIG_DEFAULTS["ad_regex"]).strip(),
+        ad_regex=(data.get("ad_regex", "") or "").strip(),
         updated_at=updated_at,
     )
 

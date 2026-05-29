@@ -3,6 +3,7 @@ const sidebar = document.getElementById("sidebar");
 const sidebarOverlay = document.getElementById("sidebar-overlay");
 const workspaceEl = document.querySelector(".workspace");
 const menuToggle = document.getElementById("mobile-menu-toggle");
+const themeToggle = document.getElementById("theme-toggle");
 const workspaceTitle = document.getElementById("workspace-title");
 const actionStatus = document.getElementById("action-status");
 const navItems = Array.from(document.querySelectorAll(".nav-item"));
@@ -33,7 +34,6 @@ const rtDeepseekTimeoutSec = document.getElementById("rt-deepseek-timeout-sec");
 const rtJoinVerifyTimeoutSec = document.getElementById("rt-join-verify-timeout-sec");
 const rtSpamWindowSec = document.getElementById("rt-spam-window-sec");
 const rtSpamMaxMessages = document.getElementById("rt-spam-max-messages");
-const rtAdRegex = document.getElementById("rt-ad-regex");
 
 const upgradeFill = document.getElementById("upgrade-fill");
 const upgradeStatus = document.getElementById("upgrade-status");
@@ -74,6 +74,10 @@ const evChatId = document.getElementById("ev-chat-id");
 const evRefresh = document.getElementById("ev-refresh");
 const evTableBody = document.getElementById("ev-table-body");
 
+const banChatId = document.getElementById("ban-chat-id");
+const banRefresh = document.getElementById("ban-refresh");
+const banTableBody = document.getElementById("ban-table-body");
+
 const gsChatId = document.getElementById("gs-chat-id");
 const gsJoinVerify = document.getElementById("gs-join-verify");
 const gsKeywordFilter = document.getElementById("gs-keyword-filter");
@@ -106,6 +110,7 @@ const i18n = i18nEl ? JSON.parse(i18nEl.textContent || "{}") : {};
 
 let updatePollTimer = null;
 const ACTIVE_SECTION_KEY = "miyin.dashboard.activeSection";
+const THEME_KEY = "miyin.dashboard.theme";
 let actionStatusTimer = null;
 let arEditingRuleId = null;
 let akEditingKeywordId = null;
@@ -241,8 +246,11 @@ function setActiveNav(target) {
 
 function setActiveSection(target) {
   sections.forEach((section) => {
-    section.classList.toggle("section-active", section.id === target);
+    const active = section.id === target;
+    section.classList.toggle("section-active", active);
+    section.hidden = !active;
   });
+  if (workspaceEl) workspaceEl.scrollTop = 0;
 }
 
 function closeMobileSidebar() {
@@ -429,6 +437,70 @@ async function loadMemberEvents() {
   renderMemberEvents(result.data);
 }
 
+function applyTheme(theme) {
+  const isDark = theme === "dark";
+  bodyEl.classList.toggle("dark", isDark);
+  if (!themeToggle) return;
+  const icon = themeToggle.querySelector("i");
+  const label = themeToggle.querySelector("span");
+  if (icon) icon.className = isDark ? "ri-sun-line" : "ri-moon-line";
+  if (label) label.textContent = isDark ? t("theme_light", "Light mode") : t("theme_dark", "Dark mode");
+}
+
+try {
+  applyTheme(window.localStorage.getItem(THEME_KEY) || "light");
+} catch (err) {
+  applyTheme("light");
+}
+
+themeToggle?.addEventListener("click", () => {
+  const nextTheme = bodyEl.classList.contains("dark") ? "light" : "dark";
+  applyTheme(nextTheme);
+  try {
+    window.localStorage.setItem(THEME_KEY, nextTheme);
+  } catch (err) {
+    // ignore
+  }
+});
+
+function renderBans(items) {
+  if (!banTableBody) return;
+  if (!Array.isArray(items) || !items.length) {
+    banTableBody.innerHTML = `<tr><td colspan="5">${escapeHtml(t("no_data", "No data"))}</td></tr>`;
+    return;
+  }
+  banTableBody.innerHTML = items
+    .map((item) => {
+      const groupText = item.group_title ? `${item.group_title} (${item.chat_id})` : `${item.chat_id}`;
+      const expiresAt = item.expires_at ? new Date(item.expires_at).toLocaleString() : "";
+      return `<tr>
+        <td>${escapeHtml(groupText)}</td>
+        <td>${escapeHtml(String(item.user_id || ""))}</td>
+        <td>${escapeHtml(item.reason || "")}</td>
+        <td>${escapeHtml(expiresAt)}</td>
+        <td>
+          <button class="table-btn" type="button" data-action="unban" data-chat-id="${item.chat_id}" data-user-id="${item.user_id}">
+            ${escapeHtml(t("unban", "Unban"))}
+          </button>
+        </td>
+      </tr>`;
+    })
+    .join("");
+}
+
+async function loadBans() {
+  const params = new URLSearchParams();
+  if (banChatId?.value) params.set("chat_id", banChatId.value);
+  const query = params.toString();
+  const result = await requestJson(`/api/v1/sanctions/bans${query ? `?${query}` : ""}`);
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    renderBans([]);
+    return;
+  }
+  renderBans(result.data);
+}
+
 function applyGroupSettings(chatIdValue) {
   const chatId = Number(chatIdValue || 0);
   const config = groupConfigCache.get(chatId);
@@ -522,6 +594,8 @@ async function handleSectionEnter(target) {
     await loadAdKeywords();
   } else if (target === "member-events") {
     await loadMemberEvents();
+  } else if (target === "bans") {
+    await loadBans();
   } else if (target === "group-settings") {
     await loadGroupConfigs();
   }
@@ -645,7 +719,6 @@ function buildRuntimePayload() {
     join_verify_timeout_sec: Number(rtJoinVerifyTimeoutSec?.value || 180),
     spam_window_sec: Number(rtSpamWindowSec?.value || 10),
     spam_max_messages: Number(rtSpamMaxMessages?.value || 6),
-    ad_regex: rtAdRegex?.value || "",
   };
 }
 
@@ -968,6 +1041,29 @@ gsRefresh?.addEventListener("click", loadGroupConfigs);
 
 evRefresh?.addEventListener("click", loadMemberEvents);
 evChatId?.addEventListener("change", loadMemberEvents);
+
+banRefresh?.addEventListener("click", loadBans);
+banChatId?.addEventListener("change", loadBans);
+banTableBody?.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLButtonElement)) return;
+  if (target.dataset.action !== "unban") return;
+  const chatId = target.dataset.chatId || "";
+  const userId = target.dataset.userId || "";
+  if (!chatId || !userId) return;
+  target.disabled = true;
+  const result = await requestJson(
+    `/api/v1/sanctions/bans/${encodeURIComponent(chatId)}/${encodeURIComponent(userId)}/unban`,
+    { method: "POST" },
+  );
+  if (!result.ok) {
+    target.disabled = false;
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    return;
+  }
+  showStatus(t("saved"), false);
+  await loadBans();
+});
 
 if (arModal) arModal.hidden = true;
 if (akModal) akModal.hidden = true;

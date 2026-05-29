@@ -29,4 +29,4 @@ class RuntimeConfigUpdate(BaseModel):
     join_verify_timeout_sec: int = Field(default=180, ge=30, le=3600)
     spam_window_sec: int = Field(default=10, ge=2, le=120)
     spam_max_messages: int = Field(default=6, ge=2, le=30)
-    ad_regex: str = Field(default=r"(t\.me/|telegram\.me/|vx|wechat|free|bet|promo)")
+    ad_regex: str = ""

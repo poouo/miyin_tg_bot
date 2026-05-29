@@ -24,6 +24,7 @@ async def init_db() -> None:
 
 
 async def _run_compat_migrations(conn: AsyncConnection) -> None:
+    await conn.run_sync(Base.metadata.create_all)
     dialect = conn.dialect.name
     if dialect == "sqlite":
         result = await conn.execute(text("PRAGMA table_info(auto_reply_rules)"))

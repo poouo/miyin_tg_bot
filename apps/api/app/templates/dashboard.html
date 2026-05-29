@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{{ t.dashboard_title }}</title>
-  <link rel="stylesheet" href="/static/css/dashboard.css" />
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/dashboard.fast.css" />
 </head>
 <body>
   <div class="bg-layer bg-layer-a"></div>
@@ -14,7 +15,7 @@
   <main class="shell">
     <aside class="sidebar glass-panel" id="sidebar" data-mobile-sidebar="true">
       <header class="sidebar-header" data-sidebar="header">
-        <div class="brand-mark">M</div>
+        <div class="brand-mark"><i class="ri-robot-2-fill"></i></div>
         <div class="brand-copy">
           <h1>Miyin TG</h1>
           <p>{{ t.admin_dashboard }}</p>
@@ -25,15 +26,15 @@
         <div class="nav-group">
           <p class="nav-group-title">{{ t.nav_group_control }}</p>
           <button class="nav-item active" type="button" data-target="overview">
-            <span class="nav-item-icon">DB</span>
+            <span class="nav-item-icon"><i class="ri-dashboard-3-line"></i></span>
             <span class="nav-item-label">{{ t.nav_overview }}</span>
           </button>
           <button class="nav-item" type="button" data-target="groups">
-            <span class="nav-item-icon">GS</span>
+            <span class="nav-item-icon"><i class="ri-group-line"></i></span>
             <span class="nav-item-label">{{ t.nav_groups }}</span>
           </button>
           <button class="nav-item" type="button" data-target="group-settings">
-            <span class="nav-item-icon">GC</span>
+            <span class="nav-item-icon"><i class="ri-equalizer-line"></i></span>
             <span class="nav-item-label">{{ t.nav_group_settings }}</span>
           </button>
         </div>
@@ -41,31 +42,39 @@
         <div class="nav-group">
           <p class="nav-group-title">{{ t.nav_group_moderation }}</p>
           <button class="nav-item" type="button" data-target="auto-replies">
-            <span class="nav-item-icon">AR</span>
+            <span class="nav-item-icon"><i class="ri-message-2-line"></i></span>
             <span class="nav-item-label">{{ t.nav_auto_replies }}</span>
           </button>
           <button class="nav-item" type="button" data-target="ad-keywords">
-            <span class="nav-item-icon">AD</span>
+            <span class="nav-item-icon"><i class="ri-spam-2-line"></i></span>
             <span class="nav-item-label">{{ t.nav_ad_keywords }}</span>
           </button>
           <button class="nav-item" type="button" data-target="member-events">
-            <span class="nav-item-icon">EV</span>
+            <span class="nav-item-icon"><i class="ri-list-check-2"></i></span>
             <span class="nav-item-label">{{ t.nav_member_events }}</span>
+          </button>
+          <button class="nav-item" type="button" data-target="bans">
+            <span class="nav-item-icon"><i class="ri-forbid-2-line"></i></span>
+            <span class="nav-item-label">{{ t.nav_bans }}</span>
           </button>
         </div>
 
         <div class="nav-group">
           <p class="nav-group-title">{{ t.nav_group_security }}</p>
           <button class="nav-item" type="button" data-target="settings">
-            <span class="nav-item-icon">ST</span>
+            <span class="nav-item-icon"><i class="ri-settings-5-line"></i></span>
             <span class="nav-item-label">{{ t.nav_system_settings }}</span>
           </button>
         </div>
       </nav>
 
       <footer class="sidebar-footer" data-sidebar="footer">
+        <button id="theme-toggle" type="button" class="btn subtle full theme-toggle">
+          <i class="ri-moon-line"></i>
+          <span>{{ t.theme_dark }}</span>
+        </button>
         <form action="/auth/logout" method="post">
-          <button type="submit" class="btn danger full">{{ t.logout }}</button>
+          <button type="submit" class="btn danger full"><i class="ri-logout-box-r-line"></i>{{ t.logout }}</button>
         </form>
       </footer>
     </aside>
@@ -81,6 +90,7 @@
           <h2 id="workspace-title">{{ t.nav_overview }}</h2>
           <p>{{ t.dashboard_subtitle }}</p>
         </div>
+        <span class="runtime-pill"><span></span>{{ t.system_running }}</span>
         <p id="action-status" class="action-status"></p>
       </header>
 
@@ -139,10 +149,6 @@
               <label>
                 {{ t.runtime_spam_max }}
                 <input id="rt-spam-max-messages" type="number" min="2" max="30" value="{{ runtime_config.spam_max_messages }}" />
-              </label>
-              <label class="full-width">
-                {{ t.runtime_ad_regex }}
-                <input id="rt-ad-regex" type="text" value="{{ runtime_config.ad_regex }}" />
               </label>
             </div>
             <div class="actions">
@@ -535,6 +541,45 @@
                 <td colspan="8">{{ t.no_group_data }}</td>
               </tr>
               {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="bans" class="glass-panel panel section">
+        <div class="panel-head">
+          <h3>{{ t.bans_title }}</h3>
+          <p>{{ t.bans_desc }}</p>
+        </div>
+        <div class="form-grid two-col">
+          <label>
+            {{ t.select_group }}
+            <select id="ban-chat-id">
+              <option value="">{{ t.all_groups }}</option>
+              {% for group in groups %}
+              <option value="{{ group.chat_id }}">{{ group.title or group.chat_id }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="ban-refresh" type="button" class="btn subtle">{{ t.refresh }}</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table ban-table">
+            <thead>
+              <tr>
+                <th>{{ t.group }}</th>
+                <th>{{ t.user }}</th>
+                <th>{{ t.reason }}</th>
+                <th>{{ t.expires_at }}</th>
+                <th>{{ t.actions }}</th>
+              </tr>
+            </thead>
+            <tbody id="ban-table-body">
+              <tr>
+                <td colspan="5">{{ t.no_data }}</td>
+              </tr>
             </tbody>
           </table>
         </div>

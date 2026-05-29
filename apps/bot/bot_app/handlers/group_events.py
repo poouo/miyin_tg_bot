@@ -6,6 +6,16 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery, ChatMemberUpdated, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from apps.api.app.core.db import SessionLocal
+from apps.api.app.services.community_feature_service import (
+    clear_afk,
+    get_afk,
+    get_lock_config,
+    get_log_channel,
+    get_welcome_config,
+    is_globally_banned,
+    render_template,
+    update_welcome_config,
+)
 from apps.api.app.services.group_service import ensure_group
 from apps.api.app.services.log_service import add_log
 from apps.api.app.services.auto_reply_service import match_auto_reply
@@ -27,6 +37,7 @@ from apps.bot.bot_app.verification_notices import (
 )
 
 router = Router()
+MANAGER_ROLES = {"administrator", "creator"}
 
 MEMBER_UNRESTRICT_PERMISSIONS = ChatPermissions(
     can_send_messages=True,
@@ -83,6 +94,112 @@ async def _delete_message_later(bot, chat_id: int, message_id: int, seconds: int
     await delete_message_later(bot, chat_id, message_id, seconds)
 
 
+async def _is_group_manager(message: Message) -> bool:
+    if message.from_user is None:
+        return False
+    try:
+        member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
+    except Exception:
+        return False
+    return getattr(member, "status", "") in MANAGER_ROLES
+
+
+def _message_lock_type(message: Message) -> str | None:
+    text = message.text or message.caption or ""
+    entities = list(message.entities or []) + list(message.caption_entities or [])
+    if text.startswith("/"):
+        return "commands"
+    if getattr(message, "forward_origin", None) or getattr(message, "forward_date", None):
+        return "forwards"
+    if getattr(message, "sticker", None):
+        return "stickers"
+    if (
+        getattr(message, "photo", None)
+        or getattr(message, "video", None)
+        or getattr(message, "animation", None)
+        or getattr(message, "document", None)
+        or getattr(message, "audio", None)
+        or getattr(message, "voice", None)
+    ):
+        return "media"
+    if any(item.type in {"url", "text_link"} for item in entities):
+        return "links"
+    lowered = text.lower()
+    if "http://" in lowered or "https://" in lowered or "t.me/" in lowered:
+        return "links"
+    return None
+
+
+async def _enforce_locks(message: Message, db) -> bool:
+    if await _is_group_manager(message):
+        return False
+    lock_type = _message_lock_type(message)
+    if lock_type is None:
+        return False
+    config = await get_lock_config(db, message.chat.id)
+    if not getattr(config, lock_type):
+        return False
+    try:
+        await message.delete()
+    except Exception:
+        pass
+    await add_log(db, message.chat.id, message.from_user.id if message.from_user else 0, "", "lock_deleted", lock_type)
+    return True
+
+
+async def _send_log_channel(bot, db, chat_id: int, text: str) -> None:
+    config = await get_log_channel(db, chat_id)
+    if not config.enabled or not config.log_chat_id:
+        return
+    try:
+        await bot.send_message(config.log_chat_id, text, parse_mode="HTML")
+    except Exception:
+        return
+
+
+async def _handle_afk(message: Message, db) -> None:
+    if message.from_user is None:
+        return
+    cleared = await clear_afk(db, message.from_user.id)
+    if cleared:
+        try:
+            await message.reply("欢迎回来，AFK 状态已解除。")
+        except Exception:
+            pass
+
+    candidates: dict[int, str] = {}
+    if message.reply_to_message and message.reply_to_message.from_user:
+        user = message.reply_to_message.from_user
+        candidates[user.id] = user.full_name
+    for entity in message.entities or []:
+        user = getattr(entity, "user", None)
+        if user:
+            candidates[user.id] = user.full_name
+    for user_id, full_name in candidates.items():
+        afk = await get_afk(db, user_id)
+        if afk is None:
+            continue
+        reason = f"\n原因：{escape(afk.reason)}" if afk.reason else ""
+        try:
+            await message.reply(f"<b>{escape(full_name)}</b> 当前 AFK。{reason}", parse_mode="HTML")
+        except Exception:
+            pass
+
+
+@router.message(
+    F.chat.type.in_({"group", "supergroup"}),
+    ~F.text,
+    ~F.new_chat_members,
+    ~F.left_chat_member,
+)
+async def group_non_text_lock_handler(message: Message) -> None:
+    if message.from_user is None or message.from_user.is_bot:
+        return
+    async with SessionLocal() as db:
+        await ensure_group(db, message.chat.id, message.chat.title or "")
+        await _enforce_locks(message, db)
+
+
 @router.message(F.chat.type.in_({"group", "supergroup"}), F.new_chat_members)
 async def new_member_handler(message: Message) -> None:
     chat = message.chat
@@ -92,11 +209,62 @@ async def new_member_handler(message: Message) -> None:
     async with SessionLocal() as db:
         runtime = await get_runtime_config(db)
         group = await ensure_group(db, chat.id, chat.title or "")
+        welcome_config = await get_welcome_config(db, chat.id)
         if not group.join_verification_enabled:
+            for member in message.new_chat_members:
+                if member.is_bot:
+                    continue
+                gban = await is_globally_banned(db, member.id)
+                if gban:
+                    try:
+                        await message.bot.ban_chat_member(chat.id, member.id)
+                    except Exception:
+                        pass
+                    await add_log(db, chat.id, member.id, member.username or "", "global_ban_enforced", gban.reason)
+                    await _send_log_channel(
+                        message.bot,
+                        db,
+                        chat.id,
+                        f"<b>全局封禁拦截</b>\n用户：<code>{member.id}</code>\n原因：{escape(gban.reason or '')}",
+                    )
+                    continue
+                if welcome_config.welcome_enabled:
+                    if welcome_config.clean_welcome and welcome_config.last_welcome_message_id:
+                        try:
+                            await message.bot.delete_message(chat.id, welcome_config.last_welcome_message_id)
+                        except Exception:
+                            pass
+                    try:
+                        text = render_template(
+                            welcome_config.welcome_text,
+                            chat_title=chat.title or "",
+                            user_id=member.id,
+                            full_name=member.full_name,
+                            username=member.username or "",
+                        )
+                    except Exception:
+                        text = f"欢迎 {escape(member.full_name)} 加入 {escape(chat.title or '')}。"
+                    sent = await message.answer(text, parse_mode="HTML")
+                    await update_welcome_config(db, chat.id, last_welcome_message_id=sent.message_id)
+                await add_log(db, chat.id, member.id, member.username or "", "member_joined", member.full_name)
             return
 
         for member in message.new_chat_members:
             if member.is_bot:
+                continue
+            gban = await is_globally_banned(db, member.id)
+            if gban:
+                try:
+                    await message.bot.ban_chat_member(chat.id, member.id)
+                except Exception:
+                    pass
+                await add_log(db, chat.id, member.id, member.username or "", "global_ban_enforced", gban.reason)
+                await _send_log_channel(
+                    message.bot,
+                    db,
+                    chat.id,
+                    f"<b>全局封禁拦截</b>\n用户：<code>{member.id}</code>\n原因：{escape(gban.reason or '')}",
+                )
                 continue
             await add_log(
                 db,
@@ -106,6 +274,24 @@ async def new_member_handler(message: Message) -> None:
                 "member_joined",
                 member.full_name,
             )
+            if welcome_config.welcome_enabled:
+                if welcome_config.clean_welcome and welcome_config.last_welcome_message_id:
+                    try:
+                        await message.bot.delete_message(chat.id, welcome_config.last_welcome_message_id)
+                    except Exception:
+                        pass
+                try:
+                    welcome_text = render_template(
+                        welcome_config.welcome_text,
+                        chat_title=chat.title or "",
+                        user_id=member.id,
+                        full_name=member.full_name,
+                        username=member.username or "",
+                    )
+                    sent = await message.answer(welcome_text, parse_mode="HTML")
+                    await update_welcome_config(db, chat.id, last_welcome_message_id=sent.message_id)
+                except Exception:
+                    pass
             await message.bot.restrict_chat_member(
                 chat_id=chat.id,
                 user_id=member.id,
@@ -129,6 +315,12 @@ async def new_member_handler(message: Message) -> None:
                 reply_markup=_build_verify_keyboard(member.id, options),
             )
             await add_log(db, chat.id, member.id, member.username or "", "join_verify_created", challenge.question)
+            await _send_log_channel(
+                message.bot,
+                db,
+                chat.id,
+                f"<b>新成员入群</b>\n用户：<code>{member.id}</code>\n名称：{escape(member.full_name)}",
+            )
 
 
 @router.message(F.chat.type.in_({"group", "supergroup"}), F.left_chat_member)
@@ -148,6 +340,28 @@ async def left_member_handler(message: Message) -> None:
             member.username or "",
             "member_left",
             member.full_name,
+        )
+        config = await get_welcome_config(db, message.chat.id)
+        if config.goodbye_enabled:
+            try:
+                text = render_template(
+                    config.goodbye_text,
+                    chat_title=message.chat.title or "",
+                    user_id=member.id,
+                    full_name=member.full_name,
+                    username=member.username or "",
+                )
+            except Exception:
+                text = f"{escape(member.full_name)} 离开了 {escape(message.chat.title or '')}。"
+            try:
+                await message.answer(text, parse_mode="HTML")
+            except Exception:
+                pass
+        await _send_log_channel(
+            message.bot,
+            db,
+            message.chat.id,
+            f"<b>成员退群</b>\n用户：<code>{member.id}</code>\n名称：{escape(member.full_name)}",
         )
 
 
@@ -244,6 +458,27 @@ async def group_text_handler(message: Message) -> None:
     async with SessionLocal() as db:
         runtime = await get_runtime_config(db)
         group = await ensure_group(db, chat.id, chat.title or "")
+        gban = await is_globally_banned(db, user.id)
+        if gban:
+            try:
+                await message.bot.ban_chat_member(chat.id, user.id)
+            except Exception:
+                pass
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            await add_log(db, chat.id, user.id, user.username or "", "global_ban_enforced", gban.reason)
+            await _send_log_channel(
+                message.bot,
+                db,
+                chat.id,
+                f"<b>全局封禁执行</b>\n用户：<code>{user.id}</code>\n原因：{escape(gban.reason or '')}",
+            )
+            return
+        await _handle_afk(message, db)
+        if await _enforce_locks(message, db):
+            return
         decision = await policy_engine.check_message(db, chat.id, user.id, text)
         if decision.blocked:
             should_delete_message = (

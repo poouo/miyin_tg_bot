@@ -108,6 +108,138 @@ class UserSanction(Base, TimestampMixin):
     recovered: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
+class RulesConfig(Base, TimestampMixin):
+    __tablename__ = "rules_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    rules_text: Mapped[str] = mapped_column(Text, default="")
+
+
+class NoteRule(Base, TimestampMixin):
+    __tablename__ = "note_rules"
+    __table_args__ = (UniqueConstraint("chat_id", "name", name="uq_note_chat_name"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    name: Mapped[str] = mapped_column(String(64), index=True)
+    text: Mapped[str] = mapped_column(Text, default="")
+    parse_mode: Mapped[str] = mapped_column(String(16), default="plain")
+
+
+class WarningSetting(Base, TimestampMixin):
+    __tablename__ = "warning_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    warn_limit: Mapped[int] = mapped_column(Integer, default=3)
+    warn_action: Mapped[str] = mapped_column(String(32), default="mute")
+    mute_minutes: Mapped[int] = mapped_column(Integer, default=60)
+    ban_minutes: Mapped[int] = mapped_column(Integer, default=1440)
+
+
+class UserWarning(Base, TimestampMixin):
+    __tablename__ = "user_warnings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    admin_id: Mapped[int] = mapped_column(BigInteger, default=0)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class ReportConfig(Base, TimestampMixin):
+    __tablename__ = "report_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class LockConfig(Base, TimestampMixin):
+    __tablename__ = "lock_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    links: Mapped[bool] = mapped_column(Boolean, default=False)
+    forwards: Mapped[bool] = mapped_column(Boolean, default=False)
+    media: Mapped[bool] = mapped_column(Boolean, default=False)
+    stickers: Mapped[bool] = mapped_column(Boolean, default=False)
+    commands: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class WelcomeConfig(Base, TimestampMixin):
+    __tablename__ = "welcome_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    welcome_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    goodbye_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    clean_welcome: Mapped[bool] = mapped_column(Boolean, default=True)
+    welcome_text: Mapped[str] = mapped_column(Text, default="欢迎 {fullname} 加入 {chat_title}。")
+    goodbye_text: Mapped[str] = mapped_column(Text, default="{fullname} 离开了 {chat_title}。")
+    last_welcome_message_id: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class LogChannelConfig(Base, TimestampMixin):
+    __tablename__ = "log_channel_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    log_chat_id: Mapped[int] = mapped_column(BigInteger, default=0)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class GlobalBan(Base, TimestampMixin):
+    __tablename__ = "global_bans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    admin_id: Mapped[int] = mapped_column(BigInteger, default=0)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class DisabledCommand(Base, TimestampMixin):
+    __tablename__ = "disabled_commands"
+    __table_args__ = (UniqueConstraint("chat_id", "command", name="uq_disabled_command_chat_command"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    command: Mapped[str] = mapped_column(String(64), index=True)
+
+
+class AfkStatus(Base, TimestampMixin):
+    __tablename__ = "afk_statuses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class RssSubscription(Base, TimestampMixin):
+    __tablename__ = "rss_subscriptions"
+    __table_args__ = (UniqueConstraint("chat_id", "url", name="uq_rss_chat_url"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    url: Mapped[str] = mapped_column(Text)
+    title: Mapped[str] = mapped_column(String(255), default="")
+    last_entry_id: Mapped[str] = mapped_column(Text, default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class UserProfile(Base, TimestampMixin):
+    __tablename__ = "user_profiles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    bio: Mapped[str] = mapped_column(Text, default="")
+    about: Mapped[str] = mapped_column(Text, default="")
+
+
 class SecurityConfig(Base, TimestampMixin):
     __tablename__ = "security_configs"
 

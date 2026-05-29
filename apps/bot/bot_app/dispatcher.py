@@ -3,38 +3,68 @@ import logging
 from contextlib import suppress
 
 from aiogram import Bot, Dispatcher
-from aiogram.types import BotCommand, BotCommandScopeAllChatAdministrators, BotCommandScopeAllGroupChats, BotCommandScopeDefault
+from aiogram.types import (
+    BotCommand,
+    BotCommandScopeAllChatAdministrators,
+    BotCommandScopeAllGroupChats,
+    BotCommandScopeAllPrivateChats,
+    BotCommandScopeChat,
+    BotCommandScopeDefault,
+)
 from aiogram.utils.token import TokenValidationError, validate_token
 
 from apps.api.app.services.runtime_config_service import get_runtime_config
 from apps.bot.bot_app.handlers.commands import router as command_router
 from apps.bot.bot_app.handlers.group_events import router as group_router
-from apps.bot.bot_app.tasks import kick_unverified_task, recover_mute_task
+from apps.bot.bot_app.tasks import kick_unverified_task, recover_mute_task, rss_poll_task
 
 logger = logging.getLogger(__name__)
 
 
 USER_COMMANDS = [
-    BotCommand(command="help", description="Show commands"),
-    BotCommand(command="ping", description="Check bot status"),
-    BotCommand(command="ask", description="Ask AI"),
-    BotCommand(command="verify", description="Complete join verification"),
+    BotCommand(command="help", description="帮助"),
+    BotCommand(command="ask", description="AI"),
+    BotCommand(command="rules", description="群规则"),
+    BotCommand(command="notes", description="群笔记"),
+    BotCommand(command="get", description="读取笔记"),
+    BotCommand(command="warns", description="我的警告"),
+    BotCommand(command="report", description="举报"),
+    BotCommand(command="id", description="查看ID"),
+    BotCommand(command="afk", description="离开"),
 ]
 
 ADMIN_COMMANDS = [
     *USER_COMMANDS,
-    BotCommand(command="ban", description="Ban a user"),
-    BotCommand(command="unban", description="Unban a user"),
-    BotCommand(command="kick", description="Remove a user and delay rejoin"),
-    BotCommand(command="mute", description="Mute a user"),
-    BotCommand(command="unmute", description="Unmute a user"),
+    BotCommand(command="ban", description="拉黑"),
+    BotCommand(command="kick", description="移除"),
+    BotCommand(command="mute", description="禁言"),
+    BotCommand(command="unban", description="解封"),
+    BotCommand(command="unmute", description="解禁"),
+    BotCommand(command="warn", description="警告"),
+    BotCommand(command="resetwarn", description="清警告"),
+    BotCommand(command="setrules", description="设规则"),
+    BotCommand(command="save", description="存笔记"),
+    BotCommand(command="lock", description="锁消息"),
+    BotCommand(command="unlock", description="解锁"),
+    BotCommand(command="adminlist", description="管理员"),
+    BotCommand(command="pin", description="置顶"),
+    BotCommand(command="unpin", description="取消置顶"),
+    BotCommand(command="welcome", description="欢迎"),
+    BotCommand(command="goodbye", description="退群"),
+    BotCommand(command="gban", description="全局封禁"),
+    BotCommand(command="disable", description="禁用指令"),
+    BotCommand(command="purge", description="清理"),
 ]
 
 
 async def setup_bot_commands(bot: Bot) -> None:
+    runtime = await get_runtime_config()
     await bot.set_my_commands(USER_COMMANDS, scope=BotCommandScopeDefault())
     await bot.set_my_commands(USER_COMMANDS, scope=BotCommandScopeAllGroupChats())
+    await bot.set_my_commands(USER_COMMANDS, scope=BotCommandScopeAllPrivateChats())
     await bot.set_my_commands(ADMIN_COMMANDS, scope=BotCommandScopeAllChatAdministrators())
+    for admin_id in runtime.telegram_admin_id_list:
+        await bot.set_my_commands(ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=admin_id))
 
 
 def build_dispatcher() -> Dispatcher:
@@ -138,16 +168,20 @@ class BotSupervisor:
         dp = build_dispatcher()
         recover_task = asyncio.create_task(recover_mute_task(bot), name="recover-mute-task")
         kick_task = asyncio.create_task(kick_unverified_task(bot), name="kick-unverified-task")
+        rss_task = asyncio.create_task(rss_poll_task(bot), name="rss-poll-task")
         try:
             await setup_bot_commands(bot)
             await dp.start_polling(bot)
         finally:
             recover_task.cancel()
             kick_task.cancel()
+            rss_task.cancel()
             with suppress(asyncio.CancelledError):
                 await recover_task
             with suppress(asyncio.CancelledError):
                 await kick_task
+            with suppress(asyncio.CancelledError):
+                await rss_task
             await bot.session.close()
 
 

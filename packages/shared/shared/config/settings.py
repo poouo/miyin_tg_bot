@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     join_verify_timeout_sec: int = 180
     spam_window_sec: int = 10
     spam_max_messages: int = 6
-    ad_regex: str = r"(t\.me/|telegram\.me/|vx|wechat|free|bet|promo)"
+    ad_regex: str = ""
 
     @property
     def telegram_admin_ids(self) -> List[int]:
