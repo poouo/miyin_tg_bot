@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Miyin TG Bot 管理台</title>
+  <link rel="stylesheet" href="/static/css/dashboard.css" />
+</head>
+<body>
+  <main class="container">
+    <section class="hero">
+      <h1>Miyin TG 群管机器人</h1>
+      <p>入群验证、关键词过滤、广告拦截、防刷屏、自动恢复、DeepSeek 问答</p>
+    </section>
+
+    <section class="cards">
+      <div class="card">
+        <h3>群组数量</h3>
+        <span>{{ stats.group_count }}</span>
+      </div>
+      <div class="card">
+        <h3>关键词规则</h3>
+        <span>{{ stats.keyword_count }}</span>
+      </div>
+      <div class="card">
+        <h3>风控日志</h3>
+        <span>{{ stats.log_count }}</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>本地在线更新</h2>
+      <p>支持后台检查更新与在线触发升级（适用于本地部署模式）。</p>
+      <div class="actions">
+        <button id="bg-status">后台状态</button>
+        <button id="check-update">检查更新</button>
+        <button id="trigger-update" class="warning">在线更新</button>
+      </div>
+      <pre id="update-output">等待操作...</pre>
+    </section>
+
+    <section class="panel">
+      <h2>已接入群组</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Chat ID</th>
+            <th>标题</th>
+            <th>入群验证</th>
+            <th>关键词过滤</th>
+            <th>广告封禁</th>
+            <th>防刷屏</th>
+            <th>自动恢复</th>
+            <th>AI</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for group in groups %}
+          <tr>
+            <td>{{ group.chat_id }}</td>
+            <td>{{ group.title }}</td>
+            <td>{{ "开" if group.join_verification_enabled else "关" }}</td>
+            <td>{{ "开" if group.keyword_filter_enabled else "关" }}</td>
+            <td>{{ "开" if group.ad_block_enabled else "关" }}</td>
+            <td>{{ "开" if group.anti_spam_enabled else "关" }}</td>
+            <td>{{ "开" if group.auto_recover_enabled else "关" }}</td>
+            <td>{{ "开" if group.deepseek_enabled else "关" }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8">暂无群组数据。把机器人拉进群并授予管理员权限后会自动入库。</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </main>
+  <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

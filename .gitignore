@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+
+# Environment
+.env
+.env.*
+.venv/
+venv/
+
+# Runtime
+logs/
+data/
+*.db
+*.sqlite3
+
+# Node
+node_modules/
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+

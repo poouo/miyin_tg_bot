@@ -1,0 +1,13 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: infra/docker/app.Dockerfile
+    container_name: miyin-tg-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "${WEB_PORT:-8080}:8080"
