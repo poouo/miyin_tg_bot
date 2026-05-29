@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
+from html import escape
 
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, ChatMemberUpdated, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Message
@@ -16,8 +17,14 @@ from apps.api.app.services.moderation.join_verification import (
     verify_challenge,
 )
 from apps.api.app.services.runtime_config_service import get_runtime_config
+from apps.bot.bot_app.ai_formatting import reply_ai_text
 from apps.bot.bot_app.moderation_actions import ModerationActionConfig, apply_moderation_action
 from apps.bot.bot_app.state import deepseek_client, policy_engine
+from apps.bot.bot_app.verification_notices import (
+    delete_message_later,
+    send_verify_fail_notice,
+    send_verify_pass_notice,
+)
 
 router = Router()
 
@@ -73,11 +80,7 @@ def _build_verify_keyboard(target_user_id: int, options: list[str]) -> InlineKey
 
 
 async def _delete_message_later(bot, chat_id: int, message_id: int, seconds: int) -> None:
-    await asyncio.sleep(seconds)
-    try:
-        await bot.delete_message(chat_id=chat_id, message_id=message_id)
-    except Exception:
-        return
+    await delete_message_later(bot, chat_id, message_id, seconds)
 
 
 @router.message(F.chat.type.in_({"group", "supergroup"}), F.new_chat_members)
@@ -111,10 +114,18 @@ async def new_member_handler(message: Message) -> None:
             challenge = await create_challenge(db, chat.id, member.id)
             options = build_answer_options(challenge.answer)
             await message.answer(
-                f"欢迎 {member.full_name}，请在 {runtime.join_verify_timeout_sec} 秒内完成验证：\n"
-                f"`{challenge.question}`\n"
-                "请点击下方按钮选择答案。",
-                parse_mode="Markdown",
+                "\n".join(
+                    [
+                        "<b>入群验证</b>",
+                        f"欢迎 <b>{escape(member.full_name)}</b>",
+                        f"请在 <b>{runtime.join_verify_timeout_sec}</b> 秒内完成验证。",
+                        "",
+                        f"<code>{escape(challenge.question)}</code>",
+                        "",
+                        "请点击下方按钮选择答案。",
+                    ]
+                ),
+                parse_mode="HTML",
                 reply_markup=_build_verify_keyboard(member.id, options),
             )
             await add_log(db, chat.id, member.id, member.username or "", "join_verify_created", challenge.question)
@@ -169,6 +180,12 @@ async def verify_button_handler(callback: CallbackQuery) -> None:
         if not ok:
             challenge = await get_challenge(db, chat_id, user_id)
             if challenge is not None and not challenge.passed:
+                action_config = ModerationActionConfig(
+                    action=group.join_verify_fail_action,
+                    kick_minutes=group.join_verify_fail_kick_minutes,
+                    mute_minutes=group.join_verify_fail_mute_minutes,
+                    ban_minutes=group.join_verify_fail_ban_minutes,
+                )
                 await apply_moderation_action(
                     callback.bot,
                     db,
@@ -176,11 +193,19 @@ async def verify_button_handler(callback: CallbackQuery) -> None:
                     user_id,
                     callback.from_user.username or "",
                     "join_verify_failed",
-                    ModerationActionConfig(
-                        action=group.join_verify_fail_action,
-                        mute_minutes=group.join_verify_fail_mute_minutes,
-                        ban_minutes=group.join_verify_fail_ban_minutes,
-                    ),
+                    action_config,
+                )
+                await send_verify_fail_notice(
+                    callback.bot,
+                    chat_id,
+                    user_id,
+                    action_config.action,
+                    action_config.kick_minutes,
+                    action_config.mute_minutes,
+                    action_config.ban_minutes,
+                    callback.from_user.full_name,
+                    callback.from_user.username or "",
+                    "未通过验证",
                 )
                 challenge.passed = True
             await add_log(db, chat_id, user_id, callback.from_user.username or "", "join_verify_failed", "button")
@@ -193,6 +218,13 @@ async def verify_button_handler(callback: CallbackQuery) -> None:
             permissions=MEMBER_UNRESTRICT_PERMISSIONS,
         )
         await add_log(db, chat_id, user_id, callback.from_user.username or "", "join_verify_passed", "button")
+        await send_verify_pass_notice(
+            callback.bot,
+            chat_id,
+            user_id,
+            callback.from_user.full_name,
+            callback.from_user.username or "",
+        )
 
     try:
         await callback.message.edit_reply_markup(reply_markup=None)
@@ -214,10 +246,16 @@ async def group_text_handler(message: Message) -> None:
         group = await ensure_group(db, chat.id, chat.title or "")
         decision = await policy_engine.check_message(db, chat.id, user.id, text)
         if decision.blocked:
-            try:
-                await message.delete()
-            except Exception:
-                pass
+            should_delete_message = (
+                decision.reason == "keyword_filter"
+                or (decision.reason == "ad_block" and group.ad_block_delete_message)
+                or (decision.reason == "anti_spam" and group.anti_spam_delete_message)
+            )
+            if should_delete_message:
+                try:
+                    await message.delete()
+                except Exception:
+                    pass
 
             mute_minutes = 10
             reason = decision.reason
@@ -241,6 +279,7 @@ async def group_text_handler(message: Message) -> None:
                     reason,
                     ModerationActionConfig(
                         action=group.ad_block_action,
+                        kick_minutes=group.ad_block_kick_minutes,
                         mute_minutes=group.ad_block_mute_minutes,
                         ban_minutes=group.ad_block_ban_minutes,
                     ),
@@ -255,6 +294,7 @@ async def group_text_handler(message: Message) -> None:
                     reason,
                     ModerationActionConfig(
                         action=group.anti_spam_action,
+                        kick_minutes=group.anti_spam_kick_minutes,
                         mute_minutes=group.anti_spam_mute_minutes,
                         ban_minutes=group.anti_spam_ban_minutes,
                     ),
@@ -304,4 +344,4 @@ async def group_text_handler(message: Message) -> None:
                 question = question[2:].strip()
             if question:
                 answer = await deepseek_client.ask(question, db=db)
-                await message.reply(answer[:3800])
+                await reply_ai_text(message, answer)

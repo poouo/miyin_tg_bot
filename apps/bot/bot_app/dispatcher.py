@@ -3,6 +3,7 @@ import logging
 from contextlib import suppress
 
 from aiogram import Bot, Dispatcher
+from aiogram.types import BotCommand, BotCommandScopeAllChatAdministrators, BotCommandScopeAllGroupChats, BotCommandScopeDefault
 from aiogram.utils.token import TokenValidationError, validate_token
 
 from apps.api.app.services.runtime_config_service import get_runtime_config
@@ -11,6 +12,29 @@ from apps.bot.bot_app.handlers.group_events import router as group_router
 from apps.bot.bot_app.tasks import kick_unverified_task, recover_mute_task
 
 logger = logging.getLogger(__name__)
+
+
+USER_COMMANDS = [
+    BotCommand(command="help", description="Show commands"),
+    BotCommand(command="ping", description="Check bot status"),
+    BotCommand(command="ask", description="Ask AI"),
+    BotCommand(command="verify", description="Complete join verification"),
+]
+
+ADMIN_COMMANDS = [
+    *USER_COMMANDS,
+    BotCommand(command="ban", description="Ban a user"),
+    BotCommand(command="unban", description="Unban a user"),
+    BotCommand(command="kick", description="Remove a user and delay rejoin"),
+    BotCommand(command="mute", description="Mute a user"),
+    BotCommand(command="unmute", description="Unmute a user"),
+]
+
+
+async def setup_bot_commands(bot: Bot) -> None:
+    await bot.set_my_commands(USER_COMMANDS, scope=BotCommandScopeDefault())
+    await bot.set_my_commands(USER_COMMANDS, scope=BotCommandScopeAllGroupChats())
+    await bot.set_my_commands(ADMIN_COMMANDS, scope=BotCommandScopeAllChatAdministrators())
 
 
 def build_dispatcher() -> Dispatcher:
@@ -115,6 +139,7 @@ class BotSupervisor:
         recover_task = asyncio.create_task(recover_mute_task(bot), name="recover-mute-task")
         kick_task = asyncio.create_task(kick_unverified_task(bot), name="kick-unverified-task")
         try:
+            await setup_bot_commands(bot)
             await dp.start_polling(bot)
         finally:
             recover_task.cancel()

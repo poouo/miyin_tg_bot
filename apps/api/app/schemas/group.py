@@ -16,12 +16,20 @@ class GroupConfigBase(BaseModel):
     auto_recover_enabled: bool = True
     deepseek_enabled: bool = True
     join_verify_fail_action: ModerationAction = "kick"
+    join_verify_fail_kick_minutes: int = Field(default=1, ge=1, le=10080)
     join_verify_fail_mute_minutes: int = Field(default=30, ge=1, le=10080)
     join_verify_fail_ban_minutes: int = Field(default=1440, ge=1, le=10080)
     ad_block_action: ModerationAction = "mute"
+    ad_block_delete_message: bool = True
+    ad_block_kick_minutes: int = Field(default=1, ge=1, le=10080)
     ad_block_mute_minutes: int = Field(default=30, ge=1, le=10080)
     ad_block_ban_minutes: int = Field(default=1440, ge=1, le=10080)
     anti_spam_action: ModerationAction = "mute"
+    anti_spam_delete_message: bool = True
+    anti_spam_window_sec: int = Field(default=10, ge=2, le=120)
+    anti_spam_same_text_max: int = Field(default=3, ge=2, le=30)
+    anti_spam_different_text_max: int = Field(default=6, ge=2, le=60)
+    anti_spam_kick_minutes: int = Field(default=1, ge=1, le=10080)
     anti_spam_mute_minutes: int = Field(default=30, ge=1, le=10080)
     anti_spam_ban_minutes: int = Field(default=1440, ge=1, le=10080)
 
@@ -39,12 +47,20 @@ class GroupConfigUpdate(BaseModel):
     auto_recover_enabled: bool | None = None
     deepseek_enabled: bool | None = None
     join_verify_fail_action: ModerationAction | None = None
+    join_verify_fail_kick_minutes: int | None = Field(default=None, ge=1, le=10080)
     join_verify_fail_mute_minutes: int | None = Field(default=None, ge=1, le=10080)
     join_verify_fail_ban_minutes: int | None = Field(default=None, ge=1, le=10080)
     ad_block_action: ModerationAction | None = None
+    ad_block_delete_message: bool | None = None
+    ad_block_kick_minutes: int | None = Field(default=None, ge=1, le=10080)
     ad_block_mute_minutes: int | None = Field(default=None, ge=1, le=10080)
     ad_block_ban_minutes: int | None = Field(default=None, ge=1, le=10080)
     anti_spam_action: ModerationAction | None = None
+    anti_spam_delete_message: bool | None = None
+    anti_spam_window_sec: int | None = Field(default=None, ge=2, le=120)
+    anti_spam_same_text_max: int | None = Field(default=None, ge=2, le=30)
+    anti_spam_different_text_max: int | None = Field(default=None, ge=2, le=60)
+    anti_spam_kick_minutes: int | None = Field(default=None, ge=1, le=10080)
     anti_spam_mute_minutes: int | None = Field(default=None, ge=1, le=10080)
     anti_spam_ban_minutes: int | None = Field(default=None, ge=1, le=10080)
 

@@ -82,12 +82,20 @@ const gsAntiSpam = document.getElementById("gs-anti-spam");
 const gsAutoRecover = document.getElementById("gs-auto-recover");
 const gsAi = document.getElementById("gs-ai");
 const gsJoinVerifyFailAction = document.getElementById("gs-join-verify-fail-action");
+const gsJoinVerifyFailKickMinutes = document.getElementById("gs-join-verify-fail-kick-minutes");
 const gsJoinVerifyFailMuteMinutes = document.getElementById("gs-join-verify-fail-mute-minutes");
 const gsJoinVerifyFailBanMinutes = document.getElementById("gs-join-verify-fail-ban-minutes");
 const gsAdBlockAction = document.getElementById("gs-ad-block-action");
+const gsAdBlockDeleteMessage = document.getElementById("gs-ad-block-delete-message");
+const gsAdBlockKickMinutes = document.getElementById("gs-ad-block-kick-minutes");
 const gsAdBlockMuteMinutes = document.getElementById("gs-ad-block-mute-minutes");
 const gsAdBlockBanMinutes = document.getElementById("gs-ad-block-ban-minutes");
 const gsAntiSpamAction = document.getElementById("gs-anti-spam-action");
+const gsAntiSpamDeleteMessage = document.getElementById("gs-anti-spam-delete-message");
+const gsAntiSpamWindowSec = document.getElementById("gs-anti-spam-window-sec");
+const gsAntiSpamSameTextMax = document.getElementById("gs-anti-spam-same-text-max");
+const gsAntiSpamDifferentTextMax = document.getElementById("gs-anti-spam-different-text-max");
+const gsAntiSpamKickMinutes = document.getElementById("gs-anti-spam-kick-minutes");
 const gsAntiSpamMuteMinutes = document.getElementById("gs-anti-spam-mute-minutes");
 const gsAntiSpamBanMinutes = document.getElementById("gs-anti-spam-ban-minutes");
 const gsSave = document.getElementById("gs-save");
@@ -432,12 +440,20 @@ function applyGroupSettings(chatIdValue) {
   if (gsAutoRecover) gsAutoRecover.checked = Boolean(config.auto_recover_enabled);
   if (gsAi) gsAi.checked = Boolean(config.deepseek_enabled);
   if (gsJoinVerifyFailAction) gsJoinVerifyFailAction.value = config.join_verify_fail_action || "kick";
+  if (gsJoinVerifyFailKickMinutes) gsJoinVerifyFailKickMinutes.value = String(Number(config.join_verify_fail_kick_minutes || 1));
   if (gsJoinVerifyFailMuteMinutes) gsJoinVerifyFailMuteMinutes.value = String(Number(config.join_verify_fail_mute_minutes || 30));
   if (gsJoinVerifyFailBanMinutes) gsJoinVerifyFailBanMinutes.value = String(Number(config.join_verify_fail_ban_minutes || 1440));
   if (gsAdBlockAction) gsAdBlockAction.value = config.ad_block_action || "mute";
+  if (gsAdBlockDeleteMessage) gsAdBlockDeleteMessage.checked = config.ad_block_delete_message !== false;
+  if (gsAdBlockKickMinutes) gsAdBlockKickMinutes.value = String(Number(config.ad_block_kick_minutes || 1));
   if (gsAdBlockMuteMinutes) gsAdBlockMuteMinutes.value = String(Number(config.ad_block_mute_minutes || 30));
   if (gsAdBlockBanMinutes) gsAdBlockBanMinutes.value = String(Number(config.ad_block_ban_minutes || 1440));
   if (gsAntiSpamAction) gsAntiSpamAction.value = config.anti_spam_action || "mute";
+  if (gsAntiSpamDeleteMessage) gsAntiSpamDeleteMessage.checked = config.anti_spam_delete_message !== false;
+  if (gsAntiSpamWindowSec) gsAntiSpamWindowSec.value = String(Number(config.anti_spam_window_sec || 10));
+  if (gsAntiSpamSameTextMax) gsAntiSpamSameTextMax.value = String(Number(config.anti_spam_same_text_max || 3));
+  if (gsAntiSpamDifferentTextMax) gsAntiSpamDifferentTextMax.value = String(Number(config.anti_spam_different_text_max || 6));
+  if (gsAntiSpamKickMinutes) gsAntiSpamKickMinutes.value = String(Number(config.anti_spam_kick_minutes || 1));
   if (gsAntiSpamMuteMinutes) gsAntiSpamMuteMinutes.value = String(Number(config.anti_spam_mute_minutes || 30));
   if (gsAntiSpamBanMinutes) gsAntiSpamBanMinutes.value = String(Number(config.anti_spam_ban_minutes || 1440));
 }
@@ -469,12 +485,20 @@ async function saveGroupSettings() {
     auto_recover_enabled: Boolean(gsAutoRecover?.checked),
     deepseek_enabled: Boolean(gsAi?.checked),
     join_verify_fail_action: gsJoinVerifyFailAction?.value || "kick",
+    join_verify_fail_kick_minutes: Number(gsJoinVerifyFailKickMinutes?.value || 1),
     join_verify_fail_mute_minutes: Number(gsJoinVerifyFailMuteMinutes?.value || 30),
     join_verify_fail_ban_minutes: Number(gsJoinVerifyFailBanMinutes?.value || 1440),
     ad_block_action: gsAdBlockAction?.value || "mute",
+    ad_block_delete_message: Boolean(gsAdBlockDeleteMessage?.checked),
+    ad_block_kick_minutes: Number(gsAdBlockKickMinutes?.value || 1),
     ad_block_mute_minutes: Number(gsAdBlockMuteMinutes?.value || 30),
     ad_block_ban_minutes: Number(gsAdBlockBanMinutes?.value || 1440),
     anti_spam_action: gsAntiSpamAction?.value || "mute",
+    anti_spam_delete_message: Boolean(gsAntiSpamDeleteMessage?.checked),
+    anti_spam_window_sec: Number(gsAntiSpamWindowSec?.value || 10),
+    anti_spam_same_text_max: Number(gsAntiSpamSameTextMax?.value || 3),
+    anti_spam_different_text_max: Number(gsAntiSpamDifferentTextMax?.value || 6),
+    anti_spam_kick_minutes: Number(gsAntiSpamKickMinutes?.value || 1),
     anti_spam_mute_minutes: Number(gsAntiSpamMuteMinutes?.value || 30),
     anti_spam_ban_minutes: Number(gsAntiSpamBanMinutes?.value || 1440),
   };

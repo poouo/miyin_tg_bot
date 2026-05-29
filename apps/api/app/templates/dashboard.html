@@ -402,6 +402,10 @@
                 </select>
               </label>
               <label>
+                {{ t.policy_kick_minutes }}
+                <input id="gs-join-verify-fail-kick-minutes" type="number" min="1" max="10080" value="1" />
+              </label>
+              <label>
                 {{ t.policy_mute_minutes }}
                 <input id="gs-join-verify-fail-mute-minutes" type="number" min="1" max="10080" value="30" />
               </label>
@@ -418,6 +422,10 @@
               <p>{{ t.policy_ad_block_desc }}</p>
             </div>
             <div class="form-grid two-col policy-form">
+              <label class="check-card">
+                <input id="gs-ad-block-delete-message" type="checkbox" checked />
+                {{ t.policy_delete_ad_message }}
+              </label>
               <label>
                 {{ t.policy_action }}
                 <select id="gs-ad-block-action">
@@ -425,6 +433,10 @@
                   <option value="ban">{{ t.action_ban }}</option>
                   <option value="mute">{{ t.action_mute }}</option>
                 </select>
+              </label>
+              <label>
+                {{ t.policy_kick_minutes }}
+                <input id="gs-ad-block-kick-minutes" type="number" min="1" max="10080" value="1" />
               </label>
               <label>
                 {{ t.policy_mute_minutes }}
@@ -443,6 +455,22 @@
               <p>{{ t.policy_anti_spam_desc }}</p>
             </div>
             <div class="form-grid two-col policy-form">
+              <label class="check-card">
+                <input id="gs-anti-spam-delete-message" type="checkbox" checked />
+                {{ t.policy_delete_spam_message }}
+              </label>
+              <label>
+                {{ t.policy_spam_window_sec }}
+                <input id="gs-anti-spam-window-sec" type="number" min="2" max="120" value="10" />
+              </label>
+              <label>
+                {{ t.policy_spam_same_text_max }}
+                <input id="gs-anti-spam-same-text-max" type="number" min="2" max="30" value="3" />
+              </label>
+              <label>
+                {{ t.policy_spam_different_text_max }}
+                <input id="gs-anti-spam-different-text-max" type="number" min="2" max="60" value="6" />
+              </label>
               <label>
                 {{ t.policy_action }}
                 <select id="gs-anti-spam-action">
@@ -450,6 +478,10 @@
                   <option value="ban">{{ t.action_ban }}</option>
                   <option value="mute">{{ t.action_mute }}</option>
                 </select>
+              </label>
+              <label>
+                {{ t.policy_kick_minutes }}
+                <input id="gs-anti-spam-kick-minutes" type="number" min="1" max="10080" value="1" />
               </label>
               <label>
                 {{ t.policy_mute_minutes }}

@@ -36,6 +36,9 @@ async def _run_compat_migrations(conn: AsyncConnection) -> None:
             conn, "group_configs", "join_verify_fail_action", "VARCHAR(32) NOT NULL DEFAULT 'kick'"
         )
         await _add_sqlite_column_if_missing(
+            conn, "group_configs", "join_verify_fail_kick_minutes", "INTEGER NOT NULL DEFAULT 1"
+        )
+        await _add_sqlite_column_if_missing(
             conn, "group_configs", "join_verify_fail_mute_minutes", "INTEGER NOT NULL DEFAULT 30"
         )
         await _add_sqlite_column_if_missing(
@@ -45,6 +48,12 @@ async def _run_compat_migrations(conn: AsyncConnection) -> None:
             conn, "group_configs", "ad_block_action", "VARCHAR(32) NOT NULL DEFAULT 'mute'"
         )
         await _add_sqlite_column_if_missing(
+            conn, "group_configs", "ad_block_delete_message", "BOOLEAN NOT NULL DEFAULT 1"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "group_configs", "ad_block_kick_minutes", "INTEGER NOT NULL DEFAULT 1"
+        )
+        await _add_sqlite_column_if_missing(
             conn, "group_configs", "ad_block_mute_minutes", "INTEGER NOT NULL DEFAULT 30"
         )
         await _add_sqlite_column_if_missing(
@@ -52,6 +61,21 @@ async def _run_compat_migrations(conn: AsyncConnection) -> None:
         )
         await _add_sqlite_column_if_missing(
             conn, "group_configs", "anti_spam_action", "VARCHAR(32) NOT NULL DEFAULT 'mute'"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "group_configs", "anti_spam_delete_message", "BOOLEAN NOT NULL DEFAULT 1"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "group_configs", "anti_spam_window_sec", "INTEGER NOT NULL DEFAULT 10"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "group_configs", "anti_spam_same_text_max", "INTEGER NOT NULL DEFAULT 3"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "group_configs", "anti_spam_different_text_max", "INTEGER NOT NULL DEFAULT 6"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "group_configs", "anti_spam_kick_minutes", "INTEGER NOT NULL DEFAULT 1"
         )
         await _add_sqlite_column_if_missing(
             conn, "group_configs", "anti_spam_mute_minutes", "INTEGER NOT NULL DEFAULT 30"
@@ -68,6 +92,9 @@ async def _run_compat_migrations(conn: AsyncConnection) -> None:
         conn, "group_configs", "join_verify_fail_action", "VARCHAR(32) NOT NULL DEFAULT 'kick'"
     )
     await _add_postgres_column_if_missing(
+        conn, "group_configs", "join_verify_fail_kick_minutes", "INTEGER NOT NULL DEFAULT 1"
+    )
+    await _add_postgres_column_if_missing(
         conn, "group_configs", "join_verify_fail_mute_minutes", "INTEGER NOT NULL DEFAULT 30"
     )
     await _add_postgres_column_if_missing(
@@ -77,6 +104,12 @@ async def _run_compat_migrations(conn: AsyncConnection) -> None:
         conn, "group_configs", "ad_block_action", "VARCHAR(32) NOT NULL DEFAULT 'mute'"
     )
     await _add_postgres_column_if_missing(
+        conn, "group_configs", "ad_block_delete_message", "BOOLEAN NOT NULL DEFAULT TRUE"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "group_configs", "ad_block_kick_minutes", "INTEGER NOT NULL DEFAULT 1"
+    )
+    await _add_postgres_column_if_missing(
         conn, "group_configs", "ad_block_mute_minutes", "INTEGER NOT NULL DEFAULT 30"
     )
     await _add_postgres_column_if_missing(
@@ -84,6 +117,21 @@ async def _run_compat_migrations(conn: AsyncConnection) -> None:
     )
     await _add_postgres_column_if_missing(
         conn, "group_configs", "anti_spam_action", "VARCHAR(32) NOT NULL DEFAULT 'mute'"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "group_configs", "anti_spam_delete_message", "BOOLEAN NOT NULL DEFAULT TRUE"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "group_configs", "anti_spam_window_sec", "INTEGER NOT NULL DEFAULT 10"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "group_configs", "anti_spam_same_text_max", "INTEGER NOT NULL DEFAULT 3"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "group_configs", "anti_spam_different_text_max", "INTEGER NOT NULL DEFAULT 6"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "group_configs", "anti_spam_kick_minutes", "INTEGER NOT NULL DEFAULT 1"
     )
     await _add_postgres_column_if_missing(
         conn, "group_configs", "anti_spam_mute_minutes", "INTEGER NOT NULL DEFAULT 30"

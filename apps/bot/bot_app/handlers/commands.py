@@ -7,8 +7,11 @@ from aiogram.types import ChatPermissions, Message
 from apps.api.app.core.db import SessionLocal
 from apps.api.app.services.group_service import ensure_group, get_group
 from apps.api.app.services.log_service import add_log
-from apps.api.app.services.moderation.join_verification import verify_challenge
+from apps.api.app.services.moderation.join_verification import get_challenge, verify_challenge
+from apps.bot.bot_app.ai_formatting import reply_ai_text
+from apps.bot.bot_app.moderation_actions import DEFAULT_KICK_MINUTES, ModerationActionConfig, apply_moderation_action
 from apps.bot.bot_app.state import deepseek_client
+from apps.bot.bot_app.verification_notices import send_temporary_notice, send_verify_fail_notice, send_verify_pass_notice
 
 router = Router()
 MANAGER_ROLES = {"administrator", "creator"}
@@ -25,6 +28,28 @@ MEMBER_UNRESTRICT_PERMISSIONS = ChatPermissions(
     can_add_web_page_previews=True,
     can_invite_users=True,
 )
+USER_HELP_TEXT = "\n".join(
+    [
+        "<b>可用指令</b>",
+        "<code>/ping</code> - 检查机器人状态",
+        "<code>/ask 问题</code> - 与 AI 聊天",
+        "<code>/verify 答案</code> - 完成入群验证",
+    ]
+)
+ADMIN_HELP_TEXT = "\n".join(
+    [
+        USER_HELP_TEXT,
+        "",
+        "<b>管理员指令</b>",
+        "<code>/ban 用户ID 分钟</code> - 拉黑用户",
+        "<code>/unban 用户ID</code> - 解除拉黑",
+        "<code>/kick 用户ID 分钟</code> - 移除并限制重新加入",
+        "<code>/mute 用户ID 分钟</code> - 禁言用户",
+        "<code>/unmute 用户ID</code> - 解除禁言",
+        "<i>提示：管理员指令也支持回复用户消息后使用。</i>",
+    ]
+)
+ADMIN_ONLY_TEXT = "<b>权限不足</b>\n此指令仅群管理员可用。"
 
 
 async def is_group_manager(message: Message) -> bool:
@@ -87,6 +112,22 @@ async def ping_handler(message: Message) -> None:
     await message.reply("pong")
 
 
+@router.message(Command("help"))
+async def help_handler(message: Message) -> None:
+    await register_group_if_needed(message)
+    if await is_group_manager(message):
+        await message.reply(ADMIN_HELP_TEXT, parse_mode="HTML")
+        return
+    await message.reply(USER_HELP_TEXT, parse_mode="HTML")
+
+
+async def require_group_manager(message: Message) -> bool:
+    if await is_group_manager(message):
+        return True
+    await message.reply(ADMIN_ONLY_TEXT, parse_mode="HTML")
+    return False
+
+
 @router.message(Command("ask"))
 async def ask_handler(message: Message, command: CommandObject) -> None:
     question = (command.args or "").strip()
@@ -103,7 +144,7 @@ async def ask_handler(message: Message, command: CommandObject) -> None:
                 await message.reply("AI is disabled in this group.")
                 return
         answer = await deepseek_client.ask(question, db=db)
-    await message.reply(answer[:3800])
+    await reply_ai_text(message, answer)
 
 
 @router.message(Command("verify"))
@@ -118,7 +159,7 @@ async def verify_handler(message: Message, command: CommandObject) -> None:
     chat_id = message.chat.id
     user_id = message.from_user.id
     async with SessionLocal() as db:
-        await ensure_group(db, chat_id, message.chat.title or "")
+        group = await ensure_group(db, chat_id, message.chat.title or "")
         ok = await verify_challenge(db, chat_id, user_id, answer)
         if ok:
             await message.bot.restrict_chat_member(
@@ -126,15 +167,54 @@ async def verify_handler(message: Message, command: CommandObject) -> None:
                 user_id=user_id,
                 permissions=MEMBER_UNRESTRICT_PERMISSIONS,
             )
-            await message.reply("Verification passed. Welcome!")
             await add_log(db, chat_id, user_id, message.from_user.username or "", "join_verify_passed", "ok")
+            await send_verify_pass_notice(
+                message.bot,
+                chat_id,
+                user_id,
+                message.from_user.full_name,
+                message.from_user.username or "",
+            )
         else:
-            await message.reply("Verification failed or expired.")
+            challenge = await get_challenge(db, chat_id, user_id)
+            if challenge is not None and not challenge.passed:
+                action_config = ModerationActionConfig(
+                    action=group.join_verify_fail_action,
+                    kick_minutes=group.join_verify_fail_kick_minutes,
+                    mute_minutes=group.join_verify_fail_mute_minutes,
+                    ban_minutes=group.join_verify_fail_ban_minutes,
+                )
+                await apply_moderation_action(
+                    message.bot,
+                    db,
+                    chat_id,
+                    user_id,
+                    message.from_user.username or "",
+                    "join_verify_failed",
+                    action_config,
+                )
+                await send_verify_fail_notice(
+                    message.bot,
+                    chat_id,
+                    user_id,
+                    action_config.action,
+                    action_config.kick_minutes,
+                    action_config.mute_minutes,
+                    action_config.ban_minutes,
+                    message.from_user.full_name,
+                    message.from_user.username or "",
+                    "未通过验证",
+                )
+                challenge.passed = True
+                await db.commit()
+            else:
+                await send_temporary_notice(message.bot, chat_id, "验证失败或已过期。")
+            await add_log(db, chat_id, user_id, message.from_user.username or "", "join_verify_failed", "command")
 
 
 @router.message(Command("ban"))
 async def ban_handler(message: Message, command: CommandObject) -> None:
-    if not await is_group_manager(message):
+    if not await require_group_manager(message):
         return
     if message.from_user is None:
         return
@@ -162,7 +242,7 @@ async def ban_handler(message: Message, command: CommandObject) -> None:
 
 @router.message(Command("unban"))
 async def unban_handler(message: Message, command: CommandObject) -> None:
-    if not await is_group_manager(message):
+    if not await require_group_manager(message):
         return
     if message.from_user is None:
         return
@@ -185,9 +265,36 @@ async def unban_handler(message: Message, command: CommandObject) -> None:
     await message.reply(f"User {target_user_id} unbanned.")
 
 
+@router.message(Command("kick"))
+async def kick_handler(message: Message, command: CommandObject) -> None:
+    if not await require_group_manager(message):
+        return
+    if message.from_user is None:
+        return
+
+    target_user_id = parse_target_user_id(message, command)
+    if target_user_id is None:
+        await message.reply("Usage: reply + /kick [minutes], or /kick user_id [minutes]")
+        return
+
+    minutes = parse_minutes(command, DEFAULT_KICK_MINUTES)
+    until_date = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+    await message.bot.ban_chat_member(message.chat.id, target_user_id, until_date=until_date)
+    async with SessionLocal() as db:
+        await add_log(
+            db,
+            message.chat.id,
+            message.from_user.id,
+            message.from_user.username or "",
+            "manual_kick",
+            f"target={target_user_id}, minutes={minutes}",
+        )
+    await message.reply(f"User {target_user_id} removed. They can rejoin after {minutes} minutes.")
+
+
 @router.message(Command("mute"))
 async def mute_handler(message: Message, command: CommandObject) -> None:
-    if not await is_group_manager(message):
+    if not await require_group_manager(message):
         return
     if message.from_user is None:
         return
@@ -219,7 +326,7 @@ async def mute_handler(message: Message, command: CommandObject) -> None:
 
 @router.message(Command("unmute"))
 async def unmute_handler(message: Message, command: CommandObject) -> None:
-    if not await is_group_manager(message):
+    if not await require_group_manager(message):
         return
     if message.from_user is None:
         return

@@ -9,6 +9,7 @@ from apps.api.app.services.log_service import add_log
 from apps.api.app.services.moderation.auto_recover import list_recoverable_sanctions, mark_recovered
 from apps.api.app.services.moderation.join_verification import list_expired_unpassed
 from apps.bot.bot_app.moderation_actions import ModerationActionConfig, apply_moderation_action
+from apps.bot.bot_app.verification_notices import send_verify_fail_notice
 
 
 async def recover_mute_task(bot: Bot) -> None:
@@ -38,6 +39,7 @@ async def kick_unverified_task(bot: Bot) -> None:
                     group = await ensure_group(db, challenge.chat_id, "")
                     action_config = ModerationActionConfig(
                         action=group.join_verify_fail_action,
+                        kick_minutes=group.join_verify_fail_kick_minutes,
                         mute_minutes=group.join_verify_fail_mute_minutes,
                         ban_minutes=group.join_verify_fail_ban_minutes,
                     )
@@ -49,6 +51,16 @@ async def kick_unverified_task(bot: Bot) -> None:
                         "",
                         "join_verify_timeout",
                         action_config,
+                    )
+                    await send_verify_fail_notice(
+                        bot,
+                        challenge.chat_id,
+                        challenge.user_id,
+                        action_config.action,
+                        action_config.kick_minutes,
+                        action_config.mute_minutes,
+                        action_config.ban_minutes,
+                        reason="验证超时",
                     )
                     await add_log(
                         db,

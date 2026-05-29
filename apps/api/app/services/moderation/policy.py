@@ -41,7 +41,12 @@ class ModerationPolicyEngine:
                 return ModerationDecision(blocked=True, reason="keyword_filter", keyword_rule=keyword_rule)
 
         if config.anti_spam_enabled and self.spam_guard.hit(
-            chat_id, user_id, runtime.spam_window_sec, runtime.spam_max_messages
+            chat_id,
+            user_id,
+            text,
+            config.anti_spam_window_sec or runtime.spam_window_sec,
+            config.anti_spam_same_text_max,
+            config.anti_spam_different_text_max,
         ):
             return ModerationDecision(blocked=True, reason="anti_spam")
 
