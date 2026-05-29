@@ -51,6 +51,7 @@
         <div class="title-wrap">
           <h2 id="workspace-title">{{ t.nav_overview }}</h2>
           <p>{{ t.dashboard_subtitle }}</p>
+          <p id="action-status" class="action-status"></p>
         </div>
       </header>
 
@@ -108,7 +109,6 @@
         <div class="actions">
           <button id="save-runtime" type="button">{{ t.runtime_save }}</button>
         </div>
-        <pre id="runtime-output">{{ t.ready }}.</pre>
       </section>
 
       <section id="deepseek" class="glass panel section">
@@ -135,7 +135,6 @@
         <div class="actions">
           <button id="save-deepseek" type="button">{{ t.deepseek_save }}</button>
         </div>
-        <pre id="deepseek-output">{{ t.ready }}.</pre>
       </section>
 
       <section id="auto-replies" class="glass panel section">
@@ -153,6 +152,7 @@
           <label>
             {{ t.auto_reply_keyword }}
             <input id="ar-keyword" type="text" maxlength="255" />
+            <small>{{ t.auto_reply_keyword_hint }}</small>
           </label>
           <label class="full-width">
             {{ t.auto_reply_content }}
@@ -169,6 +169,7 @@
         </div>
         <div class="actions">
           <button id="ar-add-rule" type="button">{{ t.auto_reply_add }}</button>
+          <button id="ar-cancel-edit" type="button" style="display:none;">{{ t.cancel_edit }}</button>
           <button id="ar-refresh" type="button">{{ t.refresh }}</button>
         </div>
         <div class="table-wrap">
@@ -189,7 +190,6 @@
             </tbody>
           </table>
         </div>
-        <pre id="ar-output">{{ t.ready }}.</pre>
       </section>
 
       <section id="ad-keywords" class="glass panel section">
@@ -207,6 +207,7 @@
           <label>
             {{ t.ad_keyword_label }}
             <input id="ak-keyword" type="text" maxlength="255" />
+            <small>{{ t.ad_keyword_hint }}</small>
           </label>
           <label>
             <input id="ak-enabled" type="checkbox" checked />
@@ -215,6 +216,7 @@
         </div>
         <div class="actions">
           <button id="ak-add-keyword" type="button">{{ t.ad_keyword_add }}</button>
+          <button id="ak-cancel-edit" type="button" style="display:none;">{{ t.cancel_edit }}</button>
           <button id="ak-refresh" type="button">{{ t.refresh }}</button>
         </div>
         <div class="table-wrap">
@@ -233,7 +235,6 @@
             </tbody>
           </table>
         </div>
-        <pre id="ak-output">{{ t.ready }}.</pre>
       </section>
 
       <section id="member-events" class="glass panel section">
@@ -243,7 +244,6 @@
           <label>
             {{ t.select_group }}
             <select id="ev-chat-id">
-              <option value="">{{ t.all_groups }}</option>
               {% for group in groups %}
               <option value="{{ group.chat_id }}">{{ group.title or group.chat_id }}</option>
               {% endfor %}
@@ -312,7 +312,6 @@
         <div class="actions">
           <button id="save-security" type="button">{{ t.save_login_security }}</button>
         </div>
-        <pre id="security-output">{{ t.ready }}.</pre>
       </section>
 
       <section id="password" class="glass panel section">
@@ -334,7 +333,6 @@
         <div class="actions">
           <button id="save-password" type="button">{{ t.save_password }}</button>
         </div>
-        <pre id="password-output">{{ t.ready }}.</pre>
       </section>
 
       <section id="groups" class="glass panel section">
@@ -351,9 +349,10 @@
                 <th>{{ t.anti_spam }}</th>
                 <th>{{ t.auto_recover }}</th>
                 <th>{{ t.ai }}</th>
+                <th>{{ t.actions }}</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="groups-table-body">
               {% for group in groups %}
               <tr>
                 <td>{{ group.chat_id }}</td>
@@ -363,11 +362,19 @@
                 <td>{{ t.switch_on if group.ad_block_enabled else t.switch_off }}</td>
                 <td>{{ t.switch_on if group.anti_spam_enabled else t.switch_off }}</td>
                 <td>{{ t.switch_on if group.auto_recover_enabled else t.switch_off }}</td>
-                <td>{{ t.switch_on if group.deepseek_enabled else t.switch_off }}</td>
+                <td>
+                  <label class="inline-check">
+                    <input type="checkbox" class="group-ai-toggle" data-chat-id="{{ group.chat_id }}" {% if group.deepseek_enabled %}checked{% endif %} />
+                    <span>{{ t.group_ai_switch }}</span>
+                  </label>
+                </td>
+                <td>
+                  <button class="table-btn" type="button" data-action="save-group-ai" data-chat-id="{{ group.chat_id }}">{{ t.save }}</button>
+                </td>
               </tr>
               {% else %}
               <tr>
-                <td colspan="8">{{ t.no_group_data }}</td>
+                <td colspan="9">{{ t.no_group_data }}</td>
               </tr>
               {% endfor %}
             </tbody>

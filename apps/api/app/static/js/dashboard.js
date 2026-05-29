@@ -3,6 +3,7 @@ const sidebar = document.getElementById("sidebar");
 const workspaceEl = document.querySelector(".workspace");
 const menuToggle = document.getElementById("mobile-menu-toggle");
 const workspaceTitle = document.getElementById("workspace-title");
+const actionStatus = document.getElementById("action-status");
 const navItems = Array.from(document.querySelectorAll(".nav-item"));
 const sections = Array.from(document.querySelectorAll(".section"));
 
@@ -46,6 +47,7 @@ const arReplyText = document.getElementById("ar-reply-text");
 const arDeleteAfter = document.getElementById("ar-delete-after");
 const arEnabled = document.getElementById("ar-enabled");
 const arAddRule = document.getElementById("ar-add-rule");
+const arCancelEdit = document.getElementById("ar-cancel-edit");
 const arRefresh = document.getElementById("ar-refresh");
 const arTableBody = document.getElementById("ar-table-body");
 const arOutput = document.getElementById("ar-output");
@@ -54,6 +56,7 @@ const akChatId = document.getElementById("ak-chat-id");
 const akKeyword = document.getElementById("ak-keyword");
 const akEnabled = document.getElementById("ak-enabled");
 const akAddKeyword = document.getElementById("ak-add-keyword");
+const akCancelEdit = document.getElementById("ak-cancel-edit");
 const akRefresh = document.getElementById("ak-refresh");
 const akTableBody = document.getElementById("ak-table-body");
 const akOutput = document.getElementById("ak-output");
@@ -61,20 +64,33 @@ const akOutput = document.getElementById("ak-output");
 const evChatId = document.getElementById("ev-chat-id");
 const evRefresh = document.getElementById("ev-refresh");
 const evTableBody = document.getElementById("ev-table-body");
+const groupsTableBody = document.getElementById("groups-table-body");
+const groupsOutput = document.getElementById("groups-output");
 
 const i18nEl = document.getElementById("i18n-data");
 const i18n = i18nEl ? JSON.parse(i18nEl.textContent || "{}") : {};
 
 let updatePollTimer = null;
 const ACTIVE_SECTION_KEY = "miyin.dashboard.activeSection";
+let arEditingRuleId = null;
+let akEditingKeywordId = null;
+let actionStatusTimer = null;
 
 function t(key, fallback) {
   return i18n[key] || fallback || key;
 }
 
 function print(el, data) {
-  if (!el) return;
-  el.textContent = JSON.stringify(data, null, 2);
+  if (el) {
+    el.textContent = JSON.stringify(data, null, 2);
+  }
+  if (Array.isArray(data)) return;
+  if (!data || typeof data !== "object") return;
+  if (data.ok === false) {
+    showStatus(data.message || data.detail || data.error || t("operation_failed", "Operation failed"), true);
+    return;
+  }
+  showStatus(t("saved", "Saved"), false);
 }
 
 function escapeHtml(text) {
@@ -84,6 +100,38 @@ function escapeHtml(text) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function resetAutoReplyEditor() {
+  arEditingRuleId = null;
+  if (arAddRule) arAddRule.textContent = t("auto_reply_add", "Add Auto Reply");
+  if (arCancelEdit) arCancelEdit.style.display = "none";
+  if (arKeyword) arKeyword.value = "";
+  if (arReplyText) arReplyText.value = "";
+  if (arDeleteAfter) arDeleteAfter.value = "0";
+  if (arEnabled) arEnabled.checked = true;
+}
+
+function resetAdKeywordEditor() {
+  akEditingKeywordId = null;
+  if (akAddKeyword) akAddKeyword.textContent = t("ad_keyword_add", "Add Ad Keyword");
+  if (akCancelEdit) akCancelEdit.style.display = "none";
+  if (akKeyword) akKeyword.value = "";
+  if (akEnabled) akEnabled.checked = true;
+}
+
+function showStatus(message, isError = false) {
+  if (!actionStatus) return;
+  actionStatus.textContent = message;
+  actionStatus.classList.toggle("error", Boolean(isError));
+  if (actionStatusTimer) {
+    window.clearTimeout(actionStatusTimer);
+  }
+  actionStatusTimer = window.setTimeout(() => {
+    if (!actionStatus) return;
+    actionStatus.textContent = "";
+    actionStatus.classList.remove("error");
+  }, 2200);
 }
 
 function setUpgradeStatus(progress, text, type = "normal") {
@@ -341,9 +389,6 @@ btnSaveSecurity?.addEventListener("click", async () => {
 });
 
 btnSavePassword?.addEventListener("click", async () => {
-  if (!passwordOutput) return;
-  passwordOutput.textContent = t("security_saving");
-
   const payload = {
     current_password: currentPassword?.value || "",
     new_password: newPassword?.value || "",
@@ -360,16 +405,16 @@ btnSavePassword?.addEventListener("click", async () => {
 
     if (!res.ok) {
       const detail = data?.detail || t("password_change_failed");
-      passwordOutput.textContent = `${t("password_change_failed")}: ${detail}`;
+      showStatus(`${t("password_change_failed")}: ${detail}`, true);
       return;
     }
 
-    passwordOutput.textContent = t("password_changed");
+    showStatus(t("password_changed"), false);
     if (currentPassword) currentPassword.value = "";
     if (newPassword) newPassword.value = "";
     if (confirmPassword) confirmPassword.value = "";
   } catch (err) {
-    passwordOutput.textContent = `${t("password_change_failed")}: ${String(err)}`;
+    showStatus(`${t("password_change_failed")}: ${String(err)}`, true);
   }
 });
 
@@ -390,6 +435,7 @@ function renderAutoReplies(items) {
         <td>${Number(item.delete_after_seconds || 0)}</td>
         <td>${escapeHtml(statusText)}</td>
         <td>
+          <button class="table-btn" type="button" data-action="edit" data-id="${item.id}">${escapeHtml(t("edit", "Edit"))}</button>
           <button class="table-btn" type="button" data-action="toggle" data-id="${item.id}" data-enabled="${item.enabled ? 1 : 0}">${escapeHtml(toggleText)}</button>
           <button class="table-btn warning" type="button" data-action="delete" data-id="${item.id}">${escapeHtml(t("delete", "Delete"))}</button>
         </td>
@@ -434,23 +480,37 @@ arAddRule?.addEventListener("click", async () => {
     enabled: Boolean(arEnabled?.checked),
   };
   try {
-    const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies`, {
-      method: "POST",
+    const isEditing = arEditingRuleId !== null;
+    const url = isEditing
+      ? `/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies/${encodeURIComponent(String(arEditingRuleId))}`
+      : `/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies`;
+    const method = isEditing ? "PATCH" : "POST";
+    const bodyPayload = isEditing
+      ? {
+          keyword: payload.keyword,
+          reply_text: payload.reply_text,
+          delete_after_seconds: payload.delete_after_seconds,
+          enabled: payload.enabled,
+        }
+      : payload;
+
+    const res = await fetch(url, {
+      method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(bodyPayload),
     });
     const data = await res.json();
     print(arOutput, data);
     if (!res.ok) return;
-
-    if (arKeyword) arKeyword.value = "";
-    if (arReplyText) arReplyText.value = "";
-    if (arDeleteAfter) arDeleteAfter.value = "0";
-    if (arEnabled) arEnabled.checked = true;
+    resetAutoReplyEditor();
     await loadAutoReplies();
   } catch (err) {
     print(arOutput, { ok: false, error: String(err) });
   }
+});
+
+arCancelEdit?.addEventListener("click", () => {
+  resetAutoReplyEditor();
 });
 
 arRefresh?.addEventListener("click", async () => {
@@ -458,6 +518,7 @@ arRefresh?.addEventListener("click", async () => {
 });
 
 arChatId?.addEventListener("change", async () => {
+  resetAutoReplyEditor();
   await loadAutoReplies();
 });
 
@@ -477,7 +538,32 @@ arTableBody?.addEventListener("click", async (event) => {
       const data = await res.json();
       print(arOutput, data);
       if (!res.ok) return;
+      if (String(arEditingRuleId) === String(ruleId)) {
+        resetAutoReplyEditor();
+      }
       await loadAutoReplies();
+      return;
+    }
+
+    if (action === "edit") {
+      const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}/auto-replies`);
+      const data = await res.json();
+      if (!res.ok) {
+        print(arOutput, data);
+        return;
+      }
+      const found = Array.isArray(data) ? data.find((item) => String(item.id) === String(ruleId)) : null;
+      if (!found) {
+        print(arOutput, { ok: false, message: t("rule_not_found", "Rule not found") });
+        return;
+      }
+      arEditingRuleId = found.id;
+      if (arKeyword) arKeyword.value = found.keyword || "";
+      if (arReplyText) arReplyText.value = found.reply_text || "";
+      if (arDeleteAfter) arDeleteAfter.value = String(Number(found.delete_after_seconds || 0));
+      if (arEnabled) arEnabled.checked = Boolean(found.enabled);
+      if (arAddRule) arAddRule.textContent = t("auto_reply_update", "Update Rule");
+      if (arCancelEdit) arCancelEdit.style.display = "";
       return;
     }
 
@@ -499,6 +585,36 @@ arTableBody?.addEventListener("click", async (event) => {
   }
 });
 
+groupsTableBody?.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLButtonElement)) return;
+  const action = target.dataset.action || "";
+  if (action !== "save-group-ai") return;
+  const chatId = target.dataset.chatId || "";
+  if (!chatId) return;
+
+  const checkbox = groupsTableBody.querySelector(`.group-ai-toggle[data-chat-id="${chatId}"]`);
+  if (!(checkbox instanceof HTMLInputElement)) return;
+  const payload = { deepseek_enabled: checkbox.checked };
+
+  try {
+    const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    print(groupsOutput, data);
+    if (!res.ok) return;
+    target.textContent = t("saved", "Saved");
+    setTimeout(() => {
+      target.textContent = t("save", "Save");
+    }, 1200);
+  } catch (err) {
+    print(groupsOutput, { ok: false, error: String(err) });
+  }
+});
+
 function renderAdKeywords(items) {
   if (!akTableBody) return;
   if (!Array.isArray(items) || !items.length) {
@@ -514,6 +630,7 @@ function renderAdKeywords(items) {
         <td>${escapeHtml(item.keyword)}</td>
         <td>${escapeHtml(statusText)}</td>
         <td>
+          <button class="table-btn" type="button" data-action="edit" data-id="${item.id}">${escapeHtml(t("edit", "Edit"))}</button>
           <button class="table-btn" type="button" data-action="toggle" data-id="${item.id}" data-enabled="${item.enabled ? 1 : 0}">${escapeHtml(toggleText)}</button>
           <button class="table-btn warning" type="button" data-action="delete" data-id="${item.id}">${escapeHtml(t("delete", "Delete"))}</button>
         </td>
@@ -554,21 +671,35 @@ akAddKeyword?.addEventListener("click", async () => {
     enabled: Boolean(akEnabled?.checked),
   };
   try {
-    const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords`, {
-      method: "POST",
+    const isEditing = akEditingKeywordId !== null;
+    const url = isEditing
+      ? `/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords/${encodeURIComponent(String(akEditingKeywordId))}`
+      : `/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords`;
+    const method = isEditing ? "PATCH" : "POST";
+    const bodyPayload = isEditing
+      ? {
+          keyword: payload.keyword,
+          enabled: payload.enabled,
+        }
+      : payload;
+    const res = await fetch(url, {
+      method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(bodyPayload),
     });
     const data = await res.json();
     print(akOutput, data);
     if (!res.ok) return;
 
-    if (akKeyword) akKeyword.value = "";
-    if (akEnabled) akEnabled.checked = true;
+    resetAdKeywordEditor();
     await loadAdKeywords();
   } catch (err) {
     print(akOutput, { ok: false, error: String(err) });
   }
+});
+
+akCancelEdit?.addEventListener("click", () => {
+  resetAdKeywordEditor();
 });
 
 akRefresh?.addEventListener("click", async () => {
@@ -576,6 +707,7 @@ akRefresh?.addEventListener("click", async () => {
 });
 
 akChatId?.addEventListener("change", async () => {
+  resetAdKeywordEditor();
   await loadAdKeywords();
 });
 
@@ -595,7 +727,30 @@ akTableBody?.addEventListener("click", async (event) => {
       const data = await res.json();
       print(akOutput, data);
       if (!res.ok) return;
+      if (String(akEditingKeywordId) === String(keywordId)) {
+        resetAdKeywordEditor();
+      }
       await loadAdKeywords();
+      return;
+    }
+
+    if (action === "edit") {
+      const res = await fetch(`/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords`);
+      const data = await res.json();
+      if (!res.ok) {
+        print(akOutput, data);
+        return;
+      }
+      const found = Array.isArray(data) ? data.find((item) => String(item.id) === String(keywordId)) : null;
+      if (!found) {
+        print(akOutput, { ok: false, message: t("rule_not_found", "Rule not found") });
+        return;
+      }
+      akEditingKeywordId = found.id;
+      if (akKeyword) akKeyword.value = found.keyword || "";
+      if (akEnabled) akEnabled.checked = Boolean(found.enabled);
+      if (akAddKeyword) akAddKeyword.textContent = t("ad_keyword_update", "Update Ad Rule");
+      if (akCancelEdit) akCancelEdit.style.display = "";
       return;
     }
 
@@ -650,7 +805,11 @@ async function loadMemberEvents() {
   const params = new URLSearchParams();
   params.set("limit", "200");
   const chatId = evChatId?.value || "";
-  if (chatId) params.set("chat_id", chatId);
+  if (!chatId) {
+    renderMemberEvents([]);
+    return;
+  }
+  params.set("chat_id", chatId);
 
   try {
     const res = await fetch(`/api/v1/logs/member-events?${params.toString()}`);

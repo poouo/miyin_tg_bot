@@ -5,6 +5,23 @@ from apps.api.app.models.entities import AutoReplyRule
 from apps.api.app.schemas.auto_reply import AutoReplyRuleCreate, AutoReplyRuleUpdate
 
 
+def _split_keywords(raw: str) -> list[str]:
+    parts = raw.replace("，", ",").split(",")
+    values: list[str] = []
+    for part in parts:
+        item = part.strip().lower()
+        if not item:
+            continue
+        if item in values:
+            continue
+        values.append(item)
+    return values
+
+
+def _normalize_keyword_field(raw: str) -> str:
+    return ",".join(_split_keywords(raw))
+
+
 async def list_auto_replies(db: AsyncSession, chat_id: int) -> list[AutoReplyRule]:
     result = await db.execute(
         select(AutoReplyRule).where(AutoReplyRule.chat_id == chat_id).order_by(AutoReplyRule.created_at.desc())
@@ -13,7 +30,9 @@ async def list_auto_replies(db: AsyncSession, chat_id: int) -> list[AutoReplyRul
 
 
 async def create_auto_reply(db: AsyncSession, payload: AutoReplyRuleCreate) -> AutoReplyRule:
-    entity = AutoReplyRule(**payload.model_dump())
+    data = payload.model_dump()
+    data["keyword"] = _normalize_keyword_field(data.get("keyword", ""))
+    entity = AutoReplyRule(**data)
     db.add(entity)
     await db.commit()
     await db.refresh(entity)
@@ -31,6 +50,8 @@ async def update_auto_reply(
         return None
 
     for key, value in payload.model_dump(exclude_unset=True).items():
+        if key == "keyword" and isinstance(value, str):
+            value = _normalize_keyword_field(value)
         setattr(entity, key, value)
 
     await db.commit()
@@ -60,6 +81,7 @@ async def match_auto_reply(db: AsyncSession, chat_id: int, text: str) -> AutoRep
     for rule in rules:
         if not rule.enabled:
             continue
-        if rule.keyword.strip().lower() in content:
-            return rule
+        for keyword in _split_keywords(rule.keyword):
+            if keyword and keyword in content:
+                return rule
     return None
