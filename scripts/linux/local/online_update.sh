@@ -2,7 +2,21 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/_common.sh"
+COMMON_PATH="${SCRIPT_DIR}/_common.sh"
+if [[ -f "${COMMON_PATH}" ]]; then
+  source "${COMMON_PATH}"
+else
+  BRANCH="${BRANCH:-main}"
+  COMMON_URL="https://raw.githubusercontent.com/poouo/miyin_tg_bot/${BRANCH}/scripts/linux/local/_common.sh"
+  if command -v curl >/dev/null 2>&1; then
+    source <(curl -fsSL "${COMMON_URL}")
+  elif command -v wget >/dev/null 2>&1; then
+    source <(wget -qO- "${COMMON_URL}")
+  else
+    echo "curl or wget is required to load _common.sh"
+    exit 1
+  fi
+fi
 
 LOCK_FILE="${APP_DIR}/run/online_update.lock"
 STATUS_FILE="${APP_DIR}/data/online_update_status.json"
@@ -53,4 +67,3 @@ stop_app_nohup
 start_app_nohup
 
 write_status "success" 100 "Update completed."
-
