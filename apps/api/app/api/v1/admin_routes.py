@@ -1,7 +1,7 @@
 import json
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,7 +34,7 @@ def _build_i18n_context(lang: str) -> dict:
 
 
 @router.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request) -> HTMLResponse | RedirectResponse:
+async def login_page(request: Request) -> Response:
     if is_admin_authenticated(request):
         return RedirectResponse(url="/", status_code=303)
     lang = read_web_language()
@@ -47,7 +47,7 @@ async def login_submit(
     request: Request,
     password: str = Form(...),
     db: AsyncSession = Depends(get_db),
-) -> HTMLResponse | RedirectResponse:
+) -> Response:
     if is_admin_authenticated(request):
         return RedirectResponse(url="/", status_code=303)
 
@@ -85,14 +85,14 @@ async def login_submit(
 
 
 @router.post("/auth/logout")
-async def logout() -> RedirectResponse:
+async def logout() -> Response:
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie(ADMIN_COOKIE_NAME)
     return response
 
 
 @router.get("/", response_class=HTMLResponse)
-async def index(request: Request, db: AsyncSession = Depends(get_db)) -> HTMLResponse | RedirectResponse:
+async def index(request: Request, db: AsyncSession = Depends(get_db)) -> Response:
     if not is_admin_authenticated(request):
         return RedirectResponse(url="/login", status_code=303)
 
