@@ -36,5 +36,4 @@ fi
 sudo mkdir -p data logs
 sudo docker compose up -d --build
 echo "[miyin] docker install done"
-echo "[miyin] web: http://<server-ip>:8080"
-
+echo "[miyin] web: http://<server-ip>:9800"

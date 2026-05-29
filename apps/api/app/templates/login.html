@@ -1,20 +1,20 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{ lang }}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Miyin TG Bot Login</title>
+  <title>{{ t.login_title }}</title>
   <link rel="stylesheet" href="/static/css/login.css" />
 </head>
 <body>
   <main class="login-wrap">
     <section class="login-card">
       <h1>Miyin TG Bot</h1>
-      <p>Admin Login</p>
+      <p>{{ t.admin_login }}</p>
       <form action="/auth/login" method="post">
-        <label for="password">Password</label>
+        <label for="password">{{ t.password_label }}</label>
         <input id="password" name="password" type="password" required />
-        <button type="submit">Login</button>
+        <button type="submit">{{ t.login_btn }}</button>
       </form>
       {% if error %}
       <p class="error">{{ error }}</p>

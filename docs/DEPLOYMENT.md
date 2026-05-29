@@ -1,27 +1,27 @@
 # Deployment
 
-## Docker (single container)
+## Docker (Single Container + SQLite)
 
-1. 编辑 `.env`
-2. 执行 `docker compose up -d --build`
-3. 打开 `http://<ip>:8080`
+1. Edit `.env`
+2. Run `docker compose up -d --build`
+3. Open `http://<ip>:9800`
 
-## Linux local deploy
+## Linux Local Deploy
 
-1. 执行 `scripts/linux/local/install.sh`
-2. 安装脚本会：
-   - 拉取 GitHub 仓库
-   - 创建 venv + 安装依赖
-   - 启动 `apps.runner.main`
-   - 启动后台更新检查进程
+1. Run `scripts/linux/local/install.sh`
+2. The installer will:
+   - pull source code from GitHub
+   - create venv and install dependencies
+   - start `apps.runner.main`
+   - start background update checker
 
-## Local update workflow
+## Local Update Workflow
 
-- 被动检查更新：
-  - `update_checker.sh` 周期执行 `git fetch`
-  - 将结果写入 `data/update_status.json`
-- 在线更新：
-  - Web 调用 `/api/v1/updates/online`
-  - 后台执行 `online_update.sh`
-  - 自动拉取代码、安装依赖、重启服务
+- Passive check:
+  - `update_checker.sh` runs `git fetch` periodically
+  - writes status into `data/update_status.json`
+- Online update:
+  - web calls `/api/v1/updates/online`
+  - backend triggers `online_update.sh`
+  - auto pulls code, installs deps, restarts service
 

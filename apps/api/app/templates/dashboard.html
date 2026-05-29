@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{ lang }}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Miyin TG Bot Dashboard</title>
+  <title>{{ t.dashboard_title }}</title>
   <link rel="stylesheet" href="/static/css/dashboard.css" />
 </head>
 <body>
@@ -15,77 +15,84 @@
     <header class="glass topbar">
       <div>
         <h1>Miyin TG Group Manager</h1>
-        <p>Admin dashboard</p>
+        <p>{{ t.admin_dashboard }}</p>
       </div>
       <form action="/auth/logout" method="post">
-        <button type="submit" class="warning">Logout</button>
+        <button type="submit" class="warning">{{ t.logout }}</button>
       </form>
     </header>
 
     <section class="cards">
       <div class="glass card">
-        <h3>Groups</h3>
+        <h3>{{ t.groups }}</h3>
         <span>{{ stats.group_count }}</span>
       </div>
       <div class="glass card">
-        <h3>Keyword Rules</h3>
+        <h3>{{ t.keyword_rules }}</h3>
         <span>{{ stats.keyword_count }}</span>
       </div>
       <div class="glass card">
-        <h3>Moderation Logs</h3>
+        <h3>{{ t.moderation_logs }}</h3>
         <span>{{ stats.log_count }}</span>
       </div>
     </section>
 
     <section class="glass panel">
-      <h2>Update Control</h2>
+      <h2>{{ t.update_control }}</h2>
       <div class="actions">
-        <button id="check-update">Check Update</button>
-        <button id="trigger-update">Online Update</button>
+        <button id="check-update">{{ t.check_update }}</button>
+        <button id="trigger-update">{{ t.online_update }}</button>
       </div>
       <div class="upgrade-track">
         <div id="upgrade-fill" class="upgrade-fill"></div>
       </div>
-      <p id="upgrade-status" class="upgrade-status">Ready.</p>
+      <p id="upgrade-status" class="upgrade-status">{{ t.ready }}.</p>
     </section>
 
     <section class="glass panel">
-      <h2>Login Protection</h2>
-      <p>Token expires in 10 days after successful login.</p>
+      <h2>{{ t.login_protection }}</h2>
+      <p>{{ t.token_expire_desc }}</p>
       <div class="form-grid">
         <label>
           <input type="checkbox" id="login-ban-enabled" {% if security.login_ban_enabled %}checked{% endif %} />
-          Enable temporary ban after multiple failed logins
+          {{ t.enable_temp_ban }}
         </label>
         <label>
-          Max failed attempts
+          {{ t.max_failed_attempts }}
           <input id="login-max-attempts" type="number" min="2" max="20" value="{{ security.login_max_attempts }}" />
         </label>
         <label>
-          Ban minutes
+          {{ t.ban_minutes }}
           <input id="login-ban-minutes" type="number" min="1" max="120" value="{{ security.login_ban_minutes }}" />
+        </label>
+        <label>
+          {{ t.web_language }}
+          <select id="web-language">
+            <option value="zh" {% if lang == "zh" %}selected{% endif %}>{{ t.lang_zh }}</option>
+            <option value="en" {% if lang == "en" %}selected{% endif %}>{{ t.lang_en }}</option>
+          </select>
         </label>
       </div>
       <div class="actions">
-        <button id="save-security">Save Login Security</button>
+        <button id="save-security">{{ t.save_login_security }}</button>
       </div>
-      <pre id="security-output">ready</pre>
+      <pre id="security-output">{{ t.ready }}.</pre>
     </section>
 
     <section class="glass panel">
-      <h2>Connected Groups</h2>
+      <h2>{{ t.connected_groups }}</h2>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Chat ID</th>
-              <th>Title</th>
-              <th>Join Verify</th>
-              <th>Keyword Filter</th>
-              <th>Ad Block</th>
-              <th>Anti Spam</th>
-              <th>Auto Recover</th>
-              <th>AI</th>
+              <th>{{ t.chat_id }}</th>
+              <th>{{ t.title }}</th>
+              <th>{{ t.join_verify }}</th>
+              <th>{{ t.keyword_filter }}</th>
+              <th>{{ t.ad_block }}</th>
+              <th>{{ t.anti_spam }}</th>
+              <th>{{ t.auto_recover }}</th>
+              <th>{{ t.ai }}</th>
             </tr>
           </thead>
           <tbody>
@@ -93,16 +100,16 @@
             <tr>
               <td>{{ group.chat_id }}</td>
               <td>{{ group.title }}</td>
-              <td>{{ "on" if group.join_verification_enabled else "off" }}</td>
-              <td>{{ "on" if group.keyword_filter_enabled else "off" }}</td>
-              <td>{{ "on" if group.ad_block_enabled else "off" }}</td>
-              <td>{{ "on" if group.anti_spam_enabled else "off" }}</td>
-              <td>{{ "on" if group.auto_recover_enabled else "off" }}</td>
-              <td>{{ "on" if group.deepseek_enabled else "off" }}</td>
+              <td>{{ t.switch_on if group.join_verification_enabled else t.switch_off }}</td>
+              <td>{{ t.switch_on if group.keyword_filter_enabled else t.switch_off }}</td>
+              <td>{{ t.switch_on if group.ad_block_enabled else t.switch_off }}</td>
+              <td>{{ t.switch_on if group.anti_spam_enabled else t.switch_off }}</td>
+              <td>{{ t.switch_on if group.auto_recover_enabled else t.switch_off }}</td>
+              <td>{{ t.switch_on if group.deepseek_enabled else t.switch_off }}</td>
             </tr>
             {% else %}
             <tr>
-              <td colspan="8">No group data yet.</td>
+              <td colspan="8">{{ t.no_group_data }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -110,6 +117,8 @@
       </div>
     </section>
   </main>
+
+  <script id="i18n-data" type="application/json">{{ t_json | safe }}</script>
   <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

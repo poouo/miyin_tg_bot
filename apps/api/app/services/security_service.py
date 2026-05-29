@@ -55,17 +55,17 @@ async def get_or_create_login_attempt(db: AsyncSession, ip: str) -> LoginAttempt
     return entity
 
 
-async def check_login_allowed(db: AsyncSession, ip: str) -> tuple[bool, str]:
+async def check_login_allowed(db: AsyncSession, ip: str) -> tuple[bool, int]:
     config = await get_or_create_security_config(db)
     if not config.login_ban_enabled:
-        return True, ""
+        return True, 0
 
     record = await get_or_create_login_attempt(db, ip)
     banned_until = normalize_utc(record.banned_until)
     if banned_until and banned_until > utc_now():
         minutes = int((banned_until - utc_now()).total_seconds() // 60) + 1
-        return False, f"登录失败次数过多，请 {minutes} 分钟后再试。"
-    return True, ""
+        return False, max(1, minutes)
+    return True, 0
 
 
 async def register_failed_login(db: AsyncSession, ip: str) -> None:
@@ -85,3 +85,4 @@ async def clear_login_attempt(db: AsyncSession, ip: str) -> None:
     record.fail_count = 0
     record.banned_until = None
     await db.commit()
+

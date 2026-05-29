@@ -18,7 +18,6 @@ COPY . /app
 RUN chmod +x /app/scripts/linux/docker/*.sh /app/scripts/linux/local/*.sh || true
 RUN mkdir -p /app/data /app/logs
 
-EXPOSE 8080
+EXPOSE 9800
 
 CMD ["python", "-m", "apps.runner.main"]
-

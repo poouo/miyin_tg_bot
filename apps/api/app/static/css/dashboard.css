@@ -215,6 +215,13 @@ button:disabled {
   background: var(--surface);
 }
 
+.form-grid select {
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: var(--surface);
+}
+
 .form-grid input[type="checkbox"] {
   accent-color: #1a84b4;
 }
@@ -350,4 +357,3 @@ th {
     width: 100%;
   }
 }
-

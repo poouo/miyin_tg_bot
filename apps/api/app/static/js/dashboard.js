@@ -6,9 +6,17 @@ const btnSaveSecurity = document.getElementById("save-security");
 const loginBanEnabled = document.getElementById("login-ban-enabled");
 const loginMaxAttempts = document.getElementById("login-max-attempts");
 const loginBanMinutes = document.getElementById("login-ban-minutes");
+const webLanguage = document.getElementById("web-language");
 
 const upgradeFill = document.getElementById("upgrade-fill");
 const upgradeStatus = document.getElementById("upgrade-status");
+
+const i18nEl = document.getElementById("i18n-data");
+const i18n = i18nEl ? JSON.parse(i18nEl.textContent || "{}") : {};
+
+function t(key, fallback) {
+  return i18n[key] || fallback || key;
+}
 
 let updatePollTimer = null;
 
@@ -34,7 +42,7 @@ async function pollOnlineUpdateStatus() {
     const res = await fetch("/api/v1/updates/online-status");
     const data = await res.json();
     if (!data.ok) {
-      setUpgradeStatus(0, "Failed to load update status.", "failed");
+      setUpgradeStatus(0, t("update_status_load_failed"), "failed");
       stopPolling();
       btnTrigger.disabled = false;
       return;
@@ -42,7 +50,7 @@ async function pollOnlineUpdateStatus() {
 
     const state = data.state || "idle";
     const progress = data.progress || 0;
-    const message = data.message || "Working...";
+    const message = data.message || t("update_status_working");
 
     if (state === "running") {
       setUpgradeStatus(progress, message, "normal");
@@ -51,7 +59,7 @@ async function pollOnlineUpdateStatus() {
     }
 
     if (state === "success") {
-      setUpgradeStatus(100, "Update successful. Refreshing...", "success");
+      setUpgradeStatus(100, t("update_success_refreshing"), "success");
       stopPolling();
       btnTrigger.disabled = false;
       setTimeout(() => window.location.reload(), 1800);
@@ -59,17 +67,17 @@ async function pollOnlineUpdateStatus() {
     }
 
     if (state === "failed") {
-      setUpgradeStatus(progress, "Update failed. Please retry.", "failed");
+      setUpgradeStatus(progress, t("update_failed_retry"), "failed");
       stopPolling();
       btnTrigger.disabled = false;
       return;
     }
 
-    setUpgradeStatus(0, "Ready.", "normal");
+    setUpgradeStatus(0, t("update_ready"), "normal");
     stopPolling();
     btnTrigger.disabled = false;
   } catch (err) {
-    setUpgradeStatus(0, "Network error while checking update status.", "failed");
+    setUpgradeStatus(0, t("update_network_error"), "failed");
     stopPolling();
     btnTrigger.disabled = false;
   }
@@ -88,49 +96,50 @@ function stopPolling() {
 }
 
 btnCheck?.addEventListener("click", async () => {
-  setUpgradeStatus(0, "Checking update...");
+  setUpgradeStatus(0, t("update_checking"));
   try {
     const res = await fetch("/api/v1/updates/check");
     const data = await res.json();
     if (!data.ok) {
-      setUpgradeStatus(0, "Check update failed.", "failed");
+      setUpgradeStatus(0, t("update_check_failed"), "failed");
       return;
     }
     if (data.has_update) {
-      setUpgradeStatus(0, "Update available. Click Online Update.");
+      setUpgradeStatus(0, t("update_available_click"));
     } else {
-      setUpgradeStatus(100, "Already up to date.", "success");
+      setUpgradeStatus(100, t("update_uptodate"), "success");
     }
   } catch (err) {
-    setUpgradeStatus(0, "Check update failed.", "failed");
+    setUpgradeStatus(0, t("update_check_failed"), "failed");
   }
 });
 
 btnTrigger?.addEventListener("click", async () => {
   btnTrigger.disabled = true;
-  setUpgradeStatus(2, "Starting online update...");
+  setUpgradeStatus(2, t("update_starting"));
   try {
     const res = await fetch("/api/v1/updates/online", { method: "POST" });
     const data = await res.json();
     if (!data.ok) {
-      setUpgradeStatus(0, data.message || "Failed to start update.", "failed");
+      setUpgradeStatus(0, data.message || t("update_start_failed"), "failed");
       btnTrigger.disabled = false;
       return;
     }
     startPolling();
     await pollOnlineUpdateStatus();
   } catch (err) {
-    setUpgradeStatus(0, "Failed to start update.", "failed");
+    setUpgradeStatus(0, t("update_start_failed"), "failed");
     btnTrigger.disabled = false;
   }
 });
 
 btnSaveSecurity?.addEventListener("click", async () => {
-  securityOutput.textContent = "saving...";
+  securityOutput.textContent = t("security_saving");
   const payload = {
     login_ban_enabled: Boolean(loginBanEnabled?.checked),
     login_max_attempts: Number(loginMaxAttempts?.value || 5),
     login_ban_minutes: Number(loginBanMinutes?.value || 5),
+    web_language: (webLanguage?.value || "zh").toLowerCase(),
   };
 
   try {
@@ -139,7 +148,11 @@ btnSaveSecurity?.addEventListener("click", async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    print(securityOutput, await res.json());
+    const data = await res.json();
+    print(securityOutput, data);
+    if (data.web_language) {
+      setTimeout(() => window.location.reload(), 300);
+    }
   } catch (err) {
     print(securityOutput, { ok: false, error: String(err) });
   }

@@ -31,5 +31,5 @@ start_app_nohup
 start_update_checker
 
 echo "[miyin] local install done"
-echo "[miyin] web: http://<server-ip>:8080"
+echo "[miyin] web: http://<server-ip>:9800"
 echo "[miyin] update status file: ${UPDATE_STATUS_FILE}"
