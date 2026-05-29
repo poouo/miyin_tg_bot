@@ -68,3 +68,20 @@ class UserSanction(Base, TimestampMixin):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     recovered: Mapped[bool] = mapped_column(Boolean, default=False)
 
+
+class SecurityConfig(Base, TimestampMixin):
+    __tablename__ = "security_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    login_ban_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    login_max_attempts: Mapped[int] = mapped_column(Integer, default=5)
+    login_ban_minutes: Mapped[int] = mapped_column(Integer, default=5)
+
+
+class LoginAttempt(Base, TimestampMixin):
+    __tablename__ = "login_attempts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ip: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    fail_count: Mapped[int] = mapped_column(Integer, default=0)
+    banned_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

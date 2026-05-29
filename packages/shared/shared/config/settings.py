@@ -24,11 +24,14 @@ class Settings(BaseSettings):
 
     web_host: str = "0.0.0.0"
     web_port: int = 8080
+    web_admin_password: str = "admin123456"
+    web_auth_secret: str = "replace_with_long_random_string"
+    web_token_expire_days: int = 10
 
     join_verify_timeout_sec: int = 180
     spam_window_sec: int = 10
     spam_max_messages: int = 6
-    ad_regex: str = r"(t\.me/|telegram\.me/|加微|vx|v信|免费领|博彩|盘口)"
+    ad_regex: str = r"(t\.me/|telegram\.me/|vx|wechat|free|bet|promo)"
 
     @field_validator("telegram_admin_ids", mode="before")
     @classmethod
@@ -46,3 +49,4 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+

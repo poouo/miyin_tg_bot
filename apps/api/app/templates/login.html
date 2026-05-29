@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Miyin TG Bot Login</title>
+  <link rel="stylesheet" href="/static/css/login.css" />
+</head>
+<body>
+  <main class="login-wrap">
+    <section class="login-card">
+      <h1>Miyin TG Bot</h1>
+      <p>Admin Login</p>
+      <form action="/auth/login" method="post">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required />
+        <button type="submit">Login</button>
+      </form>
+      {% if error %}
+      <p class="error">{{ error }}</p>
+      {% endif %}
+    </section>
+  </main>
+</body>
+</html>
+
