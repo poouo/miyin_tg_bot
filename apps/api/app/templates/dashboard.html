@@ -140,54 +140,6 @@
                 {{ t.runtime_spam_max }}
                 <input id="rt-spam-max-messages" type="number" min="2" max="30" value="{{ runtime_config.spam_max_messages }}" />
               </label>
-              <label>
-                {{ t.runtime_join_fail_action }}
-                <select id="rt-join-verify-fail-action">
-                  <option value="kick" {% if runtime_config.join_verify_fail_action == "kick" %}selected{% endif %}>{{ t.action_kick }}</option>
-                  <option value="ban" {% if runtime_config.join_verify_fail_action == "ban" %}selected{% endif %}>{{ t.action_ban }}</option>
-                  <option value="mute" {% if runtime_config.join_verify_fail_action == "mute" %}selected{% endif %}>{{ t.action_mute }}</option>
-                </select>
-              </label>
-              <label>
-                {{ t.runtime_join_fail_mute_minutes }}
-                <input id="rt-join-verify-fail-mute-minutes" type="number" min="1" max="10080" value="{{ runtime_config.join_verify_fail_mute_minutes }}" />
-              </label>
-              <label>
-                {{ t.runtime_join_fail_ban_minutes }}
-                <input id="rt-join-verify-fail-ban-minutes" type="number" min="1" max="10080" value="{{ runtime_config.join_verify_fail_ban_minutes }}" />
-              </label>
-              <label>
-                {{ t.runtime_ad_block_action }}
-                <select id="rt-ad-block-action">
-                  <option value="kick" {% if runtime_config.ad_block_action == "kick" %}selected{% endif %}>{{ t.action_kick }}</option>
-                  <option value="ban" {% if runtime_config.ad_block_action == "ban" %}selected{% endif %}>{{ t.action_ban }}</option>
-                  <option value="mute" {% if runtime_config.ad_block_action == "mute" %}selected{% endif %}>{{ t.action_mute }}</option>
-                </select>
-              </label>
-              <label>
-                {{ t.runtime_ad_block_mute_minutes }}
-                <input id="rt-ad-block-mute-minutes" type="number" min="1" max="10080" value="{{ runtime_config.ad_block_mute_minutes }}" />
-              </label>
-              <label>
-                {{ t.runtime_ad_block_ban_minutes }}
-                <input id="rt-ad-block-ban-minutes" type="number" min="1" max="10080" value="{{ runtime_config.ad_block_ban_minutes }}" />
-              </label>
-              <label>
-                {{ t.runtime_anti_spam_action }}
-                <select id="rt-anti-spam-action">
-                  <option value="kick" {% if runtime_config.anti_spam_action == "kick" %}selected{% endif %}>{{ t.action_kick }}</option>
-                  <option value="ban" {% if runtime_config.anti_spam_action == "ban" %}selected{% endif %}>{{ t.action_ban }}</option>
-                  <option value="mute" {% if runtime_config.anti_spam_action == "mute" %}selected{% endif %}>{{ t.action_mute }}</option>
-                </select>
-              </label>
-              <label>
-                {{ t.runtime_anti_spam_mute_minutes }}
-                <input id="rt-anti-spam-mute-minutes" type="number" min="1" max="10080" value="{{ runtime_config.anti_spam_mute_minutes }}" />
-              </label>
-              <label>
-                {{ t.runtime_anti_spam_ban_minutes }}
-                <input id="rt-anti-spam-ban-minutes" type="number" min="1" max="10080" value="{{ runtime_config.anti_spam_ban_minutes }}" />
-              </label>
               <label class="full-width">
                 {{ t.runtime_ad_regex }}
                 <input id="rt-ad-regex" type="text" value="{{ runtime_config.ad_regex }}" />
@@ -433,6 +385,82 @@
           <label class="check-card"><input id="gs-anti-spam" type="checkbox" /> {{ t.anti_spam }}</label>
           <label class="check-card"><input id="gs-auto-recover" type="checkbox" /> {{ t.auto_recover }}</label>
           <label class="check-card"><input id="gs-ai" type="checkbox" /> {{ t.ai }}</label>
+        </div>
+        <div class="policy-grid">
+          <article class="policy-card">
+            <div class="policy-card-head">
+              <h4>{{ t.policy_join_fail_title }}</h4>
+              <p>{{ t.policy_join_fail_desc }}</p>
+            </div>
+            <div class="form-grid two-col policy-form">
+              <label>
+                {{ t.policy_action }}
+                <select id="gs-join-verify-fail-action">
+                  <option value="kick">{{ t.action_kick }}</option>
+                  <option value="ban">{{ t.action_ban }}</option>
+                  <option value="mute">{{ t.action_mute }}</option>
+                </select>
+              </label>
+              <label>
+                {{ t.policy_mute_minutes }}
+                <input id="gs-join-verify-fail-mute-minutes" type="number" min="1" max="10080" value="30" />
+              </label>
+              <label>
+                {{ t.policy_ban_minutes }}
+                <input id="gs-join-verify-fail-ban-minutes" type="number" min="1" max="10080" value="1440" />
+              </label>
+            </div>
+          </article>
+
+          <article class="policy-card">
+            <div class="policy-card-head">
+              <h4>{{ t.policy_ad_block_title }}</h4>
+              <p>{{ t.policy_ad_block_desc }}</p>
+            </div>
+            <div class="form-grid two-col policy-form">
+              <label>
+                {{ t.policy_action }}
+                <select id="gs-ad-block-action">
+                  <option value="kick">{{ t.action_kick }}</option>
+                  <option value="ban">{{ t.action_ban }}</option>
+                  <option value="mute">{{ t.action_mute }}</option>
+                </select>
+              </label>
+              <label>
+                {{ t.policy_mute_minutes }}
+                <input id="gs-ad-block-mute-minutes" type="number" min="1" max="10080" value="30" />
+              </label>
+              <label>
+                {{ t.policy_ban_minutes }}
+                <input id="gs-ad-block-ban-minutes" type="number" min="1" max="10080" value="1440" />
+              </label>
+            </div>
+          </article>
+
+          <article class="policy-card">
+            <div class="policy-card-head">
+              <h4>{{ t.policy_anti_spam_title }}</h4>
+              <p>{{ t.policy_anti_spam_desc }}</p>
+            </div>
+            <div class="form-grid two-col policy-form">
+              <label>
+                {{ t.policy_action }}
+                <select id="gs-anti-spam-action">
+                  <option value="kick">{{ t.action_kick }}</option>
+                  <option value="ban">{{ t.action_ban }}</option>
+                  <option value="mute">{{ t.action_mute }}</option>
+                </select>
+              </label>
+              <label>
+                {{ t.policy_mute_minutes }}
+                <input id="gs-anti-spam-mute-minutes" type="number" min="1" max="10080" value="30" />
+              </label>
+              <label>
+                {{ t.policy_ban_minutes }}
+                <input id="gs-anti-spam-ban-minutes" type="number" min="1" max="10080" value="1440" />
+              </label>
+            </div>
+          </article>
         </div>
         <div class="actions">
           <button id="gs-save" type="button" class="btn">{{ t.save_group_settings }}</button>

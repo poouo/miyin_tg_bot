@@ -19,6 +19,15 @@ class GroupConfig(Base, TimestampMixin):
     anti_spam_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     auto_recover_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     deepseek_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    join_verify_fail_action: Mapped[str] = mapped_column(String(32), default="kick")
+    join_verify_fail_mute_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    join_verify_fail_ban_minutes: Mapped[int] = mapped_column(Integer, default=1440)
+    ad_block_action: Mapped[str] = mapped_column(String(32), default="mute")
+    ad_block_mute_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    ad_block_ban_minutes: Mapped[int] = mapped_column(Integer, default=1440)
+    anti_spam_action: Mapped[str] = mapped_column(String(32), default="mute")
+    anti_spam_mute_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    anti_spam_ban_minutes: Mapped[int] = mapped_column(Integer, default=1440)
 
 
 class KeywordRule(Base, TimestampMixin):

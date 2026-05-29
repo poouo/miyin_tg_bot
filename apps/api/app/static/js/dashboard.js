@@ -33,15 +33,6 @@ const rtDeepseekTimeoutSec = document.getElementById("rt-deepseek-timeout-sec");
 const rtJoinVerifyTimeoutSec = document.getElementById("rt-join-verify-timeout-sec");
 const rtSpamWindowSec = document.getElementById("rt-spam-window-sec");
 const rtSpamMaxMessages = document.getElementById("rt-spam-max-messages");
-const rtJoinVerifyFailAction = document.getElementById("rt-join-verify-fail-action");
-const rtJoinVerifyFailMuteMinutes = document.getElementById("rt-join-verify-fail-mute-minutes");
-const rtJoinVerifyFailBanMinutes = document.getElementById("rt-join-verify-fail-ban-minutes");
-const rtAdBlockAction = document.getElementById("rt-ad-block-action");
-const rtAdBlockMuteMinutes = document.getElementById("rt-ad-block-mute-minutes");
-const rtAdBlockBanMinutes = document.getElementById("rt-ad-block-ban-minutes");
-const rtAntiSpamAction = document.getElementById("rt-anti-spam-action");
-const rtAntiSpamMuteMinutes = document.getElementById("rt-anti-spam-mute-minutes");
-const rtAntiSpamBanMinutes = document.getElementById("rt-anti-spam-ban-minutes");
 const rtAdRegex = document.getElementById("rt-ad-regex");
 
 const upgradeFill = document.getElementById("upgrade-fill");
@@ -90,6 +81,15 @@ const gsAdBlock = document.getElementById("gs-ad-block");
 const gsAntiSpam = document.getElementById("gs-anti-spam");
 const gsAutoRecover = document.getElementById("gs-auto-recover");
 const gsAi = document.getElementById("gs-ai");
+const gsJoinVerifyFailAction = document.getElementById("gs-join-verify-fail-action");
+const gsJoinVerifyFailMuteMinutes = document.getElementById("gs-join-verify-fail-mute-minutes");
+const gsJoinVerifyFailBanMinutes = document.getElementById("gs-join-verify-fail-ban-minutes");
+const gsAdBlockAction = document.getElementById("gs-ad-block-action");
+const gsAdBlockMuteMinutes = document.getElementById("gs-ad-block-mute-minutes");
+const gsAdBlockBanMinutes = document.getElementById("gs-ad-block-ban-minutes");
+const gsAntiSpamAction = document.getElementById("gs-anti-spam-action");
+const gsAntiSpamMuteMinutes = document.getElementById("gs-anti-spam-mute-minutes");
+const gsAntiSpamBanMinutes = document.getElementById("gs-anti-spam-ban-minutes");
 const gsSave = document.getElementById("gs-save");
 const gsRefresh = document.getElementById("gs-refresh");
 
@@ -431,6 +431,15 @@ function applyGroupSettings(chatIdValue) {
   if (gsAntiSpam) gsAntiSpam.checked = Boolean(config.anti_spam_enabled);
   if (gsAutoRecover) gsAutoRecover.checked = Boolean(config.auto_recover_enabled);
   if (gsAi) gsAi.checked = Boolean(config.deepseek_enabled);
+  if (gsJoinVerifyFailAction) gsJoinVerifyFailAction.value = config.join_verify_fail_action || "kick";
+  if (gsJoinVerifyFailMuteMinutes) gsJoinVerifyFailMuteMinutes.value = String(Number(config.join_verify_fail_mute_minutes || 30));
+  if (gsJoinVerifyFailBanMinutes) gsJoinVerifyFailBanMinutes.value = String(Number(config.join_verify_fail_ban_minutes || 1440));
+  if (gsAdBlockAction) gsAdBlockAction.value = config.ad_block_action || "mute";
+  if (gsAdBlockMuteMinutes) gsAdBlockMuteMinutes.value = String(Number(config.ad_block_mute_minutes || 30));
+  if (gsAdBlockBanMinutes) gsAdBlockBanMinutes.value = String(Number(config.ad_block_ban_minutes || 1440));
+  if (gsAntiSpamAction) gsAntiSpamAction.value = config.anti_spam_action || "mute";
+  if (gsAntiSpamMuteMinutes) gsAntiSpamMuteMinutes.value = String(Number(config.anti_spam_mute_minutes || 30));
+  if (gsAntiSpamBanMinutes) gsAntiSpamBanMinutes.value = String(Number(config.anti_spam_ban_minutes || 1440));
 }
 
 async function loadGroupConfigs() {
@@ -459,6 +468,15 @@ async function saveGroupSettings() {
     anti_spam_enabled: Boolean(gsAntiSpam?.checked),
     auto_recover_enabled: Boolean(gsAutoRecover?.checked),
     deepseek_enabled: Boolean(gsAi?.checked),
+    join_verify_fail_action: gsJoinVerifyFailAction?.value || "kick",
+    join_verify_fail_mute_minutes: Number(gsJoinVerifyFailMuteMinutes?.value || 30),
+    join_verify_fail_ban_minutes: Number(gsJoinVerifyFailBanMinutes?.value || 1440),
+    ad_block_action: gsAdBlockAction?.value || "mute",
+    ad_block_mute_minutes: Number(gsAdBlockMuteMinutes?.value || 30),
+    ad_block_ban_minutes: Number(gsAdBlockBanMinutes?.value || 1440),
+    anti_spam_action: gsAntiSpamAction?.value || "mute",
+    anti_spam_mute_minutes: Number(gsAntiSpamMuteMinutes?.value || 30),
+    anti_spam_ban_minutes: Number(gsAntiSpamBanMinutes?.value || 1440),
   };
   const result = await requestJson(`/api/v1/groups/${encodeURIComponent(chatId)}`, {
     method: "PATCH",
@@ -603,15 +621,6 @@ function buildRuntimePayload() {
     join_verify_timeout_sec: Number(rtJoinVerifyTimeoutSec?.value || 180),
     spam_window_sec: Number(rtSpamWindowSec?.value || 10),
     spam_max_messages: Number(rtSpamMaxMessages?.value || 6),
-    join_verify_fail_action: rtJoinVerifyFailAction?.value || "kick",
-    join_verify_fail_mute_minutes: Number(rtJoinVerifyFailMuteMinutes?.value || 30),
-    join_verify_fail_ban_minutes: Number(rtJoinVerifyFailBanMinutes?.value || 1440),
-    ad_block_action: rtAdBlockAction?.value || "mute",
-    ad_block_mute_minutes: Number(rtAdBlockMuteMinutes?.value || 30),
-    ad_block_ban_minutes: Number(rtAdBlockBanMinutes?.value || 1440),
-    anti_spam_action: rtAntiSpamAction?.value || "mute",
-    anti_spam_mute_minutes: Number(rtAntiSpamMuteMinutes?.value || 30),
-    anti_spam_ban_minutes: Number(rtAntiSpamBanMinutes?.value || 1440),
     ad_regex: rtAdRegex?.value || "",
   };
 }

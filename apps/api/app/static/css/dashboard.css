@@ -496,6 +496,45 @@ body.modal-open {
   margin-top: 12px;
 }
 
+.policy-grid {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.policy-card {
+  border: 1px solid rgba(170, 198, 226, 0.62);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(252, 254, 255, 0.7);
+}
+
+.policy-card-head {
+  margin-bottom: 10px;
+}
+
+.policy-card-head h4 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.policy-card-head p {
+  margin: 5px 0 0;
+  color: var(--fx-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.policy-form {
+  margin-top: 0;
+}
+
+.policy-form label:first-child {
+  grid-column: 1 / -1;
+}
+
 .check-card {
   display: inline-flex !important;
   align-items: center;
@@ -912,6 +951,10 @@ tbody tr:hover {
 
   .cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .policy-grid {
+    grid-template-columns: 1fr;
   }
 
   .form-grid {

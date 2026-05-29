@@ -164,8 +164,7 @@ async def verify_button_handler(callback: CallbackQuery) -> None:
     chat_id = callback.message.chat.id
     user_id = callback.from_user.id
     async with SessionLocal() as db:
-        await ensure_group(db, chat_id, callback.message.chat.title or "")
-        runtime = await get_runtime_config(db)
+        group = await ensure_group(db, chat_id, callback.message.chat.title or "")
         ok = await verify_challenge(db, chat_id, user_id, selected_answer)
         if not ok:
             challenge = await get_challenge(db, chat_id, user_id)
@@ -178,9 +177,9 @@ async def verify_button_handler(callback: CallbackQuery) -> None:
                     callback.from_user.username or "",
                     "join_verify_failed",
                     ModerationActionConfig(
-                        action=runtime.join_verify_fail_action,
-                        mute_minutes=runtime.join_verify_fail_mute_minutes,
-                        ban_minutes=runtime.join_verify_fail_ban_minutes,
+                        action=group.join_verify_fail_action,
+                        mute_minutes=group.join_verify_fail_mute_minutes,
+                        ban_minutes=group.join_verify_fail_ban_minutes,
                     ),
                 )
                 challenge.passed = True
@@ -241,9 +240,9 @@ async def group_text_handler(message: Message) -> None:
                     user.username or "",
                     reason,
                     ModerationActionConfig(
-                        action=runtime.ad_block_action,
-                        mute_minutes=runtime.ad_block_mute_minutes,
-                        ban_minutes=runtime.ad_block_ban_minutes,
+                        action=group.ad_block_action,
+                        mute_minutes=group.ad_block_mute_minutes,
+                        ban_minutes=group.ad_block_ban_minutes,
                     ),
                 )
             elif decision.reason == "anti_spam":
@@ -255,9 +254,9 @@ async def group_text_handler(message: Message) -> None:
                     user.username or "",
                     reason,
                     ModerationActionConfig(
-                        action=runtime.anti_spam_action,
-                        mute_minutes=runtime.anti_spam_mute_minutes,
-                        ban_minutes=runtime.anti_spam_ban_minutes,
+                        action=group.anti_spam_action,
+                        mute_minutes=group.anti_spam_mute_minutes,
+                        ban_minutes=group.anti_spam_ban_minutes,
                     ),
                 )
             await add_log(db, chat.id, user.id, user.username or "", "message_blocked", reason)
