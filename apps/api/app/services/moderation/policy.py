@@ -7,6 +7,7 @@ from apps.api.app.services.group_service import get_group
 from apps.api.app.services.moderation.ad_block import AdBlockGuard
 from apps.api.app.services.moderation.anti_spam import AntiSpamGuard
 from apps.api.app.services.moderation.keyword_filter import match_keyword_rule
+from apps.api.app.services.runtime_config_service import get_runtime_config
 
 
 @dataclass
@@ -25,8 +26,9 @@ class ModerationPolicyEngine:
         config = await get_group(db, chat_id)
         if config is None:
             return ModerationDecision(blocked=False)
+        runtime = await get_runtime_config(db)
 
-        if config.ad_block_enabled and self.ad_guard.is_ad(text):
+        if config.ad_block_enabled and self.ad_guard.is_ad(text, runtime.ad_regex):
             return ModerationDecision(blocked=True, reason="ad_block")
 
         if config.keyword_filter_enabled:
@@ -34,8 +36,9 @@ class ModerationPolicyEngine:
             if keyword_rule:
                 return ModerationDecision(blocked=True, reason="keyword_filter", keyword_rule=keyword_rule)
 
-        if config.anti_spam_enabled and self.spam_guard.hit(chat_id, user_id):
+        if config.anti_spam_enabled and self.spam_guard.hit(
+            chat_id, user_id, runtime.spam_window_sec, runtime.spam_max_messages
+        ):
             return ModerationDecision(blocked=True, reason="anti_spam")
 
         return ModerationDecision(blocked=False)
-

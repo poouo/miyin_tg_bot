@@ -1,7 +1,15 @@
+const bodyEl = document.body;
+const sidebar = document.getElementById("sidebar");
+const menuToggle = document.getElementById("mobile-menu-toggle");
+const workspaceTitle = document.getElementById("workspace-title");
+const navItems = Array.from(document.querySelectorAll(".nav-item"));
+
 const securityOutput = document.getElementById("security-output");
+const runtimeOutput = document.getElementById("runtime-output");
 const btnCheck = document.getElementById("check-update");
 const btnTrigger = document.getElementById("trigger-update");
 const btnSaveSecurity = document.getElementById("save-security");
+const btnSaveRuntime = document.getElementById("save-runtime");
 const btnSavePassword = document.getElementById("save-password");
 
 const loginBanEnabled = document.getElementById("login-ban-enabled");
@@ -12,6 +20,18 @@ const currentPassword = document.getElementById("current-password");
 const newPassword = document.getElementById("new-password");
 const confirmPassword = document.getElementById("confirm-password");
 const passwordOutput = document.getElementById("password-output");
+
+const rtTelegramBotToken = document.getElementById("rt-telegram-bot-token");
+const rtTelegramBotUsername = document.getElementById("rt-telegram-bot-username");
+const rtTelegramAdminIds = document.getElementById("rt-telegram-admin-ids");
+const rtDeepseekApiKey = document.getElementById("rt-deepseek-api-key");
+const rtDeepseekBaseUrl = document.getElementById("rt-deepseek-base-url");
+const rtDeepseekModel = document.getElementById("rt-deepseek-model");
+const rtDeepseekTimeoutSec = document.getElementById("rt-deepseek-timeout-sec");
+const rtJoinVerifyTimeoutSec = document.getElementById("rt-join-verify-timeout-sec");
+const rtSpamWindowSec = document.getElementById("rt-spam-window-sec");
+const rtSpamMaxMessages = document.getElementById("rt-spam-max-messages");
+const rtAdRegex = document.getElementById("rt-ad-regex");
 
 const upgradeFill = document.getElementById("upgrade-fill");
 const upgradeStatus = document.getElementById("upgrade-status");
@@ -26,6 +46,7 @@ function t(key, fallback) {
 let updatePollTimer = null;
 
 function print(el, data) {
+  if (!el) return;
   el.textContent = JSON.stringify(data, null, 2);
 }
 
@@ -42,6 +63,44 @@ function setUpgradeStatus(progress, text, type = "normal") {
   }
 }
 
+function setActiveNav(target) {
+  navItems.forEach((item) => {
+    item.classList.toggle("active", item.dataset.target === target);
+  });
+  const active = navItems.find((item) => item.dataset.target === target);
+  if (active && workspaceTitle) {
+    workspaceTitle.textContent = active.textContent || "";
+  }
+}
+
+function closeMobileSidebar() {
+  bodyEl.classList.remove("sidebar-open");
+}
+
+menuToggle?.addEventListener("click", () => {
+  bodyEl.classList.toggle("sidebar-open");
+});
+
+document.addEventListener("click", (event) => {
+  if (!bodyEl.classList.contains("sidebar-open")) return;
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (sidebar?.contains(target) || menuToggle?.contains(target)) return;
+  closeMobileSidebar();
+});
+
+navItems.forEach((item) => {
+  item.addEventListener("click", () => {
+    const target = item.dataset.target;
+    if (!target) return;
+    const section = document.getElementById(target);
+    if (!section) return;
+    setActiveNav(target);
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+    closeMobileSidebar();
+  });
+});
+
 async function pollOnlineUpdateStatus() {
   try {
     const res = await fetch("/api/v1/updates/online-status");
@@ -49,7 +108,7 @@ async function pollOnlineUpdateStatus() {
     if (!data.ok) {
       setUpgradeStatus(0, t("update_status_load_failed"), "failed");
       stopPolling();
-      btnTrigger.disabled = false;
+      if (btnTrigger) btnTrigger.disabled = false;
       return;
     }
 
@@ -59,14 +118,14 @@ async function pollOnlineUpdateStatus() {
 
     if (state === "running") {
       setUpgradeStatus(progress, message, "normal");
-      btnTrigger.disabled = true;
+      if (btnTrigger) btnTrigger.disabled = true;
       return;
     }
 
     if (state === "success") {
       setUpgradeStatus(100, t("update_success_refreshing"), "success");
       stopPolling();
-      btnTrigger.disabled = false;
+      if (btnTrigger) btnTrigger.disabled = false;
       setTimeout(() => window.location.reload(), 1800);
       return;
     }
@@ -74,17 +133,17 @@ async function pollOnlineUpdateStatus() {
     if (state === "failed") {
       setUpgradeStatus(progress, t("update_failed_retry"), "failed");
       stopPolling();
-      btnTrigger.disabled = false;
+      if (btnTrigger) btnTrigger.disabled = false;
       return;
     }
 
     setUpgradeStatus(0, t("update_ready"), "normal");
     stopPolling();
-    btnTrigger.disabled = false;
+    if (btnTrigger) btnTrigger.disabled = false;
   } catch (err) {
     setUpgradeStatus(0, t("update_network_error"), "failed");
     stopPolling();
-    btnTrigger.disabled = false;
+    if (btnTrigger) btnTrigger.disabled = false;
   }
 }
 
@@ -94,10 +153,9 @@ function startPolling() {
 }
 
 function stopPolling() {
-  if (updatePollTimer) {
-    clearInterval(updatePollTimer);
-    updatePollTimer = null;
-  }
+  if (!updatePollTimer) return;
+  clearInterval(updatePollTimer);
+  updatePollTimer = null;
 }
 
 btnCheck?.addEventListener("click", async () => {
@@ -120,26 +178,55 @@ btnCheck?.addEventListener("click", async () => {
 });
 
 btnTrigger?.addEventListener("click", async () => {
-  btnTrigger.disabled = true;
+  if (btnTrigger) btnTrigger.disabled = true;
   setUpgradeStatus(2, t("update_starting"));
   try {
     const res = await fetch("/api/v1/updates/online", { method: "POST" });
     const data = await res.json();
     if (!data.ok) {
       setUpgradeStatus(0, data.message || t("update_start_failed"), "failed");
-      btnTrigger.disabled = false;
+      if (btnTrigger) btnTrigger.disabled = false;
       return;
     }
     startPolling();
     await pollOnlineUpdateStatus();
   } catch (err) {
     setUpgradeStatus(0, t("update_start_failed"), "failed");
-    btnTrigger.disabled = false;
+    if (btnTrigger) btnTrigger.disabled = false;
+  }
+});
+
+btnSaveRuntime?.addEventListener("click", async () => {
+  if (runtimeOutput) runtimeOutput.textContent = t("security_saving");
+  const payload = {
+    telegram_bot_token: rtTelegramBotToken?.value || "",
+    telegram_bot_username: rtTelegramBotUsername?.value || "",
+    telegram_admin_ids: rtTelegramAdminIds?.value || "",
+    deepseek_api_key: rtDeepseekApiKey?.value || "",
+    deepseek_base_url: rtDeepseekBaseUrl?.value || "https://api.deepseek.com",
+    deepseek_model: rtDeepseekModel?.value || "deepseek-chat",
+    deepseek_timeout_sec: Number(rtDeepseekTimeoutSec?.value || 30),
+    join_verify_timeout_sec: Number(rtJoinVerifyTimeoutSec?.value || 180),
+    spam_window_sec: Number(rtSpamWindowSec?.value || 10),
+    spam_max_messages: Number(rtSpamMaxMessages?.value || 6),
+    ad_regex: rtAdRegex?.value || "",
+  };
+
+  try {
+    const res = await fetch("/api/v1/runtime", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    print(runtimeOutput, data);
+  } catch (err) {
+    print(runtimeOutput, { ok: false, error: String(err) });
   }
 });
 
 btnSaveSecurity?.addEventListener("click", async () => {
-  securityOutput.textContent = t("security_saving");
+  if (securityOutput) securityOutput.textContent = t("security_saving");
   const payload = {
     login_ban_enabled: Boolean(loginBanEnabled?.checked),
     login_max_attempts: Number(loginMaxAttempts?.value || 5),

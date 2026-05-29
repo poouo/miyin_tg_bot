@@ -85,3 +85,11 @@ class LoginAttempt(Base, TimestampMixin):
     ip: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     fail_count: Mapped[int] = mapped_column(Integer, default=0)
     banned_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AppSetting(Base, TimestampMixin):
+    __tablename__ = "app_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    key: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    value: Mapped[str] = mapped_column(Text, default="")

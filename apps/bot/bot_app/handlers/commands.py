@@ -79,7 +79,7 @@ async def ask_handler(message: Message, command: CommandObject) -> None:
             if group and not group.deepseek_enabled:
                 await message.reply("AI is disabled in this group.")
                 return
-        answer = await deepseek_client.ask(question)
+        answer = await deepseek_client.ask(question, db=db)
     await message.reply(answer[:3800])
 
 
@@ -216,4 +216,3 @@ async def unmute_handler(message: Message, command: CommandObject) -> None:
             f"target={target_user_id}",
         )
     await message.reply(f"User {target_user_id} unmuted.")
-

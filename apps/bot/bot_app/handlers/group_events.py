@@ -8,8 +8,8 @@ from apps.api.app.services.group_service import ensure_group
 from apps.api.app.services.log_service import add_log
 from apps.api.app.services.moderation.auto_recover import add_mute_sanction
 from apps.api.app.services.moderation.join_verification import create_challenge
+from apps.api.app.services.runtime_config_service import get_runtime_config
 from apps.bot.bot_app.state import deepseek_client, policy_engine
-from packages.shared.shared.config.settings import settings
 
 router = Router()
 
@@ -21,6 +21,7 @@ async def new_member_handler(message: Message) -> None:
         return
 
     async with SessionLocal() as db:
+        runtime = await get_runtime_config(db)
         group = await ensure_group(db, chat.id, chat.title or "")
         if not group.join_verification_enabled:
             return
@@ -35,7 +36,7 @@ async def new_member_handler(message: Message) -> None:
             )
             challenge = await create_challenge(db, chat.id, member.id)
             await message.answer(
-                f"欢迎 {member.full_name}，请在 {settings.join_verify_timeout_sec} 秒内完成验证:\n"
+                f"欢迎 {member.full_name}，请在 {runtime.join_verify_timeout_sec} 秒内完成验证:\n"
                 f"`{challenge.question}`\n"
                 "回复命令: /verify 你的答案",
                 parse_mode="Markdown",
@@ -52,6 +53,7 @@ async def group_text_handler(message: Message) -> None:
     user = message.from_user
 
     async with SessionLocal() as db:
+        runtime = await get_runtime_config(db)
         group = await ensure_group(db, chat.id, chat.title or "")
         decision = await policy_engine.check_message(db, chat.id, user.id, text)
         if decision.blocked:
@@ -82,12 +84,12 @@ async def group_text_handler(message: Message) -> None:
             await add_log(db, chat.id, user.id, user.username or "", "message_blocked", reason)
             return
 
-        bot_mention = settings.telegram_bot_username.strip()
+        bot_mention = runtime.telegram_bot_username.strip()
         has_mention = bool(bot_mention) and f"@{bot_mention.lower()}" in text.lower()
         if group.deepseek_enabled and (has_mention or text.startswith("问:")):
             question = text.replace(f"@{bot_mention}", "").strip() if bot_mention else text.strip()
             if question.startswith("问:"):
                 question = question[2:].strip()
             if question:
-                answer = await deepseek_client.ask(question)
+                answer = await deepseek_client.ask(question, db=db)
                 await message.reply(answer[:3800])

@@ -2,10 +2,11 @@
 
 ## Docker (Single Container + SQLite)
 
-1. Edit `.env`
+1. Edit `.env` (only web/db/base settings)
 2. Run `docker compose up -d --build`
 3. Open `http://<ip>:9800`
 4. Default admin password is `admin` (change it in dashboard after first login)
+5. Configure TG Bot and DeepSeek runtime parameters in dashboard
 
 ## Linux Local Deploy
 

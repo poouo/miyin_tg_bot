@@ -144,27 +144,13 @@ APP_ENV=prod
 LOG_LEVEL=INFO
 PROJECT_NAME=miyin_tg_bot
 
-TELEGRAM_BOT_TOKEN=replace_me
-TELEGRAM_BOT_USERNAME=replace_me
-TELEGRAM_ADMIN_IDS=12345678,87654321
-
 DATABASE_URL=sqlite+aiosqlite:///./data/miyin.db
-
-DEEPSEEK_API_KEY=replace_me
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL=deepseek-chat
-DEEPSEEK_TIMEOUT_SEC=30
 
 WEB_HOST=0.0.0.0
 WEB_PORT=9800
 WEB_ADMIN_PASSWORD=admin
 WEB_AUTH_SECRET=change_me_to_a_long_random_string
 WEB_TOKEN_EXPIRE_DAYS=10
-
-JOIN_VERIFY_TIMEOUT_SEC=180
-SPAM_WINDOW_SEC=10
-SPAM_MAX_MESSAGES=6
-AD_REGEX=(t\\.me/|telegram\\.me/|vx|wechat|free|bet|promo)
 EOF
 }
 
@@ -201,7 +187,7 @@ if [[ ! -f "${APP_DIR}/.env" ]]; then
     write_default_env_example
   fi
   cp "${APP_DIR}/.env.example" "${APP_DIR}/.env"
-  echo "[miyin] created .env, please set BOT token and DeepSeek API key"
+  echo "[miyin] created .env, then set runtime bot/deepseek config in web admin"
 fi
 
 start_app_nohup

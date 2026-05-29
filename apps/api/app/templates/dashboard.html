@@ -11,132 +11,210 @@
   <div class="bg-orb orb-2"></div>
   <div class="bg-orb orb-3"></div>
 
-  <main class="container">
-    <header class="glass topbar">
-      <div>
-        <h1>Miyin TG Group Manager</h1>
+  <main class="shell">
+    <aside class="glass sidebar" id="sidebar">
+      <div class="brand">
+        <h1>Miyin TG</h1>
         <p>{{ t.admin_dashboard }}</p>
       </div>
-      <form action="/auth/logout" method="post">
+
+      <nav class="nav-list">
+        <button class="nav-item active" type="button" data-target="overview">{{ t.nav_overview }}</button>
+        <button class="nav-item" type="button" data-target="runtime">{{ t.nav_runtime }}</button>
+        <button class="nav-item" type="button" data-target="update">{{ t.nav_update }}</button>
+        <button class="nav-item" type="button" data-target="security">{{ t.nav_security }}</button>
+        <button class="nav-item" type="button" data-target="password">{{ t.nav_password }}</button>
+        <button class="nav-item" type="button" data-target="groups">{{ t.nav_groups }}</button>
+      </nav>
+
+      <form action="/auth/logout" method="post" class="sidebar-footer">
         <button type="submit" class="warning">{{ t.logout }}</button>
       </form>
-    </header>
+    </aside>
 
-    <section class="cards">
-      <div class="glass card">
-        <h3>{{ t.groups }}</h3>
-        <span>{{ stats.group_count }}</span>
-      </div>
-      <div class="glass card">
-        <h3>{{ t.keyword_rules }}</h3>
-        <span>{{ stats.keyword_count }}</span>
-      </div>
-      <div class="glass card">
-        <h3>{{ t.moderation_logs }}</h3>
-        <span>{{ stats.log_count }}</span>
-      </div>
-    </section>
+    <section class="workspace">
+      <header class="glass topbar">
+        <button id="mobile-menu-toggle" class="menu-toggle" type="button">☰</button>
+        <div class="title-wrap">
+          <h2 id="workspace-title">{{ t.nav_overview }}</h2>
+          <p>{{ t.dashboard_subtitle }}</p>
+        </div>
+      </header>
 
-    <section class="glass panel">
-      <h2>{{ t.update_control }}</h2>
-      <div class="actions">
-        <button id="check-update">{{ t.check_update }}</button>
-        <button id="trigger-update">{{ t.online_update }}</button>
-      </div>
-      <div class="upgrade-track">
-        <div id="upgrade-fill" class="upgrade-fill"></div>
-      </div>
-      <p id="upgrade-status" class="upgrade-status">{{ t.ready }}.</p>
-    </section>
+      <section id="overview" class="glass panel section">
+        <h3>{{ t.nav_overview }}</h3>
+        <div class="cards">
+          <div class="glass card">
+            <h4>{{ t.groups }}</h4>
+            <span>{{ stats.group_count }}</span>
+          </div>
+          <div class="glass card">
+            <h4>{{ t.keyword_rules }}</h4>
+            <span>{{ stats.keyword_count }}</span>
+          </div>
+          <div class="glass card">
+            <h4>{{ t.moderation_logs }}</h4>
+            <span>{{ stats.log_count }}</span>
+          </div>
+        </div>
+      </section>
 
-    <section class="glass panel">
-      <h2>{{ t.login_protection }}</h2>
-      <p>{{ t.token_expire_desc }}</p>
-      <div class="form-grid">
-        <label>
-          <input type="checkbox" id="login-ban-enabled" {% if security.login_ban_enabled %}checked{% endif %} />
-          {{ t.enable_temp_ban }}
-        </label>
-        <label>
-          {{ t.max_failed_attempts }}
-          <input id="login-max-attempts" type="number" min="2" max="20" value="{{ security.login_max_attempts }}" />
-        </label>
-        <label>
-          {{ t.ban_minutes }}
-          <input id="login-ban-minutes" type="number" min="1" max="120" value="{{ security.login_ban_minutes }}" />
-        </label>
-        <label>
-          {{ t.web_language }}
-          <select id="web-language">
-            <option value="zh" {% if lang == "zh" %}selected{% endif %}>{{ t.lang_zh }}</option>
-            <option value="en" {% if lang == "en" %}selected{% endif %}>{{ t.lang_en }}</option>
-          </select>
-        </label>
-      </div>
-      <div class="actions">
-        <button id="save-security">{{ t.save_login_security }}</button>
-      </div>
-      <pre id="security-output">{{ t.ready }}.</pre>
-    </section>
+      <section id="runtime" class="glass panel section">
+        <h3>{{ t.runtime_title }}</h3>
+        <p>{{ t.runtime_desc }}</p>
+        <div class="form-grid two-col">
+          <label>
+            {{ t.runtime_bot_token }}
+            <input id="rt-telegram-bot-token" type="password" value="{{ runtime_config.telegram_bot_token }}" autocomplete="off" />
+          </label>
+          <label>
+            {{ t.runtime_bot_username }}
+            <input id="rt-telegram-bot-username" type="text" value="{{ runtime_config.telegram_bot_username }}" autocomplete="off" />
+          </label>
+          <label>
+            {{ t.runtime_admin_ids }}
+            <input id="rt-telegram-admin-ids" type="text" value="{{ runtime_config.telegram_admin_ids }}" autocomplete="off" />
+          </label>
+          <label>
+            {{ t.runtime_deepseek_key }}
+            <input id="rt-deepseek-api-key" type="password" value="{{ runtime_config.deepseek_api_key }}" autocomplete="off" />
+          </label>
+          <label>
+            {{ t.runtime_deepseek_base }}
+            <input id="rt-deepseek-base-url" type="text" value="{{ runtime_config.deepseek_base_url }}" />
+          </label>
+          <label>
+            {{ t.runtime_deepseek_model }}
+            <input id="rt-deepseek-model" type="text" value="{{ runtime_config.deepseek_model }}" />
+          </label>
+          <label>
+            {{ t.runtime_deepseek_timeout }}
+            <input id="rt-deepseek-timeout-sec" type="number" min="3" max="120" value="{{ runtime_config.deepseek_timeout_sec }}" />
+          </label>
+          <label>
+            {{ t.runtime_join_timeout }}
+            <input id="rt-join-verify-timeout-sec" type="number" min="30" max="3600" value="{{ runtime_config.join_verify_timeout_sec }}" />
+          </label>
+          <label>
+            {{ t.runtime_spam_window }}
+            <input id="rt-spam-window-sec" type="number" min="2" max="120" value="{{ runtime_config.spam_window_sec }}" />
+          </label>
+          <label>
+            {{ t.runtime_spam_max }}
+            <input id="rt-spam-max-messages" type="number" min="2" max="30" value="{{ runtime_config.spam_max_messages }}" />
+          </label>
+          <label class="full-width">
+            {{ t.runtime_ad_regex }}
+            <input id="rt-ad-regex" type="text" value="{{ runtime_config.ad_regex }}" />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="save-runtime" type="button">{{ t.runtime_save }}</button>
+        </div>
+        <pre id="runtime-output">{{ t.ready }}.</pre>
+      </section>
 
-    <section class="glass panel">
-      <h2>{{ t.password_change }}</h2>
-      <div class="form-grid">
-        <label>
-          {{ t.current_password }}
-          <input id="current-password" type="password" autocomplete="current-password" />
-        </label>
-        <label>
-          {{ t.new_password }}
-          <input id="new-password" type="password" autocomplete="new-password" />
-        </label>
-        <label>
-          {{ t.confirm_password }}
-          <input id="confirm-password" type="password" autocomplete="new-password" />
-        </label>
-      </div>
-      <div class="actions">
-        <button id="save-password">{{ t.save_password }}</button>
-      </div>
-      <pre id="password-output">{{ t.ready }}.</pre>
-    </section>
+      <section id="update" class="glass panel section">
+        <h3>{{ t.update_control }}</h3>
+        <div class="actions">
+          <button id="check-update" type="button">{{ t.check_update }}</button>
+          <button id="trigger-update" type="button">{{ t.online_update }}</button>
+        </div>
+        <div class="upgrade-track">
+          <div id="upgrade-fill" class="upgrade-fill"></div>
+        </div>
+        <p id="upgrade-status" class="upgrade-status">{{ t.ready }}.</p>
+      </section>
 
-    <section class="glass panel">
-      <h2>{{ t.connected_groups }}</h2>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>{{ t.chat_id }}</th>
-              <th>{{ t.title }}</th>
-              <th>{{ t.join_verify }}</th>
-              <th>{{ t.keyword_filter }}</th>
-              <th>{{ t.ad_block }}</th>
-              <th>{{ t.anti_spam }}</th>
-              <th>{{ t.auto_recover }}</th>
-              <th>{{ t.ai }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for group in groups %}
-            <tr>
-              <td>{{ group.chat_id }}</td>
-              <td>{{ group.title }}</td>
-              <td>{{ t.switch_on if group.join_verification_enabled else t.switch_off }}</td>
-              <td>{{ t.switch_on if group.keyword_filter_enabled else t.switch_off }}</td>
-              <td>{{ t.switch_on if group.ad_block_enabled else t.switch_off }}</td>
-              <td>{{ t.switch_on if group.anti_spam_enabled else t.switch_off }}</td>
-              <td>{{ t.switch_on if group.auto_recover_enabled else t.switch_off }}</td>
-              <td>{{ t.switch_on if group.deepseek_enabled else t.switch_off }}</td>
-            </tr>
-            {% else %}
-            <tr>
-              <td colspan="8">{{ t.no_group_data }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+      <section id="security" class="glass panel section">
+        <h3>{{ t.login_protection }}</h3>
+        <p>{{ t.token_expire_desc }}</p>
+        <div class="form-grid">
+          <label>
+            <input type="checkbox" id="login-ban-enabled" {% if security.login_ban_enabled %}checked{% endif %} />
+            {{ t.enable_temp_ban }}
+          </label>
+          <label>
+            {{ t.max_failed_attempts }}
+            <input id="login-max-attempts" type="number" min="2" max="20" value="{{ security.login_max_attempts }}" />
+          </label>
+          <label>
+            {{ t.ban_minutes }}
+            <input id="login-ban-minutes" type="number" min="1" max="120" value="{{ security.login_ban_minutes }}" />
+          </label>
+          <label>
+            {{ t.web_language }}
+            <select id="web-language">
+              <option value="zh" {% if lang == "zh" %}selected{% endif %}>{{ t.lang_zh }}</option>
+              <option value="en" {% if lang == "en" %}selected{% endif %}>{{ t.lang_en }}</option>
+            </select>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="save-security" type="button">{{ t.save_login_security }}</button>
+        </div>
+        <pre id="security-output">{{ t.ready }}.</pre>
+      </section>
+
+      <section id="password" class="glass panel section">
+        <h3>{{ t.password_change }}</h3>
+        <div class="form-grid">
+          <label>
+            {{ t.current_password }}
+            <input id="current-password" type="password" autocomplete="current-password" />
+          </label>
+          <label>
+            {{ t.new_password }}
+            <input id="new-password" type="password" autocomplete="new-password" />
+          </label>
+          <label>
+            {{ t.confirm_password }}
+            <input id="confirm-password" type="password" autocomplete="new-password" />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="save-password" type="button">{{ t.save_password }}</button>
+        </div>
+        <pre id="password-output">{{ t.ready }}.</pre>
+      </section>
+
+      <section id="groups" class="glass panel section">
+        <h3>{{ t.connected_groups }}</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ t.chat_id }}</th>
+                <th>{{ t.title }}</th>
+                <th>{{ t.join_verify }}</th>
+                <th>{{ t.keyword_filter }}</th>
+                <th>{{ t.ad_block }}</th>
+                <th>{{ t.anti_spam }}</th>
+                <th>{{ t.auto_recover }}</th>
+                <th>{{ t.ai }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for group in groups %}
+              <tr>
+                <td>{{ group.chat_id }}</td>
+                <td>{{ group.title }}</td>
+                <td>{{ t.switch_on if group.join_verification_enabled else t.switch_off }}</td>
+                <td>{{ t.switch_on if group.keyword_filter_enabled else t.switch_off }}</td>
+                <td>{{ t.switch_on if group.ad_block_enabled else t.switch_off }}</td>
+                <td>{{ t.switch_on if group.anti_spam_enabled else t.switch_off }}</td>
+                <td>{{ t.switch_on if group.auto_recover_enabled else t.switch_off }}</td>
+                <td>{{ t.switch_on if group.deepseek_enabled else t.switch_off }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="8">{{ t.no_group_data }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </section>
   </main>
 

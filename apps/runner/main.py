@@ -3,6 +3,7 @@ import asyncio
 import uvicorn
 
 from apps.api.app.main import app
+from apps.api.app.core.db import init_db
 from apps.bot.bot_app.dispatcher import run_bot
 from packages.shared.shared.config.settings import settings
 from packages.shared.shared.logging.logger import setup_logging
@@ -21,6 +22,7 @@ async def run_api_server() -> None:
 
 async def run_all() -> None:
     setup_logging()
+    await init_db()
     await asyncio.gather(run_api_server(), run_bot())
 
 
@@ -30,4 +32,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

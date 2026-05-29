@@ -5,7 +5,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.app.models.entities import VerificationChallenge
-from packages.shared.shared.config.settings import settings
+from apps.api.app.services.runtime_config_service import get_runtime_config
 
 
 def _now() -> datetime:
@@ -20,7 +20,8 @@ def create_math_question() -> tuple[str, str]:
 
 async def create_challenge(db: AsyncSession, chat_id: int, user_id: int) -> VerificationChallenge:
     question, answer = create_math_question()
-    expires_at = _now() + timedelta(seconds=settings.join_verify_timeout_sec)
+    runtime = await get_runtime_config(db)
+    expires_at = _now() + timedelta(seconds=runtime.join_verify_timeout_sec)
 
     result = await db.execute(
         select(VerificationChallenge).where(
@@ -79,4 +80,3 @@ async def list_expired_unpassed(db: AsyncSession) -> list[VerificationChallenge]
         )
     )
     return list(result.scalars().all())
-

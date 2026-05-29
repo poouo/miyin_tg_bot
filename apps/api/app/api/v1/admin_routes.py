@@ -17,6 +17,7 @@ from apps.api.app.services.security_service import (
     register_failed_login,
 )
 from apps.api.app.services.stats_service import dashboard_stats
+from apps.api.app.services.runtime_config_service import get_runtime_config
 from apps.api.app.services.web_language_service import read_web_language
 from packages.shared.shared.config.settings import settings
 
@@ -99,6 +100,13 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)) -> Respons
     stats = await dashboard_stats(db)
     groups = await list_groups(db)
     security = await get_or_create_security_config(db)
+    runtime_config = await get_runtime_config(db)
     lang = read_web_language()
-    context = {"stats": stats, "groups": groups, "security": security, **_build_i18n_context(lang)}
+    context = {
+        "stats": stats,
+        "groups": groups,
+        "security": security,
+        "runtime_config": runtime_config,
+        **_build_i18n_context(lang),
+    }
     return templates.TemplateResponse(request=request, name="dashboard.html", context=context)

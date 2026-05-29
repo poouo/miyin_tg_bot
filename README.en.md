@@ -32,14 +32,17 @@ Chinese readme: [README.md](./README.md)
 cp .env.example .env
 ```
 
-2. Configure at least:
+2. Configure web service items in `.env`:
 
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_BOT_USERNAME`
-- `DEEPSEEK_API_KEY`
 - `WEB_AUTH_SECRET`
 
-3. Run locally
+3. After startup, configure bot and AI runtime values in web dashboard:
+
+- `Bot Token`
+- `Bot Username`
+- `DeepSeek API Key`
+
+4. Run locally
 
 ```bash
 python3 -m venv .venv
@@ -95,4 +98,3 @@ bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scri
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/local/uninstall.sh)
 ```
-
