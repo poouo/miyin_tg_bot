@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from random import randint
+from random import randint, shuffle
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +16,27 @@ def create_math_question() -> tuple[str, str]:
     a = randint(1, 9)
     b = randint(1, 9)
     return f"{a} + {b} = ?", str(a + b)
+
+
+def build_answer_options(answer: str, count: int = 4) -> list[str]:
+    try:
+        correct = int(answer)
+    except Exception:
+        return [answer]
+
+    options = {correct}
+    while len(options) < max(2, count):
+        delta = randint(-5, 5)
+        if delta == 0:
+            continue
+        candidate = correct + delta
+        if candidate <= 0:
+            continue
+        options.add(candidate)
+
+    result = [str(v) for v in options]
+    shuffle(result)
+    return result
 
 
 async def create_challenge(db: AsyncSession, chat_id: int, user_id: int) -> VerificationChallenge:

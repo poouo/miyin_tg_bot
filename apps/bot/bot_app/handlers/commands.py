@@ -12,6 +12,19 @@ from apps.bot.bot_app.state import deepseek_client
 
 router = Router()
 MANAGER_ROLES = {"administrator", "creator"}
+MEMBER_UNRESTRICT_PERMISSIONS = ChatPermissions(
+    can_send_messages=True,
+    can_send_audios=True,
+    can_send_documents=True,
+    can_send_photos=True,
+    can_send_videos=True,
+    can_send_video_notes=True,
+    can_send_voice_notes=True,
+    can_send_polls=True,
+    can_send_other_messages=True,
+    can_add_web_page_previews=True,
+    can_invite_users=True,
+)
 
 
 async def is_group_manager(message: Message) -> bool:
@@ -89,7 +102,7 @@ async def verify_handler(message: Message, command: CommandObject) -> None:
         return
     answer = (command.args or "").strip()
     if not answer:
-        await message.reply("Usage: /verify your_answer")
+        await message.reply("请点击入群验证消息下方按钮，或使用 /verify 你的答案")
         return
 
     chat_id = message.chat.id
@@ -98,6 +111,11 @@ async def verify_handler(message: Message, command: CommandObject) -> None:
         await ensure_group(db, chat_id, message.chat.title or "")
         ok = await verify_challenge(db, chat_id, user_id, answer)
         if ok:
+            await message.bot.restrict_chat_member(
+                chat_id=chat_id,
+                user_id=user_id,
+                permissions=MEMBER_UNRESTRICT_PERMISSIONS,
+            )
             await message.reply("Verification passed. Welcome!")
             await add_log(db, chat_id, user_id, message.from_user.username or "", "join_verify_passed", "ok")
         else:
