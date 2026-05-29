@@ -1,11 +1,15 @@
 import asyncio
+import logging
 
 from aiogram import Bot, Dispatcher
+from aiogram.utils.token import TokenValidationError
 
 from apps.bot.bot_app.handlers.commands import router as command_router
 from apps.bot.bot_app.handlers.group_events import router as group_router
 from apps.bot.bot_app.tasks import kick_unverified_task, recover_mute_task
 from packages.shared.shared.config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 
 def build_dispatcher() -> Dispatcher:
@@ -16,10 +20,17 @@ def build_dispatcher() -> Dispatcher:
 
 
 async def run_bot() -> None:
-    if not settings.telegram_bot_token:
-        raise RuntimeError("TELEGRAM_BOT_TOKEN 未配置")
+    token = settings.telegram_bot_token.strip()
+    if not token or token == "replace_me":
+        logger.warning("TELEGRAM_BOT_TOKEN is not configured; bot polling is disabled.")
+        return
 
-    bot = Bot(token=settings.telegram_bot_token)
+    try:
+        bot = Bot(token=token)
+    except TokenValidationError:
+        logger.error("TELEGRAM_BOT_TOKEN is invalid; bot polling is disabled.")
+        return
+
     dp = build_dispatcher()
 
     recover_task = asyncio.create_task(recover_mute_task(bot))
@@ -30,4 +41,3 @@ async def run_bot() -> None:
         recover_task.cancel()
         kick_task.cancel()
         await bot.session.close()
-
