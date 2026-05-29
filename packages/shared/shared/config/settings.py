@@ -24,7 +24,7 @@ class Settings(BaseSettings):
 
     web_host: str = "0.0.0.0"
     web_port: int = 9800
-    web_admin_password: str = "admin123456"
+    web_admin_password: str = "admin"
     web_auth_secret: str = "replace_with_long_random_string"
     web_token_expire_days: int = 10
 

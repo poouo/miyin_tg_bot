@@ -80,6 +80,28 @@
     </section>
 
     <section class="glass panel">
+      <h2>{{ t.password_change }}</h2>
+      <div class="form-grid">
+        <label>
+          {{ t.current_password }}
+          <input id="current-password" type="password" autocomplete="current-password" />
+        </label>
+        <label>
+          {{ t.new_password }}
+          <input id="new-password" type="password" autocomplete="new-password" />
+        </label>
+        <label>
+          {{ t.confirm_password }}
+          <input id="confirm-password" type="password" autocomplete="new-password" />
+        </label>
+      </div>
+      <div class="actions">
+        <button id="save-password">{{ t.save_password }}</button>
+      </div>
+      <pre id="password-output">{{ t.ready }}.</pre>
+    </section>
+
+    <section class="glass panel">
       <h2>{{ t.connected_groups }}</h2>
       <div class="table-wrap">
         <table>
@@ -122,4 +144,3 @@
   <script src="/static/js/dashboard.js"></script>
 </body>
 </html>
-

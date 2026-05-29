@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from apps.api.app.core.auth import ADMIN_COOKIE_NAME, create_admin_token, get_client_ip, is_admin_authenticated
 from apps.api.app.core.db import get_db
 from apps.api.app.core.i18n import get_translations, tr
+from apps.api.app.services.admin_password_service import verify_admin_password
 from apps.api.app.services.group_service import list_groups
 from apps.api.app.services.security_service import (
     check_login_allowed,
@@ -61,7 +62,7 @@ async def login_submit(
             context={"error": error, **_build_i18n_context(lang)},
         )
 
-    if password != settings.web_admin_password:
+    if not verify_admin_password(password):
         await register_failed_login(db, ip)
         return templates.TemplateResponse(
             request=request,

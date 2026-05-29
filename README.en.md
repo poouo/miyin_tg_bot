@@ -3,8 +3,9 @@
 Current version: `V1.0.00`
 
 Default Web language: Chinese (switchable to English in admin panel).
+Default admin password: `admin`.
 
-中文说明: [README.md](./README.md)
+Chinese readme: [README.md](./README.md)
 
 ## Features
 
@@ -16,6 +17,7 @@ Default Web language: Chinese (switchable to English in admin panel).
 - DeepSeek API replies in groups
 - Web admin panel (Chinese/English switch)
 - Password login for admin panel, token valid for 10 days
+- Admin password can be changed in dashboard
 - Temporary login ban after repeated failures (configurable)
 - Manual moderation commands restricted to group owner/admin
 - Docker single-container deployment (SQLite)
@@ -35,7 +37,6 @@ cp .env.example .env
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_BOT_USERNAME`
 - `DEEPSEEK_API_KEY`
-- `WEB_ADMIN_PASSWORD`
 - `WEB_AUTH_SECRET`
 
 3. Run locally
@@ -55,29 +56,43 @@ Default web URL: `http://127.0.0.1:9800`
 docker compose up -d --build
 ```
 
-## One-click Scripts (GitHub)
+## GitHub One-click Scripts (Run Separately)
 
 Repo: `https://github.com/poouo/miyin_tg_bot.git`
 
-Docker:
+### Docker install script
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/docker/install.sh)
+```
+
+### Docker upgrade script
+
+```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/docker/upgrade.sh)
+```
+
+### Docker uninstall script
+
+```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/docker/uninstall.sh)
 ```
 
-Local:
+### Local install script
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/local/install.sh)
-bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/local/upgrade.sh)
-bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/local/uninstall.sh)
 ```
 
-## Version Update Policy
+### Local upgrade script
 
-- Root `VERSION` file is the version source (`V1.0.00`)
-- Update check compares local `VERSION` with remote `VERSION`
-- `has_update=true` when remote version is newer
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/local/upgrade.sh)
+```
+
+### Local uninstall script
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/local/uninstall.sh)
+```
 

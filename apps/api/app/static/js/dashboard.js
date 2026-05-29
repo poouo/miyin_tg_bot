@@ -2,11 +2,16 @@ const securityOutput = document.getElementById("security-output");
 const btnCheck = document.getElementById("check-update");
 const btnTrigger = document.getElementById("trigger-update");
 const btnSaveSecurity = document.getElementById("save-security");
+const btnSavePassword = document.getElementById("save-password");
 
 const loginBanEnabled = document.getElementById("login-ban-enabled");
 const loginMaxAttempts = document.getElementById("login-max-attempts");
 const loginBanMinutes = document.getElementById("login-ban-minutes");
 const webLanguage = document.getElementById("web-language");
+const currentPassword = document.getElementById("current-password");
+const newPassword = document.getElementById("new-password");
+const confirmPassword = document.getElementById("confirm-password");
+const passwordOutput = document.getElementById("password-output");
 
 const upgradeFill = document.getElementById("upgrade-fill");
 const upgradeStatus = document.getElementById("upgrade-status");
@@ -158,5 +163,37 @@ btnSaveSecurity?.addEventListener("click", async () => {
   }
 });
 
-pollOnlineUpdateStatus();
+btnSavePassword?.addEventListener("click", async () => {
+  if (!passwordOutput) return;
+  passwordOutput.textContent = t("security_saving");
 
+  const payload = {
+    current_password: currentPassword?.value || "",
+    new_password: newPassword?.value || "",
+    confirm_password: confirmPassword?.value || "",
+  };
+
+  try {
+    const res = await fetch("/api/v1/security/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      const detail = data?.detail || t("password_change_failed");
+      passwordOutput.textContent = `${t("password_change_failed")}: ${detail}`;
+      return;
+    }
+
+    passwordOutput.textContent = t("password_changed");
+    if (currentPassword) currentPassword.value = "";
+    if (newPassword) newPassword.value = "";
+    if (confirmPassword) confirmPassword.value = "";
+  } catch (err) {
+    passwordOutput.textContent = `${t("password_change_failed")}: ${String(err)}`;
+  }
+});
+
+pollOnlineUpdateStatus();

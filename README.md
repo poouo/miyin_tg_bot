@@ -2,7 +2,8 @@
 
 当前版本：`V1.0.00`
 
-默认 Web 语言：中文（可在后台切换为英文）。
+默认 Web 语言：中文（可在后台切换英文）。
+默认后台密码：`admin`（登录后可在后台修改）。
 
 English readme: [README.en.md](./README.en.md)
 
@@ -16,6 +17,7 @@ English readme: [README.en.md](./README.en.md)
 - DeepSeek API 群内问答
 - Web 管理后台（支持中英文切换）
 - 管理后台密码登录，token 有效期 10 天
+- 支持在后台修改管理员密码
 - 登录失败多次临时封禁（可配置开关、次数、分钟数）
 - 手动管理指令仅群主/管理员可用
 - Docker 单容器部署（SQLite）
@@ -35,7 +37,6 @@ cp .env.example .env
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_BOT_USERNAME`
 - `DEEPSEEK_API_KEY`
-- `WEB_ADMIN_PASSWORD`
 - `WEB_AUTH_SECRET`
 
 3. 本地运行
@@ -55,29 +56,43 @@ Web 后台默认地址：`http://127.0.0.1:9800`
 docker compose up -d --build
 ```
 
-## GitHub 一键脚本
+## GitHub 一键脚本（逐个执行）
 
 仓库：`https://github.com/poouo/miyin_tg_bot.git`
 
-Docker：
+### Docker 安装脚本
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/docker/install.sh)
+```
+
+### Docker 升级脚本
+
+```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/docker/upgrade.sh)
+```
+
+### Docker 卸载脚本
+
+```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/docker/uninstall.sh)
 ```
 
-本地：
+### 本地安装脚本
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/local/install.sh)
-bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/local/upgrade.sh)
-bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/local/uninstall.sh)
 ```
 
-## 版本更新策略
+### 本地升级脚本
 
-- 项目根目录 `VERSION` 文件为版本号源（当前 `V1.0.00`）
-- 更新检测比较本地 `VERSION` 与远端 `VERSION`
-- 远端版本更高时返回 `has_update=true`
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/local/upgrade.sh)
+```
+
+### 本地卸载脚本
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/local/uninstall.sh)
+```
 
