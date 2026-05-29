@@ -67,12 +67,13 @@ cd "${APP_DIR}"
 
 ensure_venv_support
 
-if [[ ! -d "${VENV_DIR}" ]]; then
-  "${PYTHON_BIN}" -m venv "${VENV_DIR}"
+if [[ ! -d "${VENV_DIR}" ]] || [[ ! -x "${VENV_DIR}/bin/python" ]] || [[ ! -x "${VENV_DIR}/bin/pip" ]]; then
+  echo "[miyin] creating or repairing virtual environment..."
+  "${PYTHON_BIN}" -m venv --clear "${VENV_DIR}"
 fi
 
-"${VENV_DIR}/bin/pip" install --upgrade pip
-"${VENV_DIR}/bin/pip" install -r "${APP_DIR}/requirements.txt"
+"${VENV_DIR}/bin/python" -m pip install --upgrade pip
+"${VENV_DIR}/bin/python" -m pip install -r "${APP_DIR}/requirements.txt"
 
 if [[ ! -f "${APP_DIR}/.env" ]]; then
   cp "${APP_DIR}/.env.example" "${APP_DIR}/.env"
@@ -85,4 +86,3 @@ start_update_checker
 echo "[miyin] local install done"
 echo "[miyin] web: http://<server-ip>:9800"
 echo "[miyin] update status file: ${UPDATE_STATUS_FILE}"
-
