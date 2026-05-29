@@ -3,13 +3,16 @@ const sidebar = document.getElementById("sidebar");
 const menuToggle = document.getElementById("mobile-menu-toggle");
 const workspaceTitle = document.getElementById("workspace-title");
 const navItems = Array.from(document.querySelectorAll(".nav-item"));
+const sections = Array.from(document.querySelectorAll(".section"));
 
 const securityOutput = document.getElementById("security-output");
 const runtimeOutput = document.getElementById("runtime-output");
+const deepseekOutput = document.getElementById("deepseek-output");
 const btnCheck = document.getElementById("check-update");
 const btnTrigger = document.getElementById("trigger-update");
 const btnSaveSecurity = document.getElementById("save-security");
 const btnSaveRuntime = document.getElementById("save-runtime");
+const btnSaveDeepseek = document.getElementById("save-deepseek");
 const btnSavePassword = document.getElementById("save-password");
 
 const loginBanEnabled = document.getElementById("login-ban-enabled");
@@ -44,6 +47,7 @@ function t(key, fallback) {
 }
 
 let updatePollTimer = null;
+const ACTIVE_SECTION_KEY = "miyin.dashboard.activeSection";
 
 function print(el, data) {
   if (!el) return;
@@ -73,6 +77,12 @@ function setActiveNav(target) {
   }
 }
 
+function setActiveSection(target) {
+  sections.forEach((section) => {
+    section.classList.toggle("section-active", section.id === target);
+  });
+}
+
 function closeMobileSidebar() {
   bodyEl.classList.remove("sidebar-open");
 }
@@ -96,10 +106,27 @@ navItems.forEach((item) => {
     const section = document.getElementById(target);
     if (!section) return;
     setActiveNav(target);
-    section.scrollIntoView({ behavior: "smooth", block: "start" });
+    setActiveSection(target);
+    try {
+      window.localStorage.setItem(ACTIVE_SECTION_KEY, target);
+    } catch (err) {
+      // ignore
+    }
     closeMobileSidebar();
   });
 });
+
+let initialTarget = navItems.find((item) => item.classList.contains("active"))?.dataset.target || "overview";
+try {
+  const stored = window.localStorage.getItem(ACTIVE_SECTION_KEY) || "";
+  if (stored && navItems.some((item) => item.dataset.target === stored)) {
+    initialTarget = stored;
+  }
+} catch (err) {
+  // ignore
+}
+setActiveNav(initialTarget);
+setActiveSection(initialTarget);
 
 async function pollOnlineUpdateStatus() {
   try {
@@ -196,9 +223,8 @@ btnTrigger?.addEventListener("click", async () => {
   }
 });
 
-btnSaveRuntime?.addEventListener("click", async () => {
-  if (runtimeOutput) runtimeOutput.textContent = t("security_saving");
-  const payload = {
+function buildRuntimePayload() {
+  return {
     telegram_bot_token: rtTelegramBotToken?.value || "",
     telegram_bot_username: rtTelegramBotUsername?.value || "",
     telegram_admin_ids: rtTelegramAdminIds?.value || "",
@@ -211,6 +237,13 @@ btnSaveRuntime?.addEventListener("click", async () => {
     spam_max_messages: Number(rtSpamMaxMessages?.value || 6),
     ad_regex: rtAdRegex?.value || "",
   };
+}
+
+async function saveRuntime(outputEl) {
+  if (outputEl) outputEl.textContent = t("security_saving");
+  const payload = {
+    ...buildRuntimePayload(),
+  };
 
   try {
     const res = await fetch("/api/v1/runtime", {
@@ -219,10 +252,18 @@ btnSaveRuntime?.addEventListener("click", async () => {
       body: JSON.stringify(payload),
     });
     const data = await res.json();
-    print(runtimeOutput, data);
+    print(outputEl, data);
   } catch (err) {
-    print(runtimeOutput, { ok: false, error: String(err) });
+    print(outputEl, { ok: false, error: String(err) });
   }
+}
+
+btnSaveRuntime?.addEventListener("click", async () => {
+  await saveRuntime(runtimeOutput);
+});
+
+btnSaveDeepseek?.addEventListener("click", async () => {
+  await saveRuntime(deepseekOutput);
 });
 
 btnSaveSecurity?.addEventListener("click", async () => {

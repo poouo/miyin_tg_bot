@@ -19,12 +19,19 @@
       </div>
 
       <nav class="nav-list">
-        <button class="nav-item active" type="button" data-target="overview">{{ t.nav_overview }}</button>
-        <button class="nav-item" type="button" data-target="runtime">{{ t.nav_runtime }}</button>
-        <button class="nav-item" type="button" data-target="update">{{ t.nav_update }}</button>
-        <button class="nav-item" type="button" data-target="security">{{ t.nav_security }}</button>
-        <button class="nav-item" type="button" data-target="password">{{ t.nav_password }}</button>
-        <button class="nav-item" type="button" data-target="groups">{{ t.nav_groups }}</button>
+        <div class="nav-group">
+          <p class="nav-group-title">{{ t.nav_group_control }}</p>
+          <button class="nav-item active" type="button" data-target="overview">{{ t.nav_overview }}</button>
+          <button class="nav-item" type="button" data-target="runtime">{{ t.nav_runtime }}</button>
+          <button class="nav-item" type="button" data-target="deepseek">{{ t.nav_deepseek }}</button>
+          <button class="nav-item" type="button" data-target="groups">{{ t.nav_groups }}</button>
+        </div>
+        <div class="nav-group">
+          <p class="nav-group-title">{{ t.nav_group_security }}</p>
+          <button class="nav-item" type="button" data-target="update">{{ t.nav_update }}</button>
+          <button class="nav-item" type="button" data-target="security">{{ t.nav_security }}</button>
+          <button class="nav-item" type="button" data-target="password">{{ t.nav_password }}</button>
+        </div>
       </nav>
 
       <form action="/auth/logout" method="post" class="sidebar-footer">
@@ -34,7 +41,7 @@
 
     <section class="workspace">
       <header class="glass topbar">
-        <button id="mobile-menu-toggle" class="menu-toggle" type="button">☰</button>
+        <button id="mobile-menu-toggle" class="menu-toggle" type="button">Menu</button>
         <div class="title-wrap">
           <h2 id="workspace-title">{{ t.nav_overview }}</h2>
           <p>{{ t.dashboard_subtitle }}</p>
@@ -76,22 +83,6 @@
             <input id="rt-telegram-admin-ids" type="text" value="{{ runtime_config.telegram_admin_ids }}" autocomplete="off" />
           </label>
           <label>
-            {{ t.runtime_deepseek_key }}
-            <input id="rt-deepseek-api-key" type="password" value="{{ runtime_config.deepseek_api_key }}" autocomplete="off" />
-          </label>
-          <label>
-            {{ t.runtime_deepseek_base }}
-            <input id="rt-deepseek-base-url" type="text" value="{{ runtime_config.deepseek_base_url }}" />
-          </label>
-          <label>
-            {{ t.runtime_deepseek_model }}
-            <input id="rt-deepseek-model" type="text" value="{{ runtime_config.deepseek_model }}" />
-          </label>
-          <label>
-            {{ t.runtime_deepseek_timeout }}
-            <input id="rt-deepseek-timeout-sec" type="number" min="3" max="120" value="{{ runtime_config.deepseek_timeout_sec }}" />
-          </label>
-          <label>
             {{ t.runtime_join_timeout }}
             <input id="rt-join-verify-timeout-sec" type="number" min="30" max="3600" value="{{ runtime_config.join_verify_timeout_sec }}" />
           </label>
@@ -112,6 +103,33 @@
           <button id="save-runtime" type="button">{{ t.runtime_save }}</button>
         </div>
         <pre id="runtime-output">{{ t.ready }}.</pre>
+      </section>
+
+      <section id="deepseek" class="glass panel section">
+        <h3>{{ t.deepseek_title }}</h3>
+        <p>{{ t.deepseek_desc }}</p>
+        <div class="form-grid two-col">
+          <label>
+            {{ t.runtime_deepseek_key }}
+            <input id="rt-deepseek-api-key" type="password" value="{{ runtime_config.deepseek_api_key }}" autocomplete="off" />
+          </label>
+          <label>
+            {{ t.runtime_deepseek_base }}
+            <input id="rt-deepseek-base-url" type="text" value="{{ runtime_config.deepseek_base_url }}" />
+          </label>
+          <label>
+            {{ t.runtime_deepseek_model }}
+            <input id="rt-deepseek-model" type="text" value="{{ runtime_config.deepseek_model }}" />
+          </label>
+          <label>
+            {{ t.runtime_deepseek_timeout }}
+            <input id="rt-deepseek-timeout-sec" type="number" min="3" max="120" value="{{ runtime_config.deepseek_timeout_sec }}" />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="save-deepseek" type="button">{{ t.deepseek_save }}</button>
+        </div>
+        <pre id="deepseek-output">{{ t.ready }}.</pre>
       </section>
 
       <section id="update" class="glass panel section">
