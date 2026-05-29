@@ -19,8 +19,7 @@ fi
 
 cd "${APP_DIR}"
 run_privileged git fetch origin "${BRANCH}"
-run_privileged git checkout "${BRANCH}"
-run_privileged git pull --ff-only origin "${BRANCH}"
+run_privileged git checkout -B "${BRANCH}" "origin/${BRANCH}"
+run_privileged git reset --hard "origin/${BRANCH}"
 run_privileged docker compose up -d --build
 echo "[miyin] docker upgrade done"
-

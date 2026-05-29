@@ -56,8 +56,8 @@ fi
 
 write_status "running" 8 "Preparing update..."
 git fetch origin "${BRANCH}"
-git checkout "${BRANCH}"
-git pull --ff-only origin "${BRANCH}"
+git checkout -B "${BRANCH}" "origin/${BRANCH}"
+git reset --hard "origin/${BRANCH}"
 
 write_status "running" 45 "Installing dependencies..."
 "${VENV_DIR}/bin/pip" install -r "${APP_DIR}/requirements.txt"

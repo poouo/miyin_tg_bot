@@ -15,6 +15,66 @@ run_privileged() {
   fi
 }
 
+write_default_env_example() {
+  run_privileged tee "${APP_DIR}/.env.example" >/dev/null <<'EOF'
+APP_ENV=prod
+LOG_LEVEL=INFO
+PROJECT_NAME=miyin_tg_bot
+
+TELEGRAM_BOT_TOKEN=replace_me
+TELEGRAM_BOT_USERNAME=replace_me
+TELEGRAM_ADMIN_IDS=12345678,87654321
+
+DATABASE_URL=sqlite+aiosqlite:///./data/miyin.db
+
+DEEPSEEK_API_KEY=replace_me
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-chat
+DEEPSEEK_TIMEOUT_SEC=30
+
+WEB_HOST=0.0.0.0
+WEB_PORT=9800
+WEB_ADMIN_PASSWORD=admin
+WEB_AUTH_SECRET=change_me_to_a_long_random_string
+WEB_TOKEN_EXPIRE_DAYS=10
+
+JOIN_VERIFY_TIMEOUT_SEC=180
+SPAM_WINDOW_SEC=10
+SPAM_MAX_MESSAGES=6
+AD_REGEX=(t\\.me/|telegram\\.me/|vx|wechat|free|bet|promo)
+EOF
+}
+
+ensure_env_example() {
+  if [[ -f "${APP_DIR}/.env.example" ]]; then
+    return 0
+  fi
+
+  echo "[miyin] .env.example missing, trying to fetch template from GitHub..."
+  local urls=(
+    "https://raw.githubusercontent.com/poouo/miyin_tg_bot/${BRANCH}/.env.example"
+    "https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/.env.example"
+  )
+  local url
+
+  for url in "${urls[@]}"; do
+    if command -v curl >/dev/null 2>&1; then
+      if run_privileged curl -fsSL "${url}" -o "${APP_DIR}/.env.example"; then
+        echo "[miyin] .env.example downloaded from ${url}"
+        return 0
+      fi
+    elif command -v wget >/dev/null 2>&1; then
+      if run_privileged wget -qO "${APP_DIR}/.env.example" "${url}"; then
+        echo "[miyin] .env.example downloaded from ${url}"
+        return 0
+      fi
+    fi
+  done
+
+  echo "[miyin] failed to download .env.example, using built-in template"
+  write_default_env_example
+}
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker not found, please install Docker first"
   exit 1
@@ -31,8 +91,8 @@ if [[ ! -d "${APP_DIR}/.git" ]]; then
 else
   cd "${APP_DIR}"
   run_privileged git fetch origin "${BRANCH}"
-  run_privileged git checkout "${BRANCH}"
-  run_privileged git pull --ff-only origin "${BRANCH}"
+  run_privileged git checkout -B "${BRANCH}" "origin/${BRANCH}"
+  run_privileged git reset --hard "origin/${BRANCH}"
 fi
 
 cd "${APP_DIR}"
@@ -42,18 +102,7 @@ if [[ ! -f "docker-compose.yml" ]]; then
   exit 1
 fi
 
-if [[ ! -f ".env.example" ]]; then
-  echo "[miyin] .env.example missing, trying to fetch template from GitHub..."
-  ENV_EXAMPLE_URL="https://raw.githubusercontent.com/poouo/miyin_tg_bot/${BRANCH}/.env.example"
-  if command -v curl >/dev/null 2>&1; then
-    run_privileged bash -c "curl -fsSL '${ENV_EXAMPLE_URL}' > '${APP_DIR}/.env.example'"
-  elif command -v wget >/dev/null 2>&1; then
-    run_privileged bash -c "wget -qO- '${ENV_EXAMPLE_URL}' > '${APP_DIR}/.env.example'"
-  else
-    echo "curl or wget required to fetch .env.example"
-    exit 1
-  fi
-fi
+ensure_env_example
 
 if [[ ! -f ".env" ]]; then
   run_privileged cp .env.example .env
@@ -64,4 +113,3 @@ run_privileged mkdir -p data logs
 run_privileged docker compose up -d --build
 echo "[miyin] docker install done"
 echo "[miyin] web: http://<server-ip>:9800"
-

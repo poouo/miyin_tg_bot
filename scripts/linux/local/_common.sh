@@ -18,8 +18,8 @@ ensure_repo() {
   else
     cd "${APP_DIR}"
     git fetch origin "${BRANCH}"
-    git checkout "${BRANCH}"
-    git pull --ff-only origin "${BRANCH}"
+    git checkout -B "${BRANCH}" "origin/${BRANCH}"
+    git reset --hard "origin/${BRANCH}"
   fi
 }
 
