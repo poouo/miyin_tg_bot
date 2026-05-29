@@ -1,9 +1,9 @@
 import json
 from functools import lru_cache
-from typing import Annotated, List
+from typing import List
 
-from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str = ""
     telegram_bot_username: str = ""
-    telegram_admin_ids: Annotated[List[int], NoDecode] = Field(default_factory=list)
+    telegram_admin_ids_raw: str = Field(default="", alias="telegram_admin_ids", validation_alias="telegram_admin_ids")
 
     database_url: str = "sqlite+aiosqlite:///./data/miyin.db"
     deepseek_api_key: str = ""
@@ -34,25 +34,18 @@ class Settings(BaseSettings):
     spam_max_messages: int = 6
     ad_regex: str = r"(t\.me/|telegram\.me/|vx|wechat|free|bet|promo)"
 
-    @field_validator("telegram_admin_ids", mode="before")
-    @classmethod
-    def parse_admin_ids(cls, value: str | List[int] | None) -> List[int]:
-        if isinstance(value, list):
-            return [int(item) for item in value]
-        if not value:
+    @property
+    def telegram_admin_ids(self) -> List[int]:
+        raw = self.telegram_admin_ids_raw.strip()
+        if not raw:
             return []
-        if isinstance(value, str):
-            raw = value.strip()
-            if not raw:
-                return []
-            # Support both JSON array: [123,456] and CSV: 123,456
-            if raw.startswith("[") and raw.endswith("]"):
-                parsed = json.loads(raw)
-                if isinstance(parsed, list):
-                    return [int(item) for item in parsed]
-                raise ValueError("telegram_admin_ids JSON must be an array")
-            return [int(item.strip()) for item in raw.split(",") if item.strip()]
-        return [int(value)]
+        # Support both JSON array: [123,456] and CSV: 123,456
+        if raw.startswith("[") and raw.endswith("]"):
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                return [int(item) for item in parsed]
+            raise ValueError("telegram_admin_ids JSON must be an array")
+        return [int(item.strip()) for item in raw.split(",") if item.strip()]
 
 
 @lru_cache
