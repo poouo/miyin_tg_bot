@@ -175,7 +175,7 @@ button:disabled {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px;
+  padding: 18px 20px;
 }
 
 .nav-list,
@@ -184,33 +184,35 @@ button:disabled {
 }
 
 .nav-list {
-  gap: 20px;
+  gap: 18px;
   align-content: start;
 }
 
 .nav-group {
-  gap: 8px;
+  gap: 6px;
 }
 
 .nav-group-title {
   margin: 0;
-  padding: 0 12px;
+  padding: 0 0 2px;
   color: var(--muted);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .nav-item {
   width: 100%;
-  min-height: 44px;
-  display: flex;
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  column-gap: 10px;
   border: 0;
-  border-radius: 12px;
-  padding: 12px;
+  border-radius: 10px;
+  padding: 9px 12px;
   color: var(--muted);
   background: transparent;
   text-align: left;
@@ -219,7 +221,7 @@ button:disabled {
 
 .nav-item:hover {
   background: var(--surface);
-  transform: translateX(2px);
+  transform: none;
 }
 
 .nav-item.active {
@@ -233,17 +235,20 @@ body.dark .nav-item.active {
 }
 
 .nav-item-icon {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 24px;
   display: grid;
   place-items: center;
   color: currentColor;
-  font-size: 20px;
+  font-size: 19px;
 }
 
 .nav-item-label {
+  min-width: 0;
   font-size: 14px;
   font-weight: 650;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .sidebar-footer {
@@ -452,6 +457,14 @@ body.dark .runtime-pill {
   margin-top: 16px;
 }
 
+#community {
+  padding-bottom: 0;
+}
+
+#community .community-stack {
+  padding-bottom: 96px;
+}
+
 .community-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -482,6 +495,13 @@ body.dark .runtime-pill {
   border-top: 1px solid var(--border);
   background: color-mix(in srgb, var(--panel) 92%, transparent);
   backdrop-filter: blur(14px);
+}
+
+.community-actions {
+  min-height: 74px;
+  align-items: center;
+  border-radius: 0 0 16px 16px;
+  box-shadow: 0 -10px 24px rgba(15, 23, 42, 0.06);
 }
 
 .form-grid {
@@ -896,6 +916,29 @@ tbody tr:last-child td {
   overflow-y: auto;
   border-radius: 16px;
   padding: 18px;
+}
+
+#kw-modal .modal-card {
+  width: min(640px, 100%);
+}
+
+.keyword-modal-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+}
+
+.keyword-modal-enabled {
+  grid-column: 1 / -1;
+  min-height: 46px;
+}
+
+#kw-modal .modal-actions {
+  margin-top: 18px;
+  justify-content: flex-end;
+}
+
+#kw-modal .modal-actions .btn {
+  min-width: 92px;
 }
 
 .modal-head {
