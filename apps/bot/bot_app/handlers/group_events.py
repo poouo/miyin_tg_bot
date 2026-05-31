@@ -24,6 +24,7 @@ from apps.api.app.services.moderation.join_verification import (
     build_answer_options,
     create_challenge,
     get_challenge,
+    set_challenge_message_id,
     verify_challenge,
 )
 from apps.api.app.services.runtime_config_service import get_runtime_config
@@ -89,6 +90,16 @@ def _build_verify_keyboard(target_user_id: int, options: list[str]) -> InlineKey
     if row:
         rows.append(row)
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+async def _delete_verification_message(bot, chat_id: int, challenge) -> None:
+    message_id = int(getattr(challenge, "message_id", 0) or 0)
+    if message_id <= 0:
+        return
+    try:
+        await bot.delete_message(chat_id, message_id)
+    except Exception:
+        return
 
 
 async def _delete_message_later(bot, chat_id: int, message_id: int, seconds: int) -> None:
@@ -309,7 +320,7 @@ async def new_member_handler(message: Message) -> None:
             )
             challenge = await create_challenge(db, chat.id, member.id)
             options = build_answer_options(challenge.answer)
-            await message.answer(
+            verify_message = await message.answer(
                 "\n".join(
                     [
                         "<b>入群验证</b>",
@@ -324,6 +335,7 @@ async def new_member_handler(message: Message) -> None:
                 parse_mode="HTML",
                 reply_markup=_build_verify_keyboard(member.id, options),
             )
+            await set_challenge_message_id(db, chat.id, member.id, verify_message.message_id)
             await add_log(db, chat.id, member.id, member.username or "", "join_verify_created", challenge.question)
             await _send_log_channel(
                 message.bot,
@@ -404,6 +416,7 @@ async def verify_button_handler(callback: CallbackQuery) -> None:
         if not ok:
             challenge = await get_challenge(db, chat_id, user_id)
             if challenge is not None and not challenge.passed:
+                await _delete_verification_message(callback.bot, chat_id, challenge)
                 action_config = ModerationActionConfig(
                     action=group.join_verify_fail_action,
                     kick_minutes=group.join_verify_fail_kick_minutes,
@@ -432,10 +445,15 @@ async def verify_button_handler(callback: CallbackQuery) -> None:
                     "未通过验证",
                 )
                 challenge.passed = True
+                challenge.message_id = 0
             await add_log(db, chat_id, user_id, callback.from_user.username or "", "join_verify_failed", "button")
             await callback.answer("答案错误或验证已过期", show_alert=True)
             return
 
+        challenge = await get_challenge(db, chat_id, user_id)
+        if challenge is not None:
+            await _delete_verification_message(callback.bot, chat_id, challenge)
+            challenge.message_id = 0
         await callback.bot.restrict_chat_member(
             chat_id=chat_id,
             user_id=user_id,
@@ -450,10 +468,6 @@ async def verify_button_handler(callback: CallbackQuery) -> None:
             callback.from_user.username or "",
         )
 
-    try:
-        await callback.message.edit_reply_markup(reply_markup=None)
-    except Exception:
-        pass
     await callback.answer("验证通过，欢迎加入！")
 
 

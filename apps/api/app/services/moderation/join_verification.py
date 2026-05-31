@@ -39,7 +39,9 @@ def build_answer_options(answer: str, count: int = 4) -> list[str]:
     return result
 
 
-async def create_challenge(db: AsyncSession, chat_id: int, user_id: int) -> VerificationChallenge:
+async def create_challenge(
+    db: AsyncSession, chat_id: int, user_id: int, message_id: int = 0
+) -> VerificationChallenge:
     question, answer = create_math_question()
     runtime = await get_runtime_config(db)
     expires_at = _now() + timedelta(seconds=runtime.join_verify_timeout_sec)
@@ -56,6 +58,7 @@ async def create_challenge(db: AsyncSession, chat_id: int, user_id: int) -> Veri
             user_id=user_id,
             question=question,
             answer=answer,
+            message_id=message_id,
             expires_at=expires_at,
             passed=False,
         )
@@ -63,12 +66,25 @@ async def create_challenge(db: AsyncSession, chat_id: int, user_id: int) -> Veri
     else:
         entity.question = question
         entity.answer = answer
+        entity.message_id = message_id
         entity.expires_at = expires_at
         entity.passed = False
 
     await db.commit()
     await db.refresh(entity)
     return entity
+
+
+async def set_challenge_message_id(
+    db: AsyncSession, chat_id: int, user_id: int, message_id: int
+) -> VerificationChallenge | None:
+    challenge = await get_challenge(db, chat_id, user_id)
+    if challenge is None:
+        return None
+    challenge.message_id = message_id
+    await db.commit()
+    await db.refresh(challenge)
+    return challenge
 
 
 async def get_challenge(db: AsyncSession, chat_id: int, user_id: int) -> VerificationChallenge | None:

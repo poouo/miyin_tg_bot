@@ -77,6 +77,18 @@ MEMBER_UNRESTRICT_PERMISSIONS = ChatPermissions(
     can_add_web_page_previews=True,
     can_invite_users=True,
 )
+
+
+async def delete_verification_message(bot, chat_id: int, challenge) -> None:
+    message_id = int(getattr(challenge, "message_id", 0) or 0)
+    if message_id <= 0:
+        return
+    try:
+        await bot.delete_message(chat_id, message_id)
+    except Exception:
+        return
+
+
 USER_HELP_TEXT = "\n".join(
     [
         "<b>可用指令</b>",
@@ -540,6 +552,10 @@ async def verify_handler(message: Message, command: CommandObject) -> None:
         group = await ensure_group(db, chat_id, message.chat.title or "")
         ok = await verify_challenge(db, chat_id, user_id, answer)
         if ok:
+            challenge = await get_challenge(db, chat_id, user_id)
+            if challenge is not None:
+                await delete_verification_message(message.bot, chat_id, challenge)
+                challenge.message_id = 0
             await message.bot.restrict_chat_member(
                 chat_id=chat_id,
                 user_id=user_id,
@@ -556,6 +572,7 @@ async def verify_handler(message: Message, command: CommandObject) -> None:
         else:
             challenge = await get_challenge(db, chat_id, user_id)
             if challenge is not None and not challenge.passed:
+                await delete_verification_message(message.bot, chat_id, challenge)
                 action_config = ModerationActionConfig(
                     action=group.join_verify_fail_action,
                     kick_minutes=group.join_verify_fail_kick_minutes,
@@ -584,6 +601,7 @@ async def verify_handler(message: Message, command: CommandObject) -> None:
                     "未通过验证",
                 )
                 challenge.passed = True
+                challenge.message_id = 0
                 await db.commit()
             else:
                 await send_temporary_notice(message.bot, chat_id, "验证失败或已过期。")

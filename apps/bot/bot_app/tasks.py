@@ -70,6 +70,15 @@ async def recover_mute_task(bot: Bot) -> None:
         await asyncio.sleep(20)
 
 
+async def _delete_verification_message(bot: Bot, chat_id: int, message_id: int) -> None:
+    if message_id <= 0:
+        return
+    try:
+        await bot.delete_message(chat_id, message_id)
+    except Exception:
+        return
+
+
 async def kick_unverified_task(bot: Bot) -> None:
     while True:
         try:
@@ -77,6 +86,11 @@ async def kick_unverified_task(bot: Bot) -> None:
                 items = await list_expired_unpassed(db)
                 for challenge in items:
                     group = await ensure_group(db, challenge.chat_id, "")
+                    await _delete_verification_message(
+                        bot,
+                        challenge.chat_id,
+                        int(getattr(challenge, "message_id", 0) or 0),
+                    )
                     action_config = ModerationActionConfig(
                         action=group.join_verify_fail_action,
                         kick_minutes=group.join_verify_fail_kick_minutes,
@@ -111,6 +125,7 @@ async def kick_unverified_task(bot: Bot) -> None:
                         f"join verification timed out, action={action_config.action}",
                     )
                     challenge.passed = True
+                    challenge.message_id = 0
                 await db.commit()
         except Exception:
             pass

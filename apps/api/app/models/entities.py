@@ -93,6 +93,7 @@ class VerificationChallenge(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, index=True)
     question: Mapped[str] = mapped_column(String(255))
     answer: Mapped[str] = mapped_column(String(64))
+    message_id: Mapped[int] = mapped_column(Integer, default=0)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     passed: Mapped[bool] = mapped_column(Boolean, default=False)
 
