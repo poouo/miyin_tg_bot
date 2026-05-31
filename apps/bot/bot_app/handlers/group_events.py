@@ -479,8 +479,9 @@ async def group_text_handler(message: Message) -> None:
         await _handle_afk(message, db)
         if await _enforce_locks(message, db):
             return
-        decision = await policy_engine.check_message(db, chat.id, user.id, text)
-        if decision.blocked:
+        is_manager = await _is_group_manager(message)
+        decision = None if is_manager else await policy_engine.check_message(db, chat.id, user.id, text)
+        if decision is not None and decision.blocked:
             should_delete_message = (
                 decision.reason == "keyword_filter"
                 or (decision.reason == "ad_block" and group.ad_block_delete_message)
