@@ -92,6 +92,23 @@ async def list_active_ban_sanctions(db: AsyncSession, chat_id: int | None = None
     return list(result.scalars().all())
 
 
+async def get_active_ban_sanction(db: AsyncSession, chat_id: int, user_id: int) -> UserSanction | None:
+    result = await db.execute(
+        select(UserSanction)
+        .where(
+            and_(
+                UserSanction.chat_id == chat_id,
+                UserSanction.user_id == user_id,
+                UserSanction.sanction_type == "ban",
+                UserSanction.recovered.is_(False),
+                or_(UserSanction.expires_at.is_(None), UserSanction.expires_at > _now()),
+            )
+        )
+        .order_by(UserSanction.created_at.desc())
+    )
+    return result.scalars().first()
+
+
 async def mark_ban_recovered(db: AsyncSession, chat_id: int, user_id: int) -> UserSanction | None:
     result = await db.execute(
         select(UserSanction)

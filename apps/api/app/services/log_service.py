@@ -71,6 +71,8 @@ async def list_member_events(db: AsyncSession, limit: int = 200, chat_id: int | 
         "join_verify_passed",
         "join_verify_failed",
         "join_verify_timeout",
+        "user_kicked",
+        "user_banned",
     ]
     stmt = (
         select(ModerationLog, GroupConfig.title)

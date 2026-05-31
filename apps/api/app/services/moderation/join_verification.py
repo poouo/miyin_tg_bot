@@ -39,6 +39,21 @@ def build_answer_options(answer: str, count: int = 4) -> list[str]:
     return result
 
 
+def challenge_failure_reason(challenge: VerificationChallenge | None, user_answer: str) -> str:
+    if challenge is None:
+        return "验证记录不存在"
+    if challenge.passed:
+        return "验证已处理"
+    expires_at = challenge.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < _now():
+        return "验证超时"
+    if challenge.answer.strip() != user_answer.strip():
+        return "答案错误"
+    return "未通过验证"
+
+
 async def create_challenge(
     db: AsyncSession, chat_id: int, user_id: int, message_id: int = 0
 ) -> VerificationChallenge:

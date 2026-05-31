@@ -50,7 +50,7 @@ from apps.api.app.services.community_feature_service import (
 from apps.api.app.services.group_service import ensure_group, get_group, list_groups
 from apps.api.app.services.log_service import add_log
 from apps.api.app.services.moderation.auto_recover import add_ban_sanction, mark_ban_recovered
-from apps.api.app.services.moderation.join_verification import get_challenge, verify_challenge
+from apps.api.app.services.moderation.join_verification import challenge_failure_reason, get_challenge, verify_challenge
 from apps.api.app.services.runtime_config_service import get_runtime_config
 from apps.bot.bot_app.ai_formatting import reply_ai_text
 from apps.bot.bot_app.moderation_actions import DEFAULT_KICK_MINUTES, ModerationActionConfig, apply_moderation_action
@@ -571,6 +571,7 @@ async def verify_handler(message: Message, command: CommandObject) -> None:
             )
         else:
             challenge = await get_challenge(db, chat_id, user_id)
+            fail_reason = challenge_failure_reason(challenge, answer)
             if challenge is not None and not challenge.passed:
                 await delete_verification_message(message.bot, chat_id, challenge)
                 action_config = ModerationActionConfig(
@@ -598,14 +599,14 @@ async def verify_handler(message: Message, command: CommandObject) -> None:
                     action_config.ban_minutes,
                     message.from_user.full_name,
                     message.from_user.username or "",
-                    "未通过验证",
+                    fail_reason,
                 )
                 challenge.passed = True
                 challenge.message_id = 0
                 await db.commit()
             else:
-                await send_temporary_notice(message.bot, chat_id, "验证失败或已过期。")
-            await add_log(db, chat_id, user_id, message.from_user.username or "", "join_verify_failed", "command")
+                await send_temporary_notice(message.bot, chat_id, f"验证失败：{fail_reason}")
+            await add_log(db, chat_id, user_id, message.from_user.username or "", "join_verify_failed", fail_reason)
 
 
 @router.message(Command("rules"))

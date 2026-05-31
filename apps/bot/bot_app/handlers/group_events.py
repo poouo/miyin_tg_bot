@@ -19,9 +19,10 @@ from apps.api.app.services.community_feature_service import (
 from apps.api.app.services.group_service import ensure_group
 from apps.api.app.services.log_service import add_log
 from apps.api.app.services.auto_reply_service import match_auto_reply
-from apps.api.app.services.moderation.auto_recover import add_mute_sanction
+from apps.api.app.services.moderation.auto_recover import add_mute_sanction, get_active_ban_sanction
 from apps.api.app.services.moderation.join_verification import (
     build_answer_options,
+    challenge_failure_reason,
     create_challenge,
     get_challenge,
     set_challenge_message_id,
@@ -33,6 +34,7 @@ from apps.bot.bot_app.moderation_actions import ModerationActionConfig, apply_mo
 from apps.bot.bot_app.state import deepseek_client, policy_engine
 from apps.bot.bot_app.verification_notices import (
     delete_message_later,
+    send_temporary_notice,
     send_verify_fail_notice,
     send_verify_pass_notice,
 )
@@ -355,6 +357,8 @@ async def left_member_handler(message: Message) -> None:
 
     async with SessionLocal() as db:
         await ensure_group(db, message.chat.id, message.chat.title or "")
+        if await get_active_ban_sanction(db, message.chat.id, member.id):
+            return
         await add_log(
             db,
             message.chat.id,
@@ -415,6 +419,7 @@ async def verify_button_handler(callback: CallbackQuery) -> None:
         ok = await verify_challenge(db, chat_id, user_id, selected_answer)
         if not ok:
             challenge = await get_challenge(db, chat_id, user_id)
+            fail_reason = challenge_failure_reason(challenge, selected_answer)
             if challenge is not None and not challenge.passed:
                 await _delete_verification_message(callback.bot, chat_id, challenge)
                 action_config = ModerationActionConfig(
@@ -442,12 +447,14 @@ async def verify_button_handler(callback: CallbackQuery) -> None:
                     action_config.ban_minutes,
                     callback.from_user.full_name,
                     callback.from_user.username or "",
-                    "未通过验证",
+                    fail_reason,
                 )
                 challenge.passed = True
                 challenge.message_id = 0
-            await add_log(db, chat_id, user_id, callback.from_user.username or "", "join_verify_failed", "button")
-            await callback.answer("答案错误或验证已过期", show_alert=True)
+            else:
+                await send_temporary_notice(callback.bot, chat_id, f"验证失败：{fail_reason}")
+            await add_log(db, chat_id, user_id, callback.from_user.username or "", "join_verify_failed", fail_reason)
+            await callback.answer(f"验证失败：{fail_reason}", show_alert=True)
             return
 
         challenge = await get_challenge(db, chat_id, user_id)
