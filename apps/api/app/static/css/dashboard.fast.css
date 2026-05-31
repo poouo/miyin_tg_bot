@@ -457,14 +457,6 @@ body.dark .runtime-pill {
   margin-top: 16px;
 }
 
-#community {
-  padding-bottom: 0;
-}
-
-#community .community-stack {
-  padding-bottom: 96px;
-}
-
 .community-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -495,13 +487,6 @@ body.dark .runtime-pill {
   border-top: 1px solid var(--border);
   background: color-mix(in srgb, var(--panel) 92%, transparent);
   backdrop-filter: blur(14px);
-}
-
-.community-actions {
-  min-height: 74px;
-  align-items: center;
-  border-radius: 0 0 16px 16px;
-  box-shadow: 0 -10px 24px rgba(15, 23, 42, 0.06);
 }
 
 .form-grid {
@@ -917,6 +902,23 @@ tbody tr:last-child td {
 .member-events-table th:nth-child(4),
 .member-events-table td:nth-child(4) {
   width: 180px;
+}
+
+.log-detail-line {
+  line-height: 1.45;
+}
+
+.log-message-text {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--surface);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .preview-content {

@@ -38,6 +38,7 @@ from apps.bot.bot_app.verification_notices import (
 
 router = Router()
 MANAGER_ROLES = {"administrator", "creator"}
+LOG_MESSAGE_TEXT_LIMIT = 1000
 
 MEMBER_UNRESTRICT_PERMISSIONS = ChatPermissions(
     can_send_messages=True,
@@ -184,6 +185,15 @@ async def _handle_afk(message: Message, db) -> None:
             await message.reply(f"<b>{escape(full_name)}</b> 当前 AFK。{reason}", parse_mode="HTML")
         except Exception:
             pass
+
+
+def _log_message_detail(reason: str, text: str) -> str:
+    normalized_text = " ".join((text or "").split())
+    if len(normalized_text) > LOG_MESSAGE_TEXT_LIMIT:
+        normalized_text = f"{normalized_text[:LOG_MESSAGE_TEXT_LIMIT]}..."
+    if not normalized_text:
+        return reason
+    return f"reason={reason}\nmessage={normalized_text}"
 
 
 @router.message(
@@ -535,7 +545,7 @@ async def group_text_handler(message: Message) -> None:
                         ban_minutes=group.anti_spam_ban_minutes,
                     ),
                 )
-            await add_log(db, chat.id, user.id, user.username or "", "message_blocked", reason)
+            await add_log(db, chat.id, user.id, user.username or "", "message_blocked", _log_message_detail(reason, text))
             return
 
         if group.auto_recover_enabled:

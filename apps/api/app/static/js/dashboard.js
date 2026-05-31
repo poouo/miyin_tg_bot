@@ -557,18 +557,36 @@ function formatLogUser(item) {
   return item.username ? `${item.user_id} (@${item.username})` : `${item.user_id}`;
 }
 
-function formatLogDetail(item) {
+function parseLogDetail(detail) {
+  const result = { reason: "", message: "", raw: detail || "" };
+  for (const line of String(detail || "").split(/\r?\n/)) {
+    if (line.startsWith("reason=")) {
+      result.reason = line.slice("reason=".length);
+    } else if (line.startsWith("message=")) {
+      result.message = line.slice("message=".length);
+    }
+  }
+  return result;
+}
+
+function renderLogDetail(item) {
   const detail = item.detail || "";
   if (item.event_type === "message_blocked") {
-    return detail ? `${t("log_action_blocked", "Blocked")}: ${detail}` : t("log_action_blocked", "Blocked");
+    const parsed = parseLogDetail(detail);
+    const reason = parsed.reason || parsed.raw;
+    const lines = [`<div class="log-detail-line"><strong>${escapeHtml(t("log_action_blocked", "Blocked"))}</strong>${reason ? `: ${escapeHtml(reason)}` : ""}</div>`];
+    if (parsed.message) {
+      lines.push(`<div class="log-message-text">${escapeHtml(parsed.message)}</div>`);
+    }
+    return lines.join("");
   }
   if (item.event_type === "lock_deleted") {
-    return detail ? `${t("log_action_deleted", "Deleted")}: ${detail}` : t("log_action_deleted", "Deleted");
+    return `<div class="log-detail-line"><strong>${escapeHtml(t("log_action_deleted", "Deleted"))}</strong>${detail ? `: ${escapeHtml(detail)}` : ""}</div>`;
   }
   if (item.event_type === "auto_reply_triggered") {
-    return detail ? `${t("auto_reply_keyword", "Trigger keyword")}: ${detail}` : "";
+    return detail ? `<div class="log-detail-line"><strong>${escapeHtml(t("auto_reply_keyword", "Trigger keyword"))}</strong>: ${escapeHtml(detail)}</div>` : "";
   }
-  return detail;
+  return escapeHtml(detail);
 }
 
 function renderModerationLogs(items) {
@@ -586,7 +604,7 @@ function renderModerationLogs(items) {
         <td>${escapeHtml(groupText)}</td>
         <td>${escapeHtml(toEventLabel(item.event_type))}</td>
         <td>${escapeHtml(formatLogUser(item))}</td>
-        <td>${escapeHtml(formatLogDetail(item))}</td>
+        <td>${renderLogDetail(item)}</td>
       </tr>`;
     })
     .join("");
