@@ -19,6 +19,7 @@ class GroupConfig(Base, TimestampMixin):
     anti_spam_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     auto_recover_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     deepseek_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    ai_reply_delete_after_seconds: Mapped[int] = mapped_column(Integer, default=0)
     join_verify_fail_action: Mapped[str] = mapped_column(String(32), default="kick")
     join_verify_fail_kick_minutes: Mapped[int] = mapped_column(Integer, default=1)
     join_verify_fail_mute_minutes: Mapped[int] = mapped_column(Integer, default=30)

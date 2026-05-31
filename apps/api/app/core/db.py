@@ -84,6 +84,9 @@ async def _run_compat_migrations(conn: AsyncConnection) -> None:
         await _add_sqlite_column_if_missing(
             conn, "group_configs", "anti_spam_ban_minutes", "INTEGER NOT NULL DEFAULT 1440"
         )
+        await _add_sqlite_column_if_missing(
+            conn, "group_configs", "ai_reply_delete_after_seconds", "INTEGER NOT NULL DEFAULT 0"
+        )
         return
 
     await _add_postgres_column_if_missing(
@@ -139,6 +142,9 @@ async def _run_compat_migrations(conn: AsyncConnection) -> None:
     )
     await _add_postgres_column_if_missing(
         conn, "group_configs", "anti_spam_ban_minutes", "INTEGER NOT NULL DEFAULT 1440"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "group_configs", "ai_reply_delete_after_seconds", "INTEGER NOT NULL DEFAULT 0"
     )
 
 

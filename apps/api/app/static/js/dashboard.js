@@ -58,6 +58,20 @@ const arPreviewContent = document.getElementById("ar-preview-content");
 const arPreviewClose = document.getElementById("ar-preview-close");
 const arPreviewOk = document.getElementById("ar-preview-ok");
 
+const kwChatId = document.getElementById("kw-chat-id");
+const kwOpenAdd = document.getElementById("kw-open-add");
+const kwRefresh = document.getElementById("kw-refresh");
+const kwTableBody = document.getElementById("kw-table-body");
+const kwModal = document.getElementById("kw-modal");
+const kwModalTitle = document.getElementById("kw-modal-title");
+const kwModalKeyword = document.getElementById("kw-modal-keyword");
+const kwModalAction = document.getElementById("kw-modal-action");
+const kwModalMuteMinutes = document.getElementById("kw-modal-mute-minutes");
+const kwModalEnabled = document.getElementById("kw-modal-enabled");
+const kwModalSave = document.getElementById("kw-modal-save");
+const kwModalCancel = document.getElementById("kw-modal-cancel");
+const kwModalClose = document.getElementById("kw-modal-close");
+
 const akChatId = document.getElementById("ak-chat-id");
 const akOpenAdd = document.getElementById("ak-open-add");
 const akRefresh = document.getElementById("ak-refresh");
@@ -121,6 +135,7 @@ const gsAdBlock = document.getElementById("gs-ad-block");
 const gsAntiSpam = document.getElementById("gs-anti-spam");
 const gsAutoRecover = document.getElementById("gs-auto-recover");
 const gsAi = document.getElementById("gs-ai");
+const gsAiReplyDeleteAfterSeconds = document.getElementById("gs-ai-reply-delete-after-seconds");
 const gsJoinVerifyFailAction = document.getElementById("gs-join-verify-fail-action");
 const gsJoinVerifyFailKickMinutes = document.getElementById("gs-join-verify-fail-kick-minutes");
 const gsJoinVerifyFailMuteMinutes = document.getElementById("gs-join-verify-fail-mute-minutes");
@@ -149,6 +164,7 @@ const ACTIVE_SECTION_KEY = "miyin.dashboard.activeSection";
 const THEME_KEY = "miyin.dashboard.theme";
 let actionStatusTimer = null;
 let arEditingRuleId = null;
+let kwEditingKeywordId = null;
 let akEditingKeywordId = null;
 const groupConfigCache = new Map();
 
@@ -170,6 +186,16 @@ function formatParseMode(mode) {
   if (normalized === "markdownv2") return t("auto_reply_parse_mode_markdownv2", "MarkdownV2");
   if (normalized === "html") return t("auto_reply_parse_mode_html", "HTML");
   return t("auto_reply_parse_mode_plain", "Plain Text");
+}
+
+function formatReplyPreview(text, parseMode) {
+  const raw = String(text || "");
+  if (String(parseMode || "plain").toLowerCase() !== "html") {
+    return raw;
+  }
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(raw.replace(/<br\s*\/?>/gi, "\n"), "text/html");
+  return (doc.body.textContent || raw).replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function sanitizeHtml(raw) {
@@ -347,6 +373,15 @@ function resetAutoReplyModal() {
   if (arModalEnabled) arModalEnabled.checked = true;
 }
 
+function resetKeywordModal() {
+  kwEditingKeywordId = null;
+  if (kwModalTitle) kwModalTitle.textContent = t("keyword_add", "Add Keyword Rule");
+  if (kwModalKeyword) kwModalKeyword.value = "";
+  if (kwModalAction) kwModalAction.value = "delete";
+  if (kwModalMuteMinutes) kwModalMuteMinutes.value = "10";
+  if (kwModalEnabled) kwModalEnabled.checked = true;
+}
+
 function resetAdKeywordModal() {
   akEditingKeywordId = null;
   if (akModalTitle) akModalTitle.textContent = t("ad_keyword_add", "Add Ad Keyword");
@@ -365,9 +400,10 @@ function renderAutoReplies(items) {
     .map((item) => {
       const statusText = item.enabled ? t("switch_on", "on") : t("switch_off", "off");
       const toggleText = item.enabled ? t("disable", "Disable") : t("enable", "Enable");
+      const replyPreview = formatReplyPreview(item.reply_text, item.parse_mode);
       return `<tr>
         <td><div class="cell-keyword">${escapeHtml(item.keyword)}</div></td>
-        <td><div class="cell-reply">${escapeHtml(item.reply_text)}</div></td>
+        <td><div class="cell-reply">${escapeHtml(replyPreview)}</div></td>
         <td><div class="cell-center">${escapeHtml(formatParseMode(item.parse_mode))}</div></td>
         <td><div class="cell-center">${Number(item.delete_after_seconds || 0)}</div></td>
         <td><div class="cell-center">${escapeHtml(statusText)}</div></td>
@@ -395,6 +431,52 @@ async function loadAutoReplies() {
     return;
   }
   renderAutoReplies(result.data);
+}
+
+function formatKeywordAction(action) {
+  return action === "mute" ? t("action_mute", "Mute") : t("action_delete", "Delete message");
+}
+
+function renderKeywords(items) {
+  if (!kwTableBody) return;
+  if (!Array.isArray(items) || !items.length) {
+    kwTableBody.innerHTML = `<tr><td colspan="5">${escapeHtml(t("no_data", "No data"))}</td></tr>`;
+    return;
+  }
+
+  kwTableBody.innerHTML = items
+    .map((item) => {
+      const statusText = item.enabled ? t("switch_on", "on") : t("switch_off", "off");
+      const toggleText = item.enabled ? t("disable", "Disable") : t("enable", "Enable");
+      return `<tr>
+        <td><div class="cell-keyword">${escapeHtml(item.keyword)}</div></td>
+        <td><div class="cell-center">${escapeHtml(formatKeywordAction(item.action))}</div></td>
+        <td><div class="cell-center">${Number(item.mute_minutes || 10)}</div></td>
+        <td><div class="cell-center">${escapeHtml(statusText)}</div></td>
+        <td>
+          <div class="row-actions">
+            <button class="table-btn" type="button" data-action="edit" data-id="${item.id}">${escapeHtml(t("edit", "Edit"))}</button>
+            <button class="table-btn" type="button" data-action="toggle" data-id="${item.id}" data-enabled="${item.enabled ? 1 : 0}">${escapeHtml(toggleText)}</button>
+            <button class="table-btn warning" type="button" data-action="delete" data-id="${item.id}">${escapeHtml(t("delete", "Delete"))}</button>
+          </div>
+        </td>
+      </tr>`;
+    })
+    .join("");
+}
+
+async function loadKeywords() {
+  if (!kwChatId?.value) {
+    renderKeywords([]);
+    return;
+  }
+  const result = await requestJson(`/api/v1/groups/${encodeURIComponent(kwChatId.value)}/keywords`);
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    renderKeywords([]);
+    return;
+  }
+  renderKeywords(result.data);
 }
 
 function renderAdKeywords(items) {
@@ -790,6 +872,9 @@ function applyGroupSettings(chatIdValue) {
   if (gsAntiSpam) gsAntiSpam.checked = Boolean(config.anti_spam_enabled);
   if (gsAutoRecover) gsAutoRecover.checked = Boolean(config.auto_recover_enabled);
   if (gsAi) gsAi.checked = Boolean(config.deepseek_enabled);
+  if (gsAiReplyDeleteAfterSeconds) {
+    gsAiReplyDeleteAfterSeconds.value = String(Number(config.ai_reply_delete_after_seconds || 0));
+  }
   if (gsJoinVerifyFailAction) gsJoinVerifyFailAction.value = config.join_verify_fail_action || "kick";
   if (gsJoinVerifyFailKickMinutes) gsJoinVerifyFailKickMinutes.value = String(Number(config.join_verify_fail_kick_minutes || 1));
   if (gsJoinVerifyFailMuteMinutes) gsJoinVerifyFailMuteMinutes.value = String(Number(config.join_verify_fail_mute_minutes || 30));
@@ -835,6 +920,7 @@ async function saveGroupSettings() {
     anti_spam_enabled: Boolean(gsAntiSpam?.checked),
     auto_recover_enabled: Boolean(gsAutoRecover?.checked),
     deepseek_enabled: Boolean(gsAi?.checked),
+    ai_reply_delete_after_seconds: Number(gsAiReplyDeleteAfterSeconds?.value || 0),
     join_verify_fail_action: gsJoinVerifyFailAction?.value || "kick",
     join_verify_fail_kick_minutes: Number(gsJoinVerifyFailKickMinutes?.value || 1),
     join_verify_fail_mute_minutes: Number(gsJoinVerifyFailMuteMinutes?.value || 30),
@@ -869,6 +955,8 @@ async function saveGroupSettings() {
 async function handleSectionEnter(target) {
   if (target === "auto-replies") {
     await loadAutoReplies();
+  } else if (target === "keywords") {
+    await loadKeywords();
   } else if (target === "ad-keywords") {
     await loadAdKeywords();
   } else if (target === "member-events") {
@@ -1203,6 +1291,127 @@ arTableBody?.addEventListener("click", async (event) => {
     if (arModalDeleteAfter) arModalDeleteAfter.value = String(Number(found.delete_after_seconds || 0));
     if (arModalEnabled) arModalEnabled.checked = Boolean(found.enabled);
     openModal(arModal);
+  }
+});
+
+kwOpenAdd?.addEventListener("click", () => {
+  resetKeywordModal();
+  openModal(kwModal);
+});
+
+kwModalCancel?.addEventListener("click", () => closeModal(kwModal));
+kwModalClose?.addEventListener("click", () => closeModal(kwModal));
+kwModal?.addEventListener("click", (event) => {
+  if (event.target === kwModal) closeModal(kwModal);
+});
+
+kwModalSave?.addEventListener("click", async () => {
+  const chatId = kwChatId?.value || "";
+  if (!chatId) {
+    showStatus(t("select_group"), true);
+    return;
+  }
+  const payload = {
+    chat_id: Number(chatId),
+    keyword: (kwModalKeyword?.value || "").trim(),
+    action: kwModalAction?.value || "delete",
+    mute_minutes: Number(kwModalMuteMinutes?.value || 10),
+    enabled: Boolean(kwModalEnabled?.checked),
+  };
+  if (!payload.keyword) {
+    showStatus(t("fill_required_fields"), true);
+    return;
+  }
+
+  const isEditing = kwEditingKeywordId !== null;
+  const url = isEditing
+    ? `/api/v1/groups/${encodeURIComponent(chatId)}/keywords/${encodeURIComponent(String(kwEditingKeywordId))}`
+    : `/api/v1/groups/${encodeURIComponent(chatId)}/keywords`;
+  const method = isEditing ? "PATCH" : "POST";
+  const bodyPayload = isEditing
+    ? {
+        keyword: payload.keyword,
+        action: payload.action,
+        mute_minutes: payload.mute_minutes,
+        enabled: payload.enabled,
+      }
+    : payload;
+  const result = await requestJson(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(bodyPayload),
+  });
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    return;
+  }
+  closeModal(kwModal);
+  showStatus(t("saved"), false);
+  await loadKeywords();
+});
+
+kwRefresh?.addEventListener("click", loadKeywords);
+kwChatId?.addEventListener("change", loadKeywords);
+
+kwTableBody?.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLButtonElement)) return;
+  const action = target.dataset.action || "";
+  const keywordId = target.dataset.id || "";
+  const chatId = kwChatId?.value || "";
+  if (!action || !keywordId || !chatId) return;
+
+  if (action === "delete") {
+    const result = await requestJson(
+      `/api/v1/groups/${encodeURIComponent(chatId)}/keywords/${encodeURIComponent(keywordId)}`,
+      { method: "DELETE" },
+    );
+    if (!result.ok) {
+      showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+      return;
+    }
+    showStatus(t("saved"), false);
+    await loadKeywords();
+    return;
+  }
+
+  if (action === "toggle") {
+    const enabled = target.dataset.enabled === "1";
+    const result = await requestJson(
+      `/api/v1/groups/${encodeURIComponent(chatId)}/keywords/${encodeURIComponent(keywordId)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !enabled }),
+      },
+    );
+    if (!result.ok) {
+      showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+      return;
+    }
+    showStatus(t("saved"), false);
+    await loadKeywords();
+    return;
+  }
+
+  if (action === "edit") {
+    const result = await requestJson(`/api/v1/groups/${encodeURIComponent(chatId)}/keywords`);
+    if (!result.ok || !Array.isArray(result.data)) {
+      showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+      return;
+    }
+    const found = result.data.find((item) => String(item.id) === String(keywordId));
+    if (!found) {
+      showStatus(t("rule_not_found"), true);
+      return;
+    }
+    kwEditingKeywordId = found.id;
+    if (kwModalTitle) kwModalTitle.textContent = t("keyword_update", "Update Keyword Rule");
+    if (kwModalKeyword) kwModalKeyword.value = found.keyword || "";
+    if (kwModalAction) kwModalAction.value = found.action || "delete";
+    if (kwModalMuteMinutes) kwModalMuteMinutes.value = String(Number(found.mute_minutes || 10));
+    if (kwModalEnabled) kwModalEnabled.checked = Boolean(found.enabled);
+    openModal(kwModal);
   }
 });
 

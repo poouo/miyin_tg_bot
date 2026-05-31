@@ -15,6 +15,7 @@ class GroupConfigBase(BaseModel):
     anti_spam_enabled: bool = True
     auto_recover_enabled: bool = True
     deepseek_enabled: bool = True
+    ai_reply_delete_after_seconds: int = Field(default=0, ge=0, le=86400)
     join_verify_fail_action: ModerationAction = "kick"
     join_verify_fail_kick_minutes: int = Field(default=1, ge=1, le=10080)
     join_verify_fail_mute_minutes: int = Field(default=30, ge=1, le=10080)
@@ -46,6 +47,7 @@ class GroupConfigUpdate(BaseModel):
     anti_spam_enabled: bool | None = None
     auto_recover_enabled: bool | None = None
     deepseek_enabled: bool | None = None
+    ai_reply_delete_after_seconds: int | None = Field(default=None, ge=0, le=86400)
     join_verify_fail_action: ModerationAction | None = None
     join_verify_fail_kick_minutes: int | None = Field(default=None, ge=1, le=10080)
     join_verify_fail_mute_minutes: int | None = Field(default=None, ge=1, le=10080)

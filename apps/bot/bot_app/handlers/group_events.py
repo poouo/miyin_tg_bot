@@ -579,4 +579,14 @@ async def group_text_handler(message: Message) -> None:
                 question = question[2:].strip()
             if question:
                 answer = await deepseek_client.ask(question, db=db)
-                await reply_ai_text(message, answer)
+                sent = await reply_ai_text(message, answer)
+                delete_after_seconds = int(getattr(group, "ai_reply_delete_after_seconds", 0) or 0)
+                if sent is not None and delete_after_seconds > 0:
+                    asyncio.create_task(
+                        _delete_message_later(
+                            message.bot,
+                            chat.id,
+                            sent.message_id,
+                            delete_after_seconds,
+                        )
+                    )

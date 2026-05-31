@@ -59,9 +59,9 @@ def ai_text_to_html(text: str) -> str:
     return "\n\n".join(item for item in output if item).strip()[:TELEGRAM_TEXT_LIMIT]
 
 
-async def reply_ai_text(message: Message, text: str) -> None:
+async def reply_ai_text(message: Message, text: str) -> Message | None:
     html = ai_text_to_html(text)
     try:
-        await message.reply(html, parse_mode="HTML")
+        return await message.reply(html, parse_mode="HTML")
     except Exception:
-        await message.reply((text or "AI 没有返回内容。")[:AI_REPLY_LIMIT])
+        return await message.reply((text or "AI 没有返回内容。")[:AI_REPLY_LIMIT])

@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 from html import escape
 import json
@@ -54,7 +55,12 @@ from apps.api.app.services.runtime_config_service import get_runtime_config
 from apps.bot.bot_app.ai_formatting import reply_ai_text
 from apps.bot.bot_app.moderation_actions import DEFAULT_KICK_MINUTES, ModerationActionConfig, apply_moderation_action
 from apps.bot.bot_app.state import deepseek_client
-from apps.bot.bot_app.verification_notices import send_temporary_notice, send_verify_fail_notice, send_verify_pass_notice
+from apps.bot.bot_app.verification_notices import (
+    delete_message_later,
+    send_temporary_notice,
+    send_verify_fail_notice,
+    send_verify_pass_notice,
+)
 
 router = Router()
 MANAGER_ROLES = {"administrator", "creator"}
@@ -311,6 +317,7 @@ async def ask_handler(message: Message, command: CommandObject) -> None:
         return
 
     chat = message.chat
+    group = None
     async with SessionLocal() as db:
         if chat.type in {"group", "supergroup"}:
             await ensure_group(db, chat.id, chat.title or "")
@@ -319,7 +326,10 @@ async def ask_handler(message: Message, command: CommandObject) -> None:
                 await message.reply("AI is disabled in this group.")
                 return
         answer = await deepseek_client.ask(question, db=db)
-    await reply_ai_text(message, answer)
+    sent = await reply_ai_text(message, answer)
+    delete_after_seconds = int(getattr(group, "ai_reply_delete_after_seconds", 0) or 0)
+    if sent is not None and delete_after_seconds > 0:
+        asyncio.create_task(delete_message_later(message.bot, chat.id, sent.message_id, delete_after_seconds))
 
 
 @router.message(Command("id"))

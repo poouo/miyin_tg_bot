@@ -45,6 +45,10 @@
             <span class="nav-item-icon"><i class="ri-message-2-line"></i></span>
             <span class="nav-item-label">{{ t.nav_auto_replies }}</span>
           </button>
+          <button class="nav-item" type="button" data-target="keywords">
+            <span class="nav-item-icon"><i class="ri-filter-3-line"></i></span>
+            <span class="nav-item-label">{{ t.nav_keywords }}</span>
+          </button>
           <button class="nav-item" type="button" data-target="ad-keywords">
             <span class="nav-item-icon"><i class="ri-spam-2-line"></i></span>
             <span class="nav-item-label">{{ t.nav_ad_keywords }}</span>
@@ -292,6 +296,45 @@
             <tbody id="ar-table-body">
               <tr>
                 <td colspan="6">{{ t.no_data }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="keywords" class="glass-panel panel section">
+        <div class="panel-head">
+          <h3>{{ t.keywords_title }}</h3>
+          <p>{{ t.keywords_desc }}</p>
+        </div>
+        <div class="form-grid two-col">
+          <label>
+            {{ t.select_group }}
+            <select id="kw-chat-id">
+              {% for group in groups %}
+              <option value="{{ group.chat_id }}">{{ group.title or group.chat_id }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="kw-open-add" type="button" class="btn">{{ t.keyword_add }}</button>
+          <button id="kw-refresh" type="button" class="btn subtle">{{ t.refresh }}</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table keyword-table">
+            <thead>
+              <tr>
+                <th>{{ t.keyword_label }}</th>
+                <th>{{ t.policy_action }}</th>
+                <th>{{ t.policy_mute_minutes }}</th>
+                <th>{{ t.status }}</th>
+                <th>{{ t.actions }}</th>
+              </tr>
+            </thead>
+            <tbody id="kw-table-body">
+              <tr>
+                <td colspan="5">{{ t.no_data }}</td>
               </tr>
             </tbody>
           </table>
@@ -637,6 +680,10 @@
           <label class="check-card"><input id="gs-anti-spam" type="checkbox" /> {{ t.anti_spam }}</label>
           <label class="check-card"><input id="gs-auto-recover" type="checkbox" /> {{ t.auto_recover }}</label>
           <label class="check-card"><input id="gs-ai" type="checkbox" /> {{ t.ai }}</label>
+          <label>
+            {{ t.ai_reply_delete_after_seconds }}
+            <input id="gs-ai-reply-delete-after-seconds" type="number" min="0" max="86400" value="0" />
+          </label>
         </div>
         <div class="policy-grid">
           <article class="policy-card">
@@ -884,6 +931,41 @@
       <div id="ar-preview-content" class="preview-content"></div>
       <div class="actions modal-actions">
         <button id="ar-preview-ok" type="button" class="btn">{{ t.ok }}</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="kw-modal" class="modal-backdrop" hidden>
+    <div class="modal-card glass-panel" role="dialog" aria-modal="true" aria-labelledby="kw-modal-title">
+      <div class="modal-head">
+        <h3 id="kw-modal-title">{{ t.keyword_add }}</h3>
+        <button id="kw-modal-close" class="modal-close" type="button" aria-label="Close">&times;</button>
+      </div>
+      <div class="form-grid">
+        <label>
+          {{ t.keyword_label }}
+          <input id="kw-modal-keyword" type="text" maxlength="255" />
+          <small>{{ t.keyword_hint }}</small>
+        </label>
+        <label>
+          {{ t.policy_action }}
+          <select id="kw-modal-action">
+            <option value="delete">{{ t.action_delete }}</option>
+            <option value="mute">{{ t.action_mute }}</option>
+          </select>
+        </label>
+        <label>
+          {{ t.policy_mute_minutes }}
+          <input id="kw-modal-mute-minutes" type="number" min="1" max="10080" value="10" />
+        </label>
+        <label class="check-card">
+          <input id="kw-modal-enabled" type="checkbox" checked />
+          {{ t.keyword_enabled }}
+        </label>
+      </div>
+      <div class="actions modal-actions">
+        <button id="kw-modal-save" type="button" class="btn">{{ t.save }}</button>
+        <button id="kw-modal-cancel" type="button" class="btn subtle">{{ t.cancel_edit }}</button>
       </div>
     </div>
   </div>
