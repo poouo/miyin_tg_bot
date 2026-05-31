@@ -88,6 +88,12 @@ const evChatId = document.getElementById("ev-chat-id");
 const evRefresh = document.getElementById("ev-refresh");
 const evTableBody = document.getElementById("ev-table-body");
 
+const logChatId = document.getElementById("log-chat-id");
+const logEventType = document.getElementById("log-event-type");
+const logLimit = document.getElementById("log-limit");
+const logRefresh = document.getElementById("log-refresh");
+const logTableBody = document.getElementById("log-table-body");
+
 const banChatId = document.getElementById("ban-chat-id");
 const banRefresh = document.getElementById("ban-refresh");
 const banTableBody = document.getElementById("ban-table-body");
@@ -546,6 +552,60 @@ function renderMemberEvents(items) {
     .join("");
 }
 
+function formatLogUser(item) {
+  if (!item.user_id) return "";
+  return item.username ? `${item.user_id} (@${item.username})` : `${item.user_id}`;
+}
+
+function formatLogDetail(item) {
+  const detail = item.detail || "";
+  if (item.event_type === "message_blocked") {
+    return detail ? `${t("log_action_blocked", "Blocked")}: ${detail}` : t("log_action_blocked", "Blocked");
+  }
+  if (item.event_type === "lock_deleted") {
+    return detail ? `${t("log_action_deleted", "Deleted")}: ${detail}` : t("log_action_deleted", "Deleted");
+  }
+  if (item.event_type === "auto_reply_triggered") {
+    return detail ? `${t("auto_reply_keyword", "Trigger keyword")}: ${detail}` : "";
+  }
+  return detail;
+}
+
+function renderModerationLogs(items) {
+  if (!logTableBody) return;
+  if (!Array.isArray(items) || !items.length) {
+    logTableBody.innerHTML = `<tr><td colspan="5">${escapeHtml(t("no_data", "No data"))}</td></tr>`;
+    return;
+  }
+  logTableBody.innerHTML = items
+    .map((item) => {
+      const groupText = item.group_title ? `${item.group_title} (${item.chat_id})` : `${item.chat_id}`;
+      const time = item.created_at ? new Date(item.created_at).toLocaleString() : "";
+      return `<tr>
+        <td>${escapeHtml(time)}</td>
+        <td>${escapeHtml(groupText)}</td>
+        <td>${escapeHtml(toEventLabel(item.event_type))}</td>
+        <td>${escapeHtml(formatLogUser(item))}</td>
+        <td>${escapeHtml(formatLogDetail(item))}</td>
+      </tr>`;
+    })
+    .join("");
+}
+
+async function loadModerationLogs() {
+  const params = new URLSearchParams();
+  params.set("limit", String(Number(logLimit?.value || 200)));
+  if (logChatId?.value) params.set("chat_id", logChatId.value);
+  if (logEventType?.value) params.set("event_type", logEventType.value);
+  const result = await requestJson(`/api/v1/logs/recent?${params.toString()}`);
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    renderModerationLogs([]);
+    return;
+  }
+  renderModerationLogs(result.data);
+}
+
 async function loadMemberEvents() {
   if (!evChatId?.value) {
     renderMemberEvents([]);
@@ -961,6 +1021,8 @@ async function handleSectionEnter(target) {
     await loadAdKeywords();
   } else if (target === "member-events") {
     await loadMemberEvents();
+  } else if (target === "moderation-logs") {
+    await loadModerationLogs();
   } else if (target === "bans") {
     await loadBans();
   } else if (target === "community") {
@@ -1593,6 +1655,11 @@ cmGbanBody?.addEventListener("click", async (event) => {
 
 evRefresh?.addEventListener("click", loadMemberEvents);
 evChatId?.addEventListener("change", loadMemberEvents);
+
+logRefresh?.addEventListener("click", loadModerationLogs);
+logChatId?.addEventListener("change", loadModerationLogs);
+logEventType?.addEventListener("change", loadModerationLogs);
+logLimit?.addEventListener("change", loadModerationLogs);
 
 banRefresh?.addEventListener("click", loadBans);
 banChatId?.addEventListener("change", loadBans);

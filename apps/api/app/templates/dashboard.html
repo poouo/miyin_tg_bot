@@ -61,6 +61,10 @@
             <span class="nav-item-icon"><i class="ri-list-check-2"></i></span>
             <span class="nav-item-label">{{ t.nav_member_events }}</span>
           </button>
+          <button class="nav-item" type="button" data-target="moderation-logs">
+            <span class="nav-item-icon"><i class="ri-file-list-3-line"></i></span>
+            <span class="nav-item-label">{{ t.nav_moderation_logs }}</span>
+          </button>
           <button class="nav-item" type="button" data-target="bans">
             <span class="nav-item-icon"><i class="ri-forbid-2-line"></i></span>
             <span class="nav-item-label">{{ t.nav_bans }}</span>
@@ -408,6 +412,64 @@
               </tr>
             </thead>
             <tbody id="ev-table-body">
+              <tr>
+                <td colspan="5">{{ t.no_data }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="moderation-logs" class="glass-panel panel section">
+        <div class="panel-head">
+          <h3>{{ t.moderation_logs_title }}</h3>
+          <p>{{ t.moderation_logs_desc }}</p>
+        </div>
+        <div class="form-grid three-col">
+          <label>
+            {{ t.select_group }}
+            <select id="log-chat-id">
+              <option value="">{{ t.all_groups }}</option>
+              {% for group in groups %}
+              <option value="{{ group.chat_id }}">{{ group.title or group.chat_id }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            {{ t.event_type }}
+            <select id="log-event-type">
+              <option value="">{{ t.all_events }}</option>
+              <option value="message_blocked">{{ t.event_message_blocked }}</option>
+              <option value="lock_deleted">{{ t.event_lock_deleted }}</option>
+              <option value="global_ban_enforced">{{ t.event_global_ban_enforced }}</option>
+              <option value="auto_reply_triggered">{{ t.event_auto_reply_triggered }}</option>
+              <option value="user_muted">{{ t.event_user_muted }}</option>
+              <option value="user_kicked">{{ t.event_user_kicked }}</option>
+              <option value="user_banned">{{ t.event_user_banned }}</option>
+              <option value="warned">{{ t.event_warned }}</option>
+              <option value="manual_unban">{{ t.event_manual_unban }}</option>
+            </select>
+          </label>
+          <label>
+            {{ t.log_limit }}
+            <input id="log-limit" type="number" min="1" max="500" value="200" />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="log-refresh" type="button" class="btn subtle">{{ t.refresh }}</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table moderation-log-table">
+            <thead>
+              <tr>
+                <th>{{ t.time }}</th>
+                <th>{{ t.group }}</th>
+                <th>{{ t.event_type }}</th>
+                <th>{{ t.user }}</th>
+                <th>{{ t.detail }}</th>
+              </tr>
+            </thead>
+            <tbody id="log-table-body">
               <tr>
                 <td colspan="5">{{ t.no_data }}</td>
               </tr>

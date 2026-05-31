@@ -885,6 +885,40 @@ tbody tr:last-child td {
   width: 172px;
 }
 
+.moderation-log-table,
+.member-events-table {
+  min-width: 1080px;
+  table-layout: fixed;
+}
+
+.moderation-log-table th:nth-child(1),
+.moderation-log-table td:nth-child(1),
+.member-events-table th:nth-child(1),
+.member-events-table td:nth-child(1) {
+  width: 172px;
+}
+
+.moderation-log-table th:nth-child(2),
+.moderation-log-table td:nth-child(2),
+.member-events-table th:nth-child(2),
+.member-events-table td:nth-child(2) {
+  width: 220px;
+}
+
+.moderation-log-table th:nth-child(3),
+.moderation-log-table td:nth-child(3),
+.member-events-table th:nth-child(3),
+.member-events-table td:nth-child(3) {
+  width: 150px;
+}
+
+.moderation-log-table th:nth-child(4),
+.moderation-log-table td:nth-child(4),
+.member-events-table th:nth-child(4),
+.member-events-table td:nth-child(4) {
+  width: 180px;
+}
+
 .preview-content {
   min-height: 100px;
   border: 1px solid var(--border);
