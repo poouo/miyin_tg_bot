@@ -25,8 +25,10 @@ from apps.api.app.services.moderation.join_verification import (
     challenge_failure_reason,
     create_challenge,
     get_challenge,
+    is_challenge_answer_correct,
+    is_challenge_expired,
+    mark_challenge_passed,
     set_challenge_message_id,
-    verify_challenge,
 )
 from apps.api.app.services.runtime_config_service import get_runtime_config
 from apps.bot.bot_app.ai_formatting import reply_ai_text
@@ -91,6 +93,12 @@ def _build_verify_keyboard(target_user_id: int, options: list[str]) -> InlineKey
             row = []
     if row:
         rows.append(row)
+    rows.append(
+        [
+            InlineKeyboardButton(text="通过", callback_data=f"verify_pass:{target_user_id}"),
+            InlineKeyboardButton(text="移除", callback_data=f"verify_remove:{target_user_id}"),
+        ]
+    )
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -113,6 +121,16 @@ async def _is_group_manager(message: Message) -> bool:
         return False
     try:
         member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
+    except Exception:
+        return False
+    return getattr(member, "status", "") in MANAGER_ROLES
+
+
+async def _is_callback_group_manager(callback: CallbackQuery) -> bool:
+    if callback.message is None or callback.from_user is None:
+        return False
+    try:
+        member = await callback.bot.get_chat_member(callback.message.chat.id, callback.from_user.id)
     except Exception:
         return False
     return getattr(member, "status", "") in MANAGER_ROLES
@@ -169,6 +187,52 @@ async def _send_log_channel(bot, db, chat_id: int, text: str) -> None:
         await bot.send_message(config.log_chat_id, text, parse_mode="HTML")
     except Exception:
         return
+
+
+async def _approve_verified_member(
+    bot,
+    db,
+    chat_id: int,
+    user_id: int,
+    challenge,
+    full_name: str = "",
+    username: str = "",
+    detail: str = "button",
+) -> None:
+    if challenge is not None:
+        await _delete_verification_message(bot, chat_id, challenge)
+        challenge.message_id = 0
+    await bot.restrict_chat_member(
+        chat_id=chat_id,
+        user_id=user_id,
+        permissions=MEMBER_UNRESTRICT_PERMISSIONS,
+    )
+    await add_log(db, chat_id, user_id, username, "join_verify_passed", detail)
+    try:
+        await send_verify_pass_notice(bot, chat_id, user_id, full_name, username)
+    except Exception:
+        pass
+
+
+async def _remove_unverified_member(
+    bot,
+    db,
+    chat_id: int,
+    user_id: int,
+    admin_id: int,
+    challenge,
+) -> None:
+    if challenge is not None:
+        await _delete_verification_message(bot, chat_id, challenge)
+        challenge.passed = True
+        challenge.message_id = 0
+    await bot.ban_chat_member(
+        chat_id=chat_id,
+        user_id=user_id,
+        until_date=datetime.now(timezone.utc) + timedelta(minutes=1),
+    )
+    await add_log(db, chat_id, user_id, "", "join_verify_failed", f"admin_remove:{admin_id}")
+    await db.commit()
 
 
 async def _handle_afk(message: Message, db) -> None:
@@ -416,9 +480,8 @@ async def verify_button_handler(callback: CallbackQuery) -> None:
     user_id = callback.from_user.id
     async with SessionLocal() as db:
         group = await ensure_group(db, chat_id, callback.message.chat.title or "")
-        ok = await verify_challenge(db, chat_id, user_id, selected_answer)
-        if not ok:
-            challenge = await get_challenge(db, chat_id, user_id)
+        challenge = await get_challenge(db, chat_id, user_id)
+        if not is_challenge_answer_correct(challenge, selected_answer):
             fail_reason = challenge_failure_reason(challenge, selected_answer)
             if challenge is not None and not challenge.passed:
                 await _delete_verification_message(callback.bot, chat_id, challenge)
@@ -457,25 +520,104 @@ async def verify_button_handler(callback: CallbackQuery) -> None:
             await callback.answer(f"验证失败：{fail_reason}", show_alert=True)
             return
 
-        challenge = await get_challenge(db, chat_id, user_id)
-        if challenge is not None:
-            await _delete_verification_message(callback.bot, chat_id, challenge)
-            challenge.message_id = 0
-        await callback.bot.restrict_chat_member(
-            chat_id=chat_id,
-            user_id=user_id,
-            permissions=MEMBER_UNRESTRICT_PERMISSIONS,
-        )
-        await add_log(db, chat_id, user_id, callback.from_user.username or "", "join_verify_passed", "button")
-        await send_verify_pass_notice(
+        await _approve_verified_member(
             callback.bot,
+            db,
             chat_id,
             user_id,
+            challenge,
             callback.from_user.full_name,
             callback.from_user.username or "",
+            "button",
         )
+        await mark_challenge_passed(db, challenge)
 
     await callback.answer("验证通过，欢迎加入！")
+
+
+@router.callback_query(F.data.startswith("verify_pass:"))
+async def verify_admin_pass_handler(callback: CallbackQuery) -> None:
+    if callback.message is None or callback.from_user is None:
+        return
+
+    parts = (callback.data or "").split(":", 1)
+    if len(parts) != 2:
+        await callback.answer("验证数据无效", show_alert=True)
+        return
+
+    try:
+        target_user_id = int(parts[1])
+    except ValueError:
+        await callback.answer("验证数据无效", show_alert=True)
+        return
+
+    if not await _is_callback_group_manager(callback):
+        await callback.answer("仅群管理员可直接通过验证", show_alert=True)
+        return
+
+    chat_id = callback.message.chat.id
+    async with SessionLocal() as db:
+        await ensure_group(db, chat_id, callback.message.chat.title or "")
+        challenge = await get_challenge(db, chat_id, target_user_id)
+        if challenge is None or challenge.passed or is_challenge_expired(challenge):
+            fail_reason = challenge_failure_reason(challenge, "")
+            await callback.answer(f"无法通过：{fail_reason}", show_alert=True)
+            return
+
+        await _approve_verified_member(
+            callback.bot,
+            db,
+            chat_id,
+            target_user_id,
+            challenge,
+            detail=f"admin:{callback.from_user.id}",
+        )
+        await mark_challenge_passed(db, challenge)
+
+    await callback.answer("已由管理员通过验证")
+
+
+@router.callback_query(F.data.startswith("verify_remove:"))
+async def verify_admin_remove_handler(callback: CallbackQuery) -> None:
+    if callback.message is None or callback.from_user is None:
+        return
+
+    parts = (callback.data or "").split(":", 1)
+    if len(parts) != 2:
+        await callback.answer("验证数据无效", show_alert=True)
+        return
+
+    try:
+        target_user_id = int(parts[1])
+    except ValueError:
+        await callback.answer("验证数据无效", show_alert=True)
+        return
+
+    if not await _is_callback_group_manager(callback):
+        await callback.answer("仅群管理员可移除验证用户", show_alert=True)
+        return
+
+    chat_id = callback.message.chat.id
+    async with SessionLocal() as db:
+        await ensure_group(db, chat_id, callback.message.chat.title or "")
+        challenge = await get_challenge(db, chat_id, target_user_id)
+        if challenge is None:
+            await callback.answer("验证记录不存在", show_alert=True)
+            return
+        if challenge.passed:
+            await callback.answer("验证已处理", show_alert=True)
+            return
+
+        await _remove_unverified_member(
+            callback.bot,
+            db,
+            chat_id,
+            target_user_id,
+            callback.from_user.id,
+            challenge,
+        )
+
+    await callback.answer("已移除该用户")
 
 
 @router.message(F.chat.type.in_({"group", "supergroup"}), F.text)

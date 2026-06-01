@@ -12,6 +12,24 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def is_challenge_expired(challenge: VerificationChallenge) -> bool:
+    return _as_utc(challenge.expires_at) < _now()
+
+
+def is_challenge_answer_correct(challenge: VerificationChallenge | None, user_answer: str) -> bool:
+    if challenge is None or challenge.passed:
+        return False
+    if is_challenge_expired(challenge):
+        return False
+    return challenge.answer.strip() == user_answer.strip()
+
+
 def create_math_question() -> tuple[str, str]:
     a = randint(1, 9)
     b = randint(1, 9)
@@ -44,10 +62,7 @@ def challenge_failure_reason(challenge: VerificationChallenge | None, user_answe
         return "验证记录不存在"
     if challenge.passed:
         return "验证已处理"
-    expires_at = challenge.expires_at
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at < _now():
+    if is_challenge_expired(challenge):
         return "验证超时"
     if challenge.answer.strip() != user_answer.strip():
         return "答案错误"
@@ -113,17 +128,19 @@ async def get_challenge(db: AsyncSession, chat_id: int, user_id: int) -> Verific
 
 async def verify_challenge(db: AsyncSession, chat_id: int, user_id: int, user_answer: str) -> bool:
     challenge = await get_challenge(db, chat_id, user_id)
+    if not is_challenge_answer_correct(challenge, user_answer):
+        return False
+
+    return await mark_challenge_passed(db, challenge)
+
+
+async def mark_challenge_passed(db: AsyncSession, challenge: VerificationChallenge | None) -> bool:
     if challenge is None or challenge.passed:
-        return False
-    if challenge.expires_at < _now():
-        return False
-    if challenge.answer.strip() != user_answer.strip():
         return False
 
     challenge.passed = True
     await db.commit()
     return True
-
 
 async def list_expired_unpassed(db: AsyncSession) -> list[VerificationChallenge]:
     result = await db.execute(
