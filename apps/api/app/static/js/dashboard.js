@@ -118,6 +118,7 @@ const cmLockCommands = document.getElementById("cm-lock-commands");
 const cmLogEnabled = document.getElementById("cm-log-enabled");
 const cmLogChatId = document.getElementById("cm-log-chat-id");
 const cmDisabledCommands = Array.from(document.querySelectorAll(".cm-disabled-command"));
+const cmConfigSaveButtons = Array.from(document.querySelectorAll(".cm-config-save"));
 const cmSave = document.getElementById("cm-save");
 const cmRefresh = document.getElementById("cm-refresh");
 const cmNoteName = document.getElementById("cm-note-name");
@@ -1611,6 +1612,9 @@ gsRefresh?.addEventListener("click", loadGroupConfigs);
 
 cmChatId?.addEventListener("change", loadCommunityConfig);
 cmSave?.addEventListener("click", saveCommunityConfig);
+cmConfigSaveButtons.forEach((button) => {
+  button.addEventListener("click", saveCommunityConfig);
+});
 cmRefresh?.addEventListener("click", loadCommunityConfig);
 cmNoteSave?.addEventListener("click", saveCommunityNote);
 cmRssSave?.addEventListener("click", saveCommunityRss);

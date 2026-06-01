@@ -510,6 +510,9 @@
                 <textarea id="cm-rules-text" rows="6"></textarea>
               </label>
             </div>
+            <div class="actions">
+              <button type="button" class="btn cm-config-save">{{ t.save }}</button>
+            </div>
           </article>
 
           <article class="glass-surface settings-block stagger-card">
@@ -531,6 +534,9 @@
                 {{ t.community_goodbye_text }}
                 <textarea id="cm-goodbye-text" rows="4"></textarea>
               </label>
+            </div>
+            <div class="actions">
+              <button type="button" class="btn cm-config-save">{{ t.save }}</button>
             </div>
           </article>
 
@@ -563,6 +569,9 @@
                 </label>
                 <label class="check-card full-width"><input id="cm-reports-enabled" type="checkbox" /> {{ t.community_reports_enabled }}</label>
               </div>
+              <div class="actions">
+                <button type="button" class="btn cm-config-save">{{ t.save }}</button>
+              </div>
             </article>
 
             <article class="glass-surface settings-block stagger-card">
@@ -576,6 +585,9 @@
                 <label class="check-card"><input id="cm-lock-media" type="checkbox" /> {{ t.lock_media }}</label>
                 <label class="check-card"><input id="cm-lock-stickers" type="checkbox" /> {{ t.lock_stickers }}</label>
                 <label class="check-card"><input id="cm-lock-commands" type="checkbox" /> {{ t.lock_commands }}</label>
+              </div>
+              <div class="actions">
+                <button type="button" class="btn cm-config-save">{{ t.save }}</button>
               </div>
             </article>
 
@@ -591,6 +603,9 @@
                   <input id="cm-log-chat-id" type="number" value="0" />
                 </label>
               </div>
+              <div class="actions">
+                <button type="button" class="btn cm-config-save">{{ t.save }}</button>
+              </div>
             </article>
 
             <article class="glass-surface settings-block stagger-card">
@@ -602,6 +617,9 @@
                 {% for command in disableable_commands %}
                 <label class="check-card"><input class="cm-disabled-command" type="checkbox" value="{{ command }}" /> /{{ command }}</label>
                 {% endfor %}
+              </div>
+              <div class="actions">
+                <button type="button" class="btn cm-config-save">{{ t.save }}</button>
               </div>
             </article>
           </div>
