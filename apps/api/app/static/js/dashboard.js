@@ -118,7 +118,7 @@ const cmLockCommands = document.getElementById("cm-lock-commands");
 const cmLogEnabled = document.getElementById("cm-log-enabled");
 const cmLogChatId = document.getElementById("cm-log-chat-id");
 const cmDisabledCommands = Array.from(document.querySelectorAll(".cm-disabled-command"));
-const cmConfigSaveButtons = Array.from(document.querySelectorAll(".cm-config-save"));
+const cmSection = document.getElementById("community");
 const cmSave = document.getElementById("cm-save");
 const cmRefresh = document.getElementById("cm-refresh");
 const cmNoteName = document.getElementById("cm-note-name");
@@ -169,6 +169,7 @@ const i18n = i18nEl ? JSON.parse(i18nEl.textContent || "{}") : {};
 let updatePollTimer = null;
 const ACTIVE_SECTION_KEY = "miyin.dashboard.activeSection";
 const THEME_KEY = "miyin.dashboard.theme";
+const COMMUNITY_CHAT_KEY = "miyin.dashboard.communityChatId";
 let actionStatusTimer = null;
 let arEditingRuleId = null;
 let kwEditingKeywordId = null;
@@ -709,6 +710,28 @@ function getCommunityChatId() {
   return cmChatId?.value || "";
 }
 
+function rememberCommunityChatId() {
+  const chatId = getCommunityChatId();
+  if (!chatId) return;
+  try {
+    window.localStorage.setItem(COMMUNITY_CHAT_KEY, chatId);
+  } catch (err) {
+    // ignore
+  }
+}
+
+function restoreCommunityChatId() {
+  if (!cmChatId) return;
+  try {
+    const stored = window.localStorage.getItem(COMMUNITY_CHAT_KEY) || "";
+    if (stored && Array.from(cmChatId.options).some((option) => option.value === stored)) {
+      cmChatId.value = stored;
+    }
+  } catch (err) {
+    // ignore
+  }
+}
+
 function applyCommunityConfig(config) {
   if (!config) return;
   if (cmRulesText) cmRulesText.value = config.rules_text || "";
@@ -738,6 +761,7 @@ function applyCommunityConfig(config) {
 async function loadCommunityConfig() {
   const chatId = getCommunityChatId();
   if (!chatId) return;
+  rememberCommunityChatId();
   const result = await requestJson(`/api/v1/community/${encodeURIComponent(chatId)}`);
   if (!result.ok) {
     showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
@@ -786,7 +810,7 @@ async function saveCommunityConfig() {
     showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
     return;
   }
-  applyCommunityConfig(result.data);
+  await loadCommunityConfig();
   showStatus(t("saved"), false);
 }
 
@@ -1080,6 +1104,7 @@ try {
 }
 setActiveNav(initialTarget);
 setActiveSection(initialTarget);
+restoreCommunityChatId();
 handleSectionEnter(initialTarget);
 
 async function pollOnlineUpdateStatus() {
@@ -1610,10 +1635,17 @@ gsChatId?.addEventListener("change", () => applyGroupSettings(gsChatId.value));
 gsSave?.addEventListener("click", saveGroupSettings);
 gsRefresh?.addEventListener("click", loadGroupConfigs);
 
-cmChatId?.addEventListener("change", loadCommunityConfig);
+cmChatId?.addEventListener("change", async () => {
+  rememberCommunityChatId();
+  await loadCommunityConfig();
+});
 cmSave?.addEventListener("click", saveCommunityConfig);
-cmConfigSaveButtons.forEach((button) => {
-  button.addEventListener("click", saveCommunityConfig);
+cmSection?.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const button = target.closest(".cm-config-save");
+  if (!(button instanceof HTMLButtonElement)) return;
+  await saveCommunityConfig();
 });
 cmRefresh?.addEventListener("click", loadCommunityConfig);
 cmNoteSave?.addEventListener("click", saveCommunityNote);

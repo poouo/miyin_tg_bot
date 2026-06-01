@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -24,6 +25,13 @@ from packages.shared.shared.config.settings import settings
 
 router = APIRouter(tags=["admin"])
 templates = Jinja2Templates(directory="apps/api/app/templates")
+
+
+def _read_app_version() -> str:
+    try:
+        return Path("VERSION").read_text(encoding="utf-8").strip()
+    except Exception:
+        return "dev"
 
 
 def _build_i18n_context(lang: str) -> dict:
@@ -109,6 +117,7 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)) -> Respons
         "security": security,
         "runtime_config": runtime_config,
         "disableable_commands": sorted(DISABLEABLE_COMMANDS),
+        "app_version": _read_app_version(),
         **_build_i18n_context(lang),
     }
     return templates.TemplateResponse(request=request, name="dashboard.html", context=context)
