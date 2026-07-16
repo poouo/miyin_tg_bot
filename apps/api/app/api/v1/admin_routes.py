@@ -11,6 +11,7 @@ from apps.api.app.core.db import get_db
 from apps.api.app.core.i18n import get_translations, tr
 from apps.api.app.services.admin_password_service import verify_admin_password
 from apps.api.app.services.group_service import list_groups
+from apps.api.app.services.log_service import list_recent_logs
 from apps.api.app.services.security_service import (
     check_login_allowed,
     clear_login_attempt,
@@ -25,6 +26,15 @@ from packages.shared.shared.config.settings import settings
 
 router = APIRouter(tags=["admin"])
 templates = Jinja2Templates(directory="apps/api/app/templates")
+PROJECT_ROOT = Path(__file__).resolve().parents[5]
+GROUP_FEATURE_FIELDS = (
+    "join_verification_enabled",
+    "keyword_filter_enabled",
+    "ad_block_enabled",
+    "anti_spam_enabled",
+    "auto_recover_enabled",
+    "deepseek_enabled",
+)
 
 
 def _read_app_version() -> str:
@@ -41,6 +51,23 @@ def _build_i18n_context(lang: str) -> dict:
         "t": t,
         "t_json": json.dumps(t, ensure_ascii=False),
     }
+
+
+def _read_app_version() -> str:
+    try:
+        return (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def _build_group_overview(groups: list, limit: int = 6) -> list[dict]:
+    return [
+        {
+            "group": group,
+            "enabled_count": sum(bool(getattr(group, field)) for field in GROUP_FEATURE_FIELDS),
+        }
+        for group in groups[:limit]
+    ]
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -108,12 +135,20 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)) -> Respons
 
     stats = await dashboard_stats(db)
     groups = await list_groups(db)
+    recent_logs = await list_recent_logs(db, limit=6)
     security = await get_or_create_security_config(db)
     runtime_config = await get_runtime_config(db)
     lang = read_web_language()
     context = {
         "stats": stats,
         "groups": groups,
+        "overview_groups": _build_group_overview(groups),
+        "recent_logs": recent_logs,
+        "overview_status": {
+            "bot_configured": bool(runtime_config.telegram_bot_token),
+            "ai_configured": bool(runtime_config.deepseek_api_key),
+            "version": _read_app_version(),
+        },
         "security": security,
         "runtime_config": runtime_config,
         "disableable_commands": sorted(DISABLEABLE_COMMANDS),

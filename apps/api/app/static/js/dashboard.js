@@ -5,9 +5,11 @@ const workspaceEl = document.querySelector(".workspace");
 const menuToggle = document.getElementById("mobile-menu-toggle");
 const themeToggle = document.getElementById("theme-toggle");
 const workspaceTitle = document.getElementById("workspace-title");
-const actionStatus = document.getElementById("action-status");
+const toastRegion = document.getElementById("toast-region");
 const navItems = Array.from(document.querySelectorAll(".nav-item"));
 const sections = Array.from(document.querySelectorAll(".section"));
+const overviewActions = Array.from(document.querySelectorAll("[data-overview-target]"));
+const overviewTimes = Array.from(document.querySelectorAll("[data-overview-time]"));
 
 const btnCheck = document.getElementById("check-update");
 const btnTrigger = document.getElementById("trigger-update");
@@ -36,6 +38,7 @@ const rtSpamWindowSec = document.getElementById("rt-spam-window-sec");
 const rtSpamMaxMessages = document.getElementById("rt-spam-max-messages");
 
 const upgradeFill = document.getElementById("upgrade-fill");
+const upgradeTrack = document.querySelector(".upgrade-track");
 const upgradeStatus = document.getElementById("upgrade-status");
 
 const arChatId = document.getElementById("ar-chat-id");
@@ -168,7 +171,7 @@ const i18n = i18nEl ? JSON.parse(i18nEl.textContent || "{}") : {};
 
 let updatePollTimer = null;
 const ACTIVE_SECTION_KEY = "miyin.dashboard.activeSection";
-const THEME_KEY = "miyin.dashboard.theme";
+const THEME_KEY = "miyin.dashboard.theme.v2";
 const COMMUNITY_CHAT_KEY = "miyin.dashboard.communityChatId";
 let actionStatusTimer = null;
 let arEditingRuleId = null;
@@ -178,6 +181,35 @@ const groupConfigCache = new Map();
 
 function t(key, fallback) {
   return i18n[key] || fallback || key;
+}
+
+function formatOverviewTimes() {
+  const locale = document.documentElement.lang === "en" ? "en-US" : "zh-CN";
+  const relative = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  const now = Date.now();
+
+  overviewTimes.forEach((timeEl) => {
+    const raw = String(timeEl.dataset.overviewTime || "").trim();
+    if (!raw) return;
+    const normalized = /(?:Z|[+-]\d{2}:\d{2})$/i.test(raw) ? raw : `${raw}Z`;
+    const date = new Date(normalized);
+    if (Number.isNaN(date.getTime())) return;
+
+    const diffSeconds = Math.round((date.getTime() - now) / 1000);
+    const absoluteSeconds = Math.abs(diffSeconds);
+    if (absoluteSeconds < 60) {
+      timeEl.textContent = relative.format(diffSeconds, "second");
+    } else if (absoluteSeconds < 3600) {
+      timeEl.textContent = relative.format(Math.round(diffSeconds / 60), "minute");
+    } else if (absoluteSeconds < 86400) {
+      timeEl.textContent = relative.format(Math.round(diffSeconds / 3600), "hour");
+    } else if (absoluteSeconds < 604800) {
+      timeEl.textContent = relative.format(Math.round(diffSeconds / 86400), "day");
+    } else {
+      timeEl.textContent = date.toLocaleDateString(locale, { month: "2-digit", day: "2-digit" });
+    }
+    timeEl.title = date.toLocaleString(locale, { hour12: false });
+  });
 }
 
 function escapeHtml(text) {
@@ -261,18 +293,78 @@ function buildAutoReplyPreviewHtml(content, parseMode) {
 }
 
 function showStatus(message, isError = false) {
-  if (!actionStatus) return;
-  actionStatus.textContent = message || "";
-  actionStatus.classList.toggle("error", Boolean(isError));
-  if (actionStatusTimer) {
-    window.clearTimeout(actionStatusTimer);
+  const text = String(message || "").trim();
+  if (!text || !toastRegion) return;
+
+  while (toastRegion.children.length >= 4) {
+    const candidates = Array.from(toastRegion.children);
+    const oldest = candidates.find((item) => !item.contains(document.activeElement)) || candidates[0];
+    if (oldest?.dismissTimer) window.clearTimeout(oldest.dismissTimer);
+    oldest?.remove();
   }
-  if (!message) return;
-  actionStatusTimer = window.setTimeout(() => {
-    if (!actionStatus) return;
-    actionStatus.textContent = "";
-    actionStatus.classList.remove("error");
-  }, 2400);
+
+  const toast = document.createElement("div");
+  toast.className = `app-toast ${isError ? "error" : "success"}`;
+  toast.setAttribute("role", isError ? "alert" : "status");
+
+  const icon = document.createElement("span");
+  icon.className = "toast-icon";
+  icon.setAttribute("aria-hidden", "true");
+  const iconGlyph = document.createElement("i");
+  iconGlyph.className = isError ? "ri-error-warning-line" : "ri-checkbox-circle-line";
+  icon.append(iconGlyph);
+
+  const messageEl = document.createElement("span");
+  messageEl.className = "toast-message";
+  messageEl.textContent = text;
+
+  const close = document.createElement("button");
+  close.className = "toast-close";
+  close.type = "button";
+  close.setAttribute("aria-label", t("close", "Close"));
+  close.title = t("close", "Close");
+  const closeGlyph = document.createElement("i");
+  closeGlyph.className = "ri-close-line";
+  close.append(closeGlyph);
+
+  toast.append(icon, messageEl, close);
+  toastRegion.append(toast);
+
+  let isHovered = false;
+  let hasFocus = false;
+  const dismiss = () => {
+    if (toast.dataset.dismissed === "true") return;
+    toast.dataset.dismissed = "true";
+    if (toast.dismissTimer) window.clearTimeout(toast.dismissTimer);
+    toast.classList.add("is-leaving");
+    window.setTimeout(() => toast.remove(), 220);
+  };
+  const scheduleDismiss = () => {
+    if (toast.dataset.dismissed === "true") return;
+    if (toast.dismissTimer) window.clearTimeout(toast.dismissTimer);
+    toast.dismissTimer = window.setTimeout(dismiss, isError ? 5200 : 3600);
+  };
+
+  close.addEventListener("click", dismiss);
+  toast.addEventListener("mouseenter", () => {
+    isHovered = true;
+    window.clearTimeout(toast.dismissTimer);
+  });
+  toast.addEventListener("mouseleave", () => {
+    isHovered = false;
+    if (!hasFocus) scheduleDismiss();
+  });
+  toast.addEventListener("focusin", () => {
+    hasFocus = true;
+    window.clearTimeout(toast.dismissTimer);
+  });
+  toast.addEventListener("focusout", (event) => {
+    if (event.relatedTarget && toast.contains(event.relatedTarget)) return;
+    hasFocus = false;
+    if (!isHovered) scheduleDismiss();
+  });
+  window.requestAnimationFrame(() => toast.classList.add("is-visible"));
+  scheduleDismiss();
 }
 
 async function requestJson(url, options = {}) {
@@ -297,6 +389,9 @@ function setUpgradeStatus(progress, text, type = "normal") {
     upgradeFill.classList.remove("success", "failed");
     if (type === "success") upgradeFill.classList.add("success");
     if (type === "failed") upgradeFill.classList.add("failed");
+  }
+  if (upgradeTrack) {
+    upgradeTrack.setAttribute("aria-valuenow", String(safeProgress));
   }
   if (upgradeStatus) {
     upgradeStatus.textContent = `${safeProgress}% - ${text}`;
@@ -451,7 +546,6 @@ function renderKeywords(items) {
     kwTableBody.innerHTML = `<tr><td colspan="5">${escapeHtml(t("no_data", "No data"))}</td></tr>`;
     return;
   }
-
   kwTableBody.innerHTML = items
     .map((item) => {
       const statusText = item.enabled ? t("switch_on", "on") : t("switch_off", "off");
@@ -645,11 +739,15 @@ async function loadMemberEvents() {
 function applyTheme(theme) {
   const isDark = theme === "dark";
   bodyEl.classList.toggle("dark", isDark);
+  document.documentElement.style.colorScheme = isDark ? "dark" : "light";
   if (!themeToggle) return;
   const icon = themeToggle.querySelector("i");
   const label = themeToggle.querySelector("span");
+  const nextLabel = isDark ? t("theme_light", "Light mode") : t("theme_dark", "Dark mode");
   if (icon) icon.className = isDark ? "ri-sun-line" : "ri-moon-line";
-  if (label) label.textContent = isDark ? t("theme_light", "Light mode") : t("theme_dark", "Dark mode");
+  if (label) label.textContent = nextLabel;
+  themeToggle.setAttribute("aria-label", nextLabel);
+  themeToggle.title = nextLabel;
 }
 
 try {
@@ -1056,7 +1154,9 @@ async function saveGroupSettings() {
 }
 
 async function handleSectionEnter(target) {
-  if (target === "auto-replies") {
+  if (target === "overview") {
+    formatOverviewTimes();
+  } else if (target === "auto-replies") {
     await loadAutoReplies();
   } else if (target === "keywords") {
     await loadKeywords();
@@ -1080,6 +1180,15 @@ navItems.forEach((item) => {
     const target = item.dataset.target;
     if (!target) return;
     if (!document.getElementById(target)) return;
+    if (target === "overview" && !document.getElementById("overview")?.classList.contains("section-active")) {
+      try {
+        window.localStorage.setItem(ACTIVE_SECTION_KEY, target);
+      } catch (err) {
+        // ignore
+      }
+      window.location.reload();
+      return;
+    }
     setActiveNav(target);
     setActiveSection(target);
     try {
@@ -1090,6 +1199,14 @@ navItems.forEach((item) => {
     if (workspaceEl) workspaceEl.scrollTop = 0;
     await handleSectionEnter(target);
     closeMobileSidebar();
+  });
+});
+
+overviewActions.forEach((button) => {
+  button.addEventListener("click", () => {
+    const target = button.dataset.overviewTarget;
+    const navItem = navItems.find((item) => item.dataset.target === target);
+    navItem?.click();
   });
 });
 
@@ -1106,6 +1223,7 @@ setActiveNav(initialTarget);
 setActiveSection(initialTarget);
 restoreCommunityChatId();
 handleSectionEnter(initialTarget);
+window.setInterval(formatOverviewTimes, 60000);
 
 async function pollOnlineUpdateStatus() {
   const result = await requestJson("/api/v1/updates/online-status");

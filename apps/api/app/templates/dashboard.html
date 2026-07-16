@@ -15,11 +15,17 @@
   <main class="shell">
     <aside class="sidebar glass-panel" id="sidebar" data-mobile-sidebar="true">
       <header class="sidebar-header" data-sidebar="header">
-        <div class="brand-mark"><i class="ri-robot-2-fill"></i></div>
-        <div class="brand-copy">
-          <h1>Miyin TG</h1>
-          <p>{{ t.admin_dashboard }}</p>
+        <div class="sidebar-brand">
+          <div class="brand-mark"><i class="ri-robot-2-fill"></i></div>
+          <div class="brand-copy">
+            <h1>Miyin TG</h1>
+            <p>{{ t.admin_dashboard }}</p>
+          </div>
         </div>
+        <button id="theme-toggle" type="button" class="sidebar-header-action" data-theme-dark="{{ t.theme_dark }}" data-theme-light="{{ t.theme_light }}" aria-label="{{ t.theme_dark }}" title="{{ t.theme_dark }}">
+          <i class="ri-moon-line"></i>
+          <span class="sr-only">{{ t.theme_dark }}</span>
+        </button>
       </header>
 
       <nav class="sidebar-scroll nav-list">
@@ -81,13 +87,18 @@
       </nav>
 
       <footer class="sidebar-footer" data-sidebar="footer">
-        <button id="theme-toggle" type="button" class="btn subtle full theme-toggle">
-          <i class="ri-moon-line"></i>
-          <span>{{ t.theme_dark }}</span>
-        </button>
-        <form action="/auth/logout" method="post">
-          <button type="submit" class="btn danger full"><i class="ri-logout-box-r-line"></i>{{ t.logout }}</button>
-        </form>
+        <div class="sidebar-account">
+          <span class="account-avatar"><i class="ri-user-3-line"></i></span>
+          <span class="account-copy">
+            <strong>{{ t.admin_dashboard }}</strong>
+            <small>Miyin TG</small>
+          </span>
+          <form action="/auth/logout" method="post">
+            <button type="submit" class="sidebar-logout" aria-label="{{ t.logout }}" title="{{ t.logout }}">
+              <i class="ri-logout-box-r-line"></i>
+            </button>
+          </form>
+        </div>
       </footer>
     </aside>
 
@@ -103,27 +114,195 @@
           <p>{{ t.dashboard_subtitle }}</p>
         </div>
         <span class="runtime-pill"><span></span>{{ t.system_running }}</span>
-        <p id="action-status" class="action-status"></p>
       </header>
 
       <section id="overview" class="glass-panel panel section">
-        <div class="panel-head">
+        <div class="panel-head overview-heading">
           <h3>{{ t.nav_overview }}</h3>
+          <span class="overview-live-badge"><span></span>{{ t.system_running }}</span>
         </div>
-        <div class="cards">
-          <article class="glass-surface card stagger-card">
-            <h4>{{ t.groups }}</h4>
-            <span>{{ stats.group_count }}</span>
+
+        <div class="overview-stats">
+          <article class="overview-stat-card stagger-card">
+            <span class="overview-stat-icon tone-emerald"><i class="ri-group-line"></i></span>
+            <div class="overview-stat-copy">
+              <span>{{ t.groups }}</span>
+              <strong>{{ stats.group_count }}</strong>
+            </div>
           </article>
-          <article class="glass-surface card stagger-card">
-            <h4>{{ t.keyword_rules }}</h4>
-            <span>{{ stats.keyword_count }}</span>
+          <article class="overview-stat-card stagger-card">
+            <span class="overview-stat-icon tone-sky"><i class="ri-message-2-line"></i></span>
+            <div class="overview-stat-copy">
+              <span>{{ t.overview_auto_reply_rules }}</span>
+              <strong>{{ stats.auto_reply_count }}</strong>
+            </div>
           </article>
-          <article class="glass-surface card stagger-card">
-            <h4>{{ t.moderation_logs }}</h4>
-            <span>{{ stats.log_count }}</span>
+          <article class="overview-stat-card stagger-card">
+            <span class="overview-stat-icon tone-violet"><i class="ri-filter-3-line"></i></span>
+            <div class="overview-stat-copy">
+              <span>{{ t.keyword_rules }}</span>
+              <strong>{{ stats.keyword_count }}</strong>
+            </div>
+          </article>
+          <article class="overview-stat-card stagger-card">
+            <span class="overview-stat-icon tone-amber"><i class="ri-spam-2-line"></i></span>
+            <div class="overview-stat-copy">
+              <span>{{ t.overview_ad_keyword_rules }}</span>
+              <strong>{{ stats.ad_keyword_count }}</strong>
+            </div>
+          </article>
+          <article class="overview-stat-card stagger-card">
+            <span class="overview-stat-icon tone-rose"><i class="ri-forbid-2-line"></i></span>
+            <div class="overview-stat-copy">
+              <span>{{ t.overview_active_bans }}</span>
+              <strong>{{ stats.active_ban_count }}</strong>
+            </div>
+          </article>
+          <article class="overview-stat-card stagger-card">
+            <span class="overview-stat-icon tone-slate"><i class="ri-pulse-line"></i></span>
+            <div class="overview-stat-copy">
+              <span>{{ t.overview_last_24h_events }}</span>
+              <strong>{{ stats.last_24h_log_count }}</strong>
+              <small>{{ t.overview_total_events }} {{ stats.log_count }}</small>
+            </div>
           </article>
         </div>
+
+        <div class="overview-content-grid">
+          <article class="overview-surface overview-activity">
+            <header class="overview-surface-head">
+              <h4>{{ t.overview_recent_activity }}</h4>
+              <button type="button" class="overview-text-action" data-overview-target="moderation-logs">
+                {{ t.overview_view_all }}<i class="ri-arrow-right-line" aria-hidden="true"></i>
+              </button>
+            </header>
+            {% if recent_logs %}
+            <ul class="overview-activity-list">
+              {% for log in recent_logs %}
+              <li>
+                <span class="overview-activity-icon {% if 'ban' in log.event_type or 'kick' in log.event_type or 'mute' in log.event_type or 'blocked' in log.event_type or 'deleted' in log.event_type %}is-alert{% elif 'passed' in log.event_type or 'recover' in log.event_type or 'auto_reply' in log.event_type %}is-success{% endif %}">
+                  {% if 'ban' in log.event_type or 'kick' in log.event_type or 'mute' in log.event_type %}
+                  <i class="ri-shield-flash-line"></i>
+                  {% elif 'blocked' in log.event_type or 'deleted' in log.event_type %}
+                  <i class="ri-delete-bin-6-line"></i>
+                  {% elif 'member' in log.event_type or 'join_verify' in log.event_type %}
+                  <i class="ri-user-follow-line"></i>
+                  {% else %}
+                  <i class="ri-notification-3-line"></i>
+                  {% endif %}
+                </span>
+                <div class="overview-activity-copy">
+                  <div class="overview-activity-title">
+                    <strong>{{ t.get('event_' ~ log.event_type, log.event_type) }}</strong>
+                    <time datetime="{{ log.created_at.isoformat() }}{% if not log.created_at.tzinfo %}Z{% endif %}" data-overview-time="{{ log.created_at.isoformat() }}{% if not log.created_at.tzinfo %}Z{% endif %}">{{ log.created_at.strftime('%m-%d %H:%M') }}</time>
+                  </div>
+                  <p>
+                    <span>{{ log.group_title or log.chat_id }}</span>
+                    {% if log.username %}
+                    <span>@{{ log.username }}</span>
+                    {% elif log.user_id %}
+                    <span>{{ t.user_id }} {{ log.user_id }}</span>
+                    {% endif %}
+                  </p>
+                </div>
+              </li>
+              {% endfor %}
+            </ul>
+            {% else %}
+            <div class="overview-empty">
+              <i class="ri-inbox-2-line"></i>
+              <span>{{ t.no_data }}</span>
+            </div>
+            {% endif %}
+          </article>
+
+          <div class="overview-side-stack">
+            <article class="overview-surface">
+              <header class="overview-surface-head">
+                <h4>{{ t.overview_service_status }}</h4>
+              </header>
+              <ul class="overview-service-list">
+                <li>
+                  <span class="overview-service-icon is-good"><i class="ri-server-line"></i></span>
+                  <div><strong>{{ t.overview_web_service }}</strong><small>{{ t.overview_online }}</small></div>
+                  <span class="overview-status-dot is-good"></span>
+                </li>
+                <li>
+                  <span class="overview-service-icon is-good"><i class="ri-database-2-line"></i></span>
+                  <div><strong>{{ t.overview_database_service }}</strong><small>{{ t.overview_connected }}</small></div>
+                  <span class="overview-status-dot is-good"></span>
+                </li>
+                <li>
+                  <span class="overview-service-icon {% if overview_status.bot_configured %}is-good{% else %}is-warning{% endif %}"><i class="ri-telegram-line"></i></span>
+                  <div><strong>{{ t.overview_bot_service }}</strong><small>{{ t.overview_configured if overview_status.bot_configured else t.overview_not_configured }}</small></div>
+                  <span class="overview-status-dot {% if overview_status.bot_configured %}is-good{% else %}is-warning{% endif %}"></span>
+                </li>
+                <li>
+                  <span class="overview-service-icon {% if overview_status.ai_configured %}is-good{% else %}is-warning{% endif %}"><i class="ri-sparkling-2-line"></i></span>
+                  <div><strong>{{ t.overview_ai_service }}</strong><small>{{ t.overview_configured if overview_status.ai_configured else t.overview_not_configured }}</small></div>
+                  <span class="overview-status-dot {% if overview_status.ai_configured %}is-good{% else %}is-warning{% endif %}"></span>
+                </li>
+                <li>
+                  <span class="overview-service-icon"><i class="ri-git-branch-line"></i></span>
+                  <div><strong>{{ t.overview_current_version }}</strong><small>{{ overview_status.version or t.overview_unknown }}</small></div>
+                </li>
+              </ul>
+            </article>
+
+            <article class="overview-surface">
+              <header class="overview-surface-head">
+                <h4>{{ t.overview_quick_actions }}</h4>
+              </header>
+              <div class="overview-quick-actions">
+                <button type="button" data-overview-target="auto-replies"><i class="ri-message-2-line"></i><span>{{ t.nav_auto_replies }}</span><i class="ri-arrow-right-s-line"></i></button>
+                <button type="button" data-overview-target="keywords"><i class="ri-filter-3-line"></i><span>{{ t.nav_keywords }}</span><i class="ri-arrow-right-s-line"></i></button>
+                <button type="button" data-overview-target="group-settings"><i class="ri-equalizer-line"></i><span>{{ t.nav_group_settings }}</span><i class="ri-arrow-right-s-line"></i></button>
+                <button type="button" data-overview-target="moderation-logs"><i class="ri-file-list-3-line"></i><span>{{ t.nav_moderation_logs }}</span><i class="ri-arrow-right-s-line"></i></button>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <article class="overview-surface overview-groups">
+          <header class="overview-surface-head">
+            <h4>{{ t.overview_group_coverage }}</h4>
+            <button type="button" class="overview-text-action" data-overview-target="groups">
+              {{ t.overview_view_all }}<i class="ri-arrow-right-line" aria-hidden="true"></i>
+            </button>
+          </header>
+          {% if overview_groups %}
+          <div class="overview-group-list">
+            {% for item in overview_groups %}
+            {% set group = item.group %}
+            <div class="overview-group-row">
+              <div class="overview-group-identity">
+                <span><i class="ri-group-line"></i></span>
+                <div><strong>{{ group.title or group.chat_id }}</strong><small>{{ group.chat_id }}</small></div>
+              </div>
+              <div class="overview-feature-strip">
+                <span class="{% if group.join_verification_enabled %}is-on{% endif %}" role="img" title="{{ t.join_verify }}" aria-label="{{ t.join_verify }}: {{ t.switch_on if group.join_verification_enabled else t.switch_off }}"><i class="ri-user-follow-line" aria-hidden="true"></i></span>
+                <span class="{% if group.keyword_filter_enabled %}is-on{% endif %}" role="img" title="{{ t.keyword_filter }}" aria-label="{{ t.keyword_filter }}: {{ t.switch_on if group.keyword_filter_enabled else t.switch_off }}"><i class="ri-filter-3-line" aria-hidden="true"></i></span>
+                <span class="{% if group.ad_block_enabled %}is-on{% endif %}" role="img" title="{{ t.ad_block }}" aria-label="{{ t.ad_block }}: {{ t.switch_on if group.ad_block_enabled else t.switch_off }}"><i class="ri-spam-2-line" aria-hidden="true"></i></span>
+                <span class="{% if group.anti_spam_enabled %}is-on{% endif %}" role="img" title="{{ t.anti_spam }}" aria-label="{{ t.anti_spam }}: {{ t.switch_on if group.anti_spam_enabled else t.switch_off }}"><i class="ri-speed-up-line" aria-hidden="true"></i></span>
+                <span class="{% if group.auto_recover_enabled %}is-on{% endif %}" role="img" title="{{ t.auto_recover }}" aria-label="{{ t.auto_recover }}: {{ t.switch_on if group.auto_recover_enabled else t.switch_off }}"><i class="ri-message-2-line" aria-hidden="true"></i></span>
+                <span class="{% if group.deepseek_enabled %}is-on{% endif %}" role="img" title="{{ t.ai }}" aria-label="{{ t.ai }}: {{ t.switch_on if group.deepseek_enabled else t.switch_off }}"><i class="ri-sparkling-2-line" aria-hidden="true"></i></span>
+              </div>
+              <div class="overview-coverage">
+                <span>{{ item.enabled_count }}/6 {{ t.overview_features_enabled }}</span>
+                <div role="progressbar" aria-valuemin="0" aria-valuemax="6" aria-valuenow="{{ item.enabled_count }}" aria-label="{{ t.overview_group_coverage }}">
+                  <span style="width: {{ item.enabled_count * 100 // 6 }}%"></span>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="overview-empty">
+            <i class="ri-group-line"></i>
+            <span>{{ t.no_group_data }}</span>
+          </div>
+          {% endif %}
+        </article>
       </section>
 
       <section id="settings" class="glass-panel panel section">
@@ -164,7 +343,7 @@
               </label>
             </div>
             <div class="actions">
-              <button id="save-runtime" type="button" class="btn">{{ t.runtime_save }}</button>
+              <button id="save-runtime" type="button" class="btn"><i class="ri-save-3-line" aria-hidden="true"></i>{{ t.runtime_save }}</button>
             </div>
           </article>
 
@@ -192,7 +371,7 @@
               </label>
             </div>
             <div class="actions">
-              <button id="save-deepseek" type="button" class="btn">{{ t.deepseek_save }}</button>
+              <button id="save-deepseek" type="button" class="btn"><i class="ri-save-3-line" aria-hidden="true"></i>{{ t.deepseek_save }}</button>
             </div>
           </article>
 
@@ -201,13 +380,13 @@
               <h4>{{ t.update_control }}</h4>
             </div>
             <div class="actions">
-              <button id="check-update" type="button" class="btn subtle">{{ t.check_update }}</button>
-              <button id="trigger-update" type="button" class="btn">{{ t.online_update }}</button>
+              <button id="check-update" type="button" class="btn subtle"><i class="ri-search-line" aria-hidden="true"></i>{{ t.check_update }}</button>
+              <button id="trigger-update" type="button" class="btn"><i class="ri-upload-cloud-2-line" aria-hidden="true"></i>{{ t.online_update }}</button>
             </div>
-            <div class="upgrade-track">
+            <div class="upgrade-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="upgrade-status">
               <div id="upgrade-fill" class="upgrade-fill"></div>
             </div>
-            <p id="upgrade-status" class="upgrade-status">{{ t.ready }}.</p>
+            <p id="upgrade-status" class="upgrade-status" role="status" aria-live="polite">{{ t.ready }}.</p>
           </article>
 
           <article class="glass-surface settings-block">
@@ -237,7 +416,7 @@
               </label>
             </div>
             <div class="actions">
-              <button id="save-security" type="button" class="btn">{{ t.save_login_security }}</button>
+              <button id="save-security" type="button" class="btn"><i class="ri-save-3-line" aria-hidden="true"></i>{{ t.save_login_security }}</button>
             </div>
           </article>
 
@@ -260,7 +439,7 @@
               </label>
             </div>
             <div class="actions">
-              <button id="save-password" type="button" class="btn">{{ t.save_password }}</button>
+              <button id="save-password" type="button" class="btn"><i class="ri-key-2-line" aria-hidden="true"></i>{{ t.save_password }}</button>
             </div>
           </article>
         </div>
@@ -282,8 +461,8 @@
           </label>
         </div>
         <div class="actions">
-          <button id="ar-open-add" type="button" class="btn">{{ t.auto_reply_add }}</button>
-          <button id="ar-refresh" type="button" class="btn subtle">{{ t.refresh }}</button>
+          <button id="ar-open-add" type="button" class="btn"><i class="ri-add-line" aria-hidden="true"></i>{{ t.auto_reply_add }}</button>
+          <button id="ar-refresh" type="button" class="btn subtle"><i class="ri-refresh-line" aria-hidden="true"></i>{{ t.refresh }}</button>
         </div>
         <div class="table-wrap">
           <table class="data-table auto-reply-table">
@@ -322,8 +501,8 @@
           </label>
         </div>
         <div class="actions">
-          <button id="kw-open-add" type="button" class="btn">{{ t.keyword_add }}</button>
-          <button id="kw-refresh" type="button" class="btn subtle">{{ t.refresh }}</button>
+          <button id="kw-open-add" type="button" class="btn"><i class="ri-add-line" aria-hidden="true"></i>{{ t.keyword_add }}</button>
+          <button id="kw-refresh" type="button" class="btn subtle"><i class="ri-refresh-line" aria-hidden="true"></i>{{ t.refresh }}</button>
         </div>
         <div class="table-wrap">
           <table class="data-table keyword-table">
@@ -361,8 +540,8 @@
           </label>
         </div>
         <div class="actions">
-          <button id="ak-open-add" type="button" class="btn">{{ t.ad_keyword_add }}</button>
-          <button id="ak-refresh" type="button" class="btn subtle">{{ t.refresh }}</button>
+          <button id="ak-open-add" type="button" class="btn"><i class="ri-add-line" aria-hidden="true"></i>{{ t.ad_keyword_add }}</button>
+          <button id="ak-refresh" type="button" class="btn subtle"><i class="ri-refresh-line" aria-hidden="true"></i>{{ t.refresh }}</button>
         </div>
         <div class="table-wrap">
           <table class="data-table ad-keyword-table">
@@ -398,7 +577,7 @@
           </label>
         </div>
         <div class="actions">
-          <button id="ev-refresh" type="button" class="btn subtle">{{ t.refresh }}</button>
+          <button id="ev-refresh" type="button" class="btn subtle"><i class="ri-refresh-line" aria-hidden="true"></i>{{ t.refresh }}</button>
         </div>
         <div class="table-wrap">
           <table class="data-table member-events-table">
@@ -456,7 +635,7 @@
           </label>
         </div>
         <div class="actions">
-          <button id="log-refresh" type="button" class="btn subtle">{{ t.refresh }}</button>
+          <button id="log-refresh" type="button" class="btn subtle"><i class="ri-refresh-line" aria-hidden="true"></i>{{ t.refresh }}</button>
         </div>
         <div class="table-wrap">
           <table class="data-table moderation-log-table">
@@ -494,8 +673,8 @@
           </label>
         </div>
         <div class="actions community-actions">
-          <button id="cm-save" type="button" class="btn">{{ t.save }}</button>
-          <button id="cm-refresh" type="button" class="btn subtle">{{ t.refresh }}</button>
+          <button id="cm-save" type="button" class="btn"><i class="ri-save-3-line" aria-hidden="true"></i>{{ t.save }}</button>
+          <button id="cm-refresh" type="button" class="btn subtle"><i class="ri-refresh-line" aria-hidden="true"></i>{{ t.refresh }}</button>
         </div>
 
         <div class="settings-stack community-stack">
@@ -648,7 +827,7 @@
               </label>
             </div>
             <div class="actions">
-              <button id="cm-note-save" type="button" class="btn">{{ t.note_save }}</button>
+              <button id="cm-note-save" type="button" class="btn"><i class="ri-save-3-line" aria-hidden="true"></i>{{ t.note_save }}</button>
             </div>
             <div class="table-wrap compact-table">
               <table class="data-table">
@@ -683,7 +862,7 @@
                 </label>
               </div>
               <div class="actions">
-                <button id="cm-rss-save" type="button" class="btn">{{ t.rss_add }}</button>
+                <button id="cm-rss-save" type="button" class="btn"><i class="ri-add-line" aria-hidden="true"></i>{{ t.rss_add }}</button>
               </div>
               <div class="table-wrap compact-table">
                 <table class="data-table">
@@ -717,7 +896,7 @@
                 </label>
               </div>
               <div class="actions">
-                <button id="cm-gban-save" type="button" class="btn warning">{{ t.global_ban_add }}</button>
+                <button id="cm-gban-save" type="button" class="btn warning"><i class="ri-forbid-2-line" aria-hidden="true"></i>{{ t.global_ban_add }}</button>
               </div>
               <div class="table-wrap compact-table">
                 <table class="data-table">
@@ -874,8 +1053,8 @@
           </article>
         </div>
         <div class="actions">
-          <button id="gs-save" type="button" class="btn">{{ t.save_group_settings }}</button>
-          <button id="gs-refresh" type="button" class="btn subtle">{{ t.refresh }}</button>
+          <button id="gs-save" type="button" class="btn"><i class="ri-save-3-line" aria-hidden="true"></i>{{ t.save_group_settings }}</button>
+          <button id="gs-refresh" type="button" class="btn subtle"><i class="ri-refresh-line" aria-hidden="true"></i>{{ t.refresh }}</button>
         </div>
       </section>
 
@@ -936,7 +1115,7 @@
           </label>
         </div>
         <div class="actions">
-          <button id="ban-refresh" type="button" class="btn subtle">{{ t.refresh }}</button>
+          <button id="ban-refresh" type="button" class="btn subtle"><i class="ri-refresh-line" aria-hidden="true"></i>{{ t.refresh }}</button>
         </div>
         <div class="table-wrap">
           <table class="data-table ban-table">
@@ -959,6 +1138,8 @@
       </section>
     </section>
   </main>
+
+  <div id="toast-region" class="toast-region"></div>
 
   <div id="ar-modal" class="modal-backdrop" hidden>
     <div class="modal-card glass-panel" role="dialog" aria-modal="true" aria-labelledby="ar-modal-title">
@@ -994,9 +1175,9 @@
         </label>
       </div>
       <div class="actions modal-actions">
-        <button id="ar-modal-preview" type="button" class="btn subtle">{{ t.preview }}</button>
-        <button id="ar-modal-save" type="button" class="btn">{{ t.save }}</button>
-        <button id="ar-modal-cancel" type="button" class="btn subtle">{{ t.cancel_edit }}</button>
+        <button id="ar-modal-preview" type="button" class="btn subtle"><i class="ri-eye-line" aria-hidden="true"></i>{{ t.preview }}</button>
+        <button id="ar-modal-save" type="button" class="btn"><i class="ri-save-3-line" aria-hidden="true"></i>{{ t.save }}</button>
+        <button id="ar-modal-cancel" type="button" class="btn subtle"><i class="ri-close-line" aria-hidden="true"></i>{{ t.cancel_edit }}</button>
       </div>
     </div>
   </div>
@@ -1010,7 +1191,7 @@
       <p class="preview-desc">{{ t.auto_reply_preview_desc }}</p>
       <div id="ar-preview-content" class="preview-content"></div>
       <div class="actions modal-actions">
-        <button id="ar-preview-ok" type="button" class="btn">{{ t.ok }}</button>
+        <button id="ar-preview-ok" type="button" class="btn"><i class="ri-check-line" aria-hidden="true"></i>{{ t.ok }}</button>
       </div>
     </div>
   </div>
@@ -1044,8 +1225,8 @@
         </label>
       </div>
       <div class="actions modal-actions">
-        <button id="kw-modal-save" type="button" class="btn">{{ t.save }}</button>
-        <button id="kw-modal-cancel" type="button" class="btn subtle">{{ t.cancel_edit }}</button>
+        <button id="kw-modal-save" type="button" class="btn"><i class="ri-save-3-line" aria-hidden="true"></i>{{ t.save }}</button>
+        <button id="kw-modal-cancel" type="button" class="btn subtle"><i class="ri-close-line" aria-hidden="true"></i>{{ t.cancel_edit }}</button>
       </div>
     </div>
   </div>
@@ -1068,8 +1249,8 @@
         </label>
       </div>
       <div class="actions modal-actions">
-        <button id="ak-modal-save" type="button" class="btn">{{ t.save }}</button>
-        <button id="ak-modal-cancel" type="button" class="btn subtle">{{ t.cancel_edit }}</button>
+        <button id="ak-modal-save" type="button" class="btn"><i class="ri-save-3-line" aria-hidden="true"></i>{{ t.save }}</button>
+        <button id="ak-modal-cancel" type="button" class="btn subtle"><i class="ri-close-line" aria-hidden="true"></i>{{ t.cancel_edit }}</button>
       </div>
     </div>
   </div>

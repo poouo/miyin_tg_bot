@@ -4,23 +4,61 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{{ t.login_title }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/login.css" />
 </head>
 <body>
-  <main class="login-wrap">
-    <section class="login-card">
-      <h1>Miyin TG Bot</h1>
-      <p>{{ t.admin_login }}</p>
-      <form action="/auth/login" method="post">
-        <label for="password">{{ t.password_label }}</label>
-        <input id="password" name="password" type="password" required />
-        <button type="submit">{{ t.login_btn }}</button>
-      </form>
-      {% if error %}
-      <p class="error">{{ error }}</p>
-      {% endif %}
+  <main class="login-shell">
+    <section class="login-brand-panel" aria-labelledby="brand-title">
+      <div class="brand-content">
+        <div class="login-brand">
+          <span class="brand-mark"><i class="ri-robot-2-fill"></i></span>
+          <h1 id="brand-title">Miyin TG</h1>
+        </div>
+        <p class="brand-tagline">{{ t.dashboard_subtitle }}</p>
+        <div class="brand-highlights" aria-hidden="true">
+          <div><i class="ri-dashboard-3-line"></i><span>{{ t.nav_overview }}</span></div>
+          <div><i class="ri-group-line"></i><span>{{ t.nav_groups }}</span></div>
+          <div><i class="ri-shield-check-line"></i><span>{{ t.nav_group_moderation }}</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="login-panel">
+      <button id="login-theme-toggle" class="theme-toggle" type="button" data-theme-dark="{{ t.theme_dark }}" data-theme-light="{{ t.theme_light }}" aria-label="{{ t.theme_dark }}" title="{{ t.theme_dark }}">
+        <i class="ri-moon-line"></i>
+        <span class="sr-only">{{ t.theme_dark }}</span>
+      </button>
+      <div class="login-card">
+        <div class="mobile-brand">
+          <span class="brand-mark"><i class="ri-robot-2-fill"></i></span>
+          <strong>Miyin TG</strong>
+        </div>
+        <header class="login-card-head">
+          <h2>{{ t.admin_login }}</h2>
+          <p>{{ t.dashboard_subtitle }}</p>
+        </header>
+        <form action="/auth/login" method="post">
+          <label for="password">{{ t.password_label }}</label>
+          <div class="password-field">
+            <i class="ri-lock-2-line field-icon"></i>
+            <input id="password" name="password" type="password" autocomplete="current-password" required />
+            <button id="password-toggle" class="password-toggle" type="button" aria-label="{{ t.password_label }}">
+              <i class="ri-eye-line"></i>
+            </button>
+          </div>
+          <button class="login-submit" type="submit">
+            <i class="ri-login-box-line"></i>
+            <span>{{ t.login_btn }}</span>
+          </button>
+        </form>
+        {% if error %}
+        <p class="error" role="alert"><i class="ri-error-warning-line"></i><span>{{ error }}</span></p>
+        {% endif %}
+      </div>
     </section>
   </main>
+  <script src="/static/js/login.js"></script>
 </body>
 </html>
 
