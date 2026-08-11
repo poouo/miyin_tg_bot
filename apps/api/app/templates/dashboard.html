@@ -509,15 +509,14 @@
             <thead>
               <tr>
                 <th>{{ t.keyword_label }}</th>
-                <th>{{ t.policy_action }}</th>
-                <th>{{ t.policy_mute_minutes }}</th>
+                <th>{{ t.keyword_actions }}</th>
                 <th>{{ t.status }}</th>
                 <th>{{ t.actions }}</th>
               </tr>
             </thead>
             <tbody id="kw-table-body">
               <tr>
-                <td colspan="5">{{ t.no_data }}</td>
+                <td colspan="4">{{ t.no_data }}</td>
               </tr>
             </tbody>
           </table>
@@ -548,13 +547,14 @@
             <thead>
               <tr>
                 <th>{{ t.ad_keyword_label }}</th>
+                <th>{{ t.ad_keyword_actions }}</th>
                 <th>{{ t.status }}</th>
                 <th>{{ t.actions }}</th>
               </tr>
             </thead>
             <tbody id="ak-table-body">
               <tr>
-                <td colspan="3">{{ t.no_data }}</td>
+                <td colspan="4">{{ t.no_data }}</td>
               </tr>
             </tbody>
           </table>
@@ -984,6 +984,13 @@
                 <input id="gs-ad-block-delete-message" type="checkbox" checked />
                 {{ t.policy_delete_ad_message }}
               </label>
+              <label class="check-card check-card-detail full-width">
+                <input id="gs-ad-block-apply-to-mentions" type="checkbox" />
+                <span class="check-card-copy">
+                  <span>{{ t.ad_apply_to_mentions }}</span>
+                  <small>{{ t.ad_apply_to_mentions_hint }}</small>
+                </span>
+              </label>
               <label>
                 {{ t.policy_action }}
                 <select id="gs-ad-block-action">
@@ -1208,16 +1215,30 @@
           <input id="kw-modal-keyword" type="text" maxlength="255" />
           <small>{{ t.keyword_hint }}</small>
         </label>
-        <label>
-          {{ t.policy_action }}
-          <select id="kw-modal-action">
-            <option value="delete">{{ t.action_delete }}</option>
-            <option value="mute">{{ t.action_mute }}</option>
-          </select>
-        </label>
-        <label>
+        <fieldset class="ad-action-fieldset full-width">
+          <legend>{{ t.keyword_actions }}</legend>
+          <div class="ad-action-options">
+            <label class="check-card">
+              <input id="kw-modal-delete-message" type="checkbox" checked />
+              {{ t.action_delete }}
+            </label>
+            <label class="check-card">
+              <input id="kw-modal-mute-user" type="checkbox" />
+              {{ t.action_mute }}
+            </label>
+            <label class="check-card">
+              <input id="kw-modal-ban-user" type="checkbox" />
+              {{ t.action_ban }}
+            </label>
+          </div>
+        </fieldset>
+        <label id="kw-modal-mute-minutes-field" class="ad-action-duration" hidden>
           {{ t.policy_mute_minutes }}
           <input id="kw-modal-mute-minutes" type="number" min="1" max="10080" value="10" />
+        </label>
+        <label id="kw-modal-ban-minutes-field" class="ad-action-duration" hidden>
+          {{ t.policy_ban_minutes }}
+          <input id="kw-modal-ban-minutes" type="number" min="1" max="10080" value="1440" />
         </label>
         <label class="check-card keyword-modal-enabled">
           <input id="kw-modal-enabled" type="checkbox" checked />
@@ -1237,13 +1258,45 @@
         <h3 id="ak-modal-title">{{ t.ad_keyword_add }}</h3>
         <button id="ak-modal-close" class="modal-close" type="button" aria-label="Close">&times;</button>
       </div>
-      <div class="form-grid">
-        <label>
+      <div class="form-grid ad-keyword-modal-grid">
+        <label class="full-width">
           {{ t.ad_keyword_label }}
           <input id="ak-modal-keyword" type="text" maxlength="255" />
           <small>{{ t.ad_keyword_hint }}</small>
         </label>
-        <label class="check-card">
+        <fieldset class="ad-action-fieldset full-width">
+          <legend>{{ t.ad_keyword_actions }}</legend>
+          <div class="ad-action-options">
+            <label class="check-card">
+              <input id="ak-modal-delete-message" type="checkbox" checked />
+              {{ t.action_delete }}
+            </label>
+            <label class="check-card">
+              <input id="ak-modal-mute-user" type="checkbox" />
+              {{ t.action_mute }}
+            </label>
+            <label class="check-card">
+              <input id="ak-modal-ban-user" type="checkbox" />
+              {{ t.action_ban }}
+            </label>
+          </div>
+        </fieldset>
+        <label class="check-card check-card-detail full-width">
+          <input id="ak-modal-apply-to-mentions" type="checkbox" />
+          <span class="check-card-copy">
+            <span>{{ t.ad_apply_to_mentions }}</span>
+            <small>{{ t.ad_apply_to_mentions_hint }}</small>
+          </span>
+        </label>
+        <label id="ak-modal-mute-minutes-field" class="ad-action-duration" hidden>
+          {{ t.policy_mute_minutes }}
+          <input id="ak-modal-mute-minutes" type="number" min="1" max="10080" value="30" />
+        </label>
+        <label id="ak-modal-ban-minutes-field" class="ad-action-duration" hidden>
+          {{ t.policy_ban_minutes }}
+          <input id="ak-modal-ban-minutes" type="number" min="1" max="10080" value="1440" />
+        </label>
+        <label class="check-card ad-keyword-modal-enabled full-width">
           <input id="ak-modal-enabled" type="checkbox" checked />
           {{ t.ad_keyword_enabled }}
         </label>

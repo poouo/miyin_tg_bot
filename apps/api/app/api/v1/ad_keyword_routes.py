@@ -27,7 +27,10 @@ async def update_ad_keyword_rule(
     payload: AdKeywordUpdate,
     db: AsyncSession = Depends(get_db),
 ) -> AdKeywordRead:
-    entity = await update_ad_keyword(db, chat_id, keyword_id, payload)
+    try:
+        entity = await update_ad_keyword(db, chat_id, keyword_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     if entity is None:
         raise HTTPException(status_code=404, detail="ad keyword not found")
     return entity

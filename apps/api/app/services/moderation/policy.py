@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.api.app.models.entities import KeywordRule
+from apps.api.app.models.entities import AdKeyword, KeywordRule
 from apps.api.app.services.ad_keyword_service import match_ad_keyword
 from apps.api.app.services.group_service import get_group
 from apps.api.app.services.moderation.ad_block import AdBlockGuard
@@ -16,6 +16,7 @@ class ModerationDecision:
     blocked: bool
     reason: str = ""
     keyword_rule: KeywordRule | None = None
+    ad_keyword_rule: AdKeyword | None = None
 
 
 class ModerationPolicyEngine:
@@ -30,9 +31,14 @@ class ModerationPolicyEngine:
         runtime = await get_runtime_config(db)
 
         if config.ad_block_enabled:
+            ad_keyword_rule = await match_ad_keyword(db, chat_id, text)
+            if ad_keyword_rule:
+                return ModerationDecision(
+                    blocked=True,
+                    reason="ad_block",
+                    ad_keyword_rule=ad_keyword_rule,
+                )
             if self.ad_guard.is_ad(text, runtime.ad_regex):
-                return ModerationDecision(blocked=True, reason="ad_block")
-            if await match_ad_keyword(db, chat_id, text):
                 return ModerationDecision(blocked=True, reason="ad_block")
 
         if config.keyword_filter_enabled:

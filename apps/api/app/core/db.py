@@ -52,6 +52,9 @@ async def _run_compat_migrations(conn: AsyncConnection) -> None:
             conn, "group_configs", "ad_block_delete_message", "BOOLEAN NOT NULL DEFAULT 1"
         )
         await _add_sqlite_column_if_missing(
+            conn, "group_configs", "ad_block_apply_to_mentions", "BOOLEAN NOT NULL DEFAULT 0"
+        )
+        await _add_sqlite_column_if_missing(
             conn, "group_configs", "ad_block_kick_minutes", "INTEGER NOT NULL DEFAULT 1"
         )
         await _add_sqlite_column_if_missing(
@@ -90,6 +93,44 @@ async def _run_compat_migrations(conn: AsyncConnection) -> None:
         await _add_sqlite_column_if_missing(
             conn, "verification_challenges", "message_id", "INTEGER NOT NULL DEFAULT 0"
         )
+        await _add_sqlite_column_if_missing(
+            conn, "keyword_rules", "delete_message", "BOOLEAN NOT NULL DEFAULT 1"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "keyword_rules", "mute_user", "BOOLEAN NOT NULL DEFAULT 0"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "keyword_rules", "ban_user", "BOOLEAN NOT NULL DEFAULT 0"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "keyword_rules", "ban_minutes", "INTEGER NOT NULL DEFAULT 1440"
+        )
+        await conn.execute(
+            text(
+                "UPDATE keyword_rules SET "
+                "mute_user = CASE WHEN action = 'mute' THEN 1 ELSE mute_user END, "
+                "ban_user = CASE WHEN action = 'ban' THEN 1 ELSE ban_user END, "
+                "action = CASE WHEN action IN ('delete', 'mute', 'ban') THEN action ELSE 'delete' END"
+            )
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "ad_keywords", "delete_message", "BOOLEAN NOT NULL DEFAULT 1"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "ad_keywords", "mute_user", "BOOLEAN NOT NULL DEFAULT 0"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "ad_keywords", "mute_minutes", "INTEGER NOT NULL DEFAULT 30"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "ad_keywords", "ban_user", "BOOLEAN NOT NULL DEFAULT 0"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "ad_keywords", "ban_minutes", "INTEGER NOT NULL DEFAULT 1440"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "ad_keywords", "apply_to_mentions", "BOOLEAN NOT NULL DEFAULT 0"
+        )
         return
 
     await _add_postgres_column_if_missing(
@@ -112,6 +153,9 @@ async def _run_compat_migrations(conn: AsyncConnection) -> None:
     )
     await _add_postgres_column_if_missing(
         conn, "group_configs", "ad_block_delete_message", "BOOLEAN NOT NULL DEFAULT TRUE"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "group_configs", "ad_block_apply_to_mentions", "BOOLEAN NOT NULL DEFAULT FALSE"
     )
     await _add_postgres_column_if_missing(
         conn, "group_configs", "ad_block_kick_minutes", "INTEGER NOT NULL DEFAULT 1"
@@ -151,6 +195,44 @@ async def _run_compat_migrations(conn: AsyncConnection) -> None:
     )
     await _add_postgres_column_if_missing(
         conn, "verification_challenges", "message_id", "INTEGER NOT NULL DEFAULT 0"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "keyword_rules", "delete_message", "BOOLEAN NOT NULL DEFAULT TRUE"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "keyword_rules", "mute_user", "BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "keyword_rules", "ban_user", "BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "keyword_rules", "ban_minutes", "INTEGER NOT NULL DEFAULT 1440"
+    )
+    await conn.execute(
+        text(
+            "UPDATE keyword_rules SET "
+            "mute_user = CASE WHEN action = 'mute' THEN TRUE ELSE mute_user END, "
+            "ban_user = CASE WHEN action = 'ban' THEN TRUE ELSE ban_user END, "
+            "action = CASE WHEN action IN ('delete', 'mute', 'ban') THEN action ELSE 'delete' END"
+        )
+    )
+    await _add_postgres_column_if_missing(
+        conn, "ad_keywords", "delete_message", "BOOLEAN NOT NULL DEFAULT TRUE"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "ad_keywords", "mute_user", "BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "ad_keywords", "mute_minutes", "INTEGER NOT NULL DEFAULT 30"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "ad_keywords", "ban_user", "BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "ad_keywords", "ban_minutes", "INTEGER NOT NULL DEFAULT 1440"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "ad_keywords", "apply_to_mentions", "BOOLEAN NOT NULL DEFAULT FALSE"
     )
 
 

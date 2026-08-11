@@ -26,6 +26,7 @@ class GroupConfig(Base, TimestampMixin):
     join_verify_fail_ban_minutes: Mapped[int] = mapped_column(Integer, default=1440)
     ad_block_action: Mapped[str] = mapped_column(String(32), default="mute")
     ad_block_delete_message: Mapped[bool] = mapped_column(Boolean, default=True)
+    ad_block_apply_to_mentions: Mapped[bool] = mapped_column(Boolean, default=False)
     ad_block_kick_minutes: Mapped[int] = mapped_column(Integer, default=1)
     ad_block_mute_minutes: Mapped[int] = mapped_column(Integer, default=30)
     ad_block_ban_minutes: Mapped[int] = mapped_column(Integer, default=1440)
@@ -46,7 +47,11 @@ class KeywordRule(Base, TimestampMixin):
     chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
     keyword: Mapped[str] = mapped_column(String(255), index=True)
     action: Mapped[str] = mapped_column(String(32), default="delete")
+    delete_message: Mapped[bool] = mapped_column(Boolean, default=True)
+    mute_user: Mapped[bool] = mapped_column(Boolean, default=False)
     mute_minutes: Mapped[int] = mapped_column(Integer, default=10)
+    ban_user: Mapped[bool] = mapped_column(Boolean, default=False)
+    ban_minutes: Mapped[int] = mapped_column(Integer, default=1440)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -70,6 +75,12 @@ class AdKeyword(Base, TimestampMixin):
     chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
     keyword: Mapped[str] = mapped_column(String(255), index=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    delete_message: Mapped[bool] = mapped_column(Boolean, default=True)
+    mute_user: Mapped[bool] = mapped_column(Boolean, default=False)
+    mute_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    ban_user: Mapped[bool] = mapped_column(Boolean, default=False)
+    ban_minutes: Mapped[int] = mapped_column(Integer, default=1440)
+    apply_to_mentions: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class ModerationLog(Base):
@@ -240,6 +251,16 @@ class UserProfile(Base, TimestampMixin):
     user_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
     bio: Mapped[str] = mapped_column(Text, default="")
     about: Mapped[str] = mapped_column(Text, default="")
+
+
+class ChatUserIdentity(Base, TimestampMixin):
+    __tablename__ = "chat_user_identities"
+    __table_args__ = (UniqueConstraint("chat_id", "user_id", name="uq_chat_user_identity"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    username: Mapped[str] = mapped_column(String(32), default="", index=True)
 
 
 class SecurityConfig(Base, TimestampMixin):

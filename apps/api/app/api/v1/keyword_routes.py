@@ -27,7 +27,10 @@ async def update_keyword_rule(
     payload: KeywordRuleUpdate,
     db: AsyncSession = Depends(get_db),
 ) -> KeywordRuleRead:
-    entity = await update_keyword(db, chat_id, keyword_id, payload)
+    try:
+        entity = await update_keyword(db, chat_id, keyword_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     if entity is None:
         raise HTTPException(status_code=404, detail="keyword rule not found")
     return entity

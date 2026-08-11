@@ -3537,3 +3537,144 @@ tbody tr:hover {
     min-width: 0;
   }
 }
+
+/* Per-rule moderation actions */
+#keywords .keyword-table,
+#ad-keywords .ad-keyword-table {
+  min-width: 980px;
+}
+
+#keywords .keyword-table th:nth-child(2),
+#keywords .keyword-table td:nth-child(2),
+#ad-keywords .ad-keyword-table th:nth-child(2),
+#ad-keywords .ad-keyword-table td:nth-child(2) {
+  width: 300px;
+  text-align: left;
+}
+
+#keywords .keyword-table th:nth-child(3),
+#keywords .keyword-table td:nth-child(3),
+#ad-keywords .ad-keyword-table th:nth-child(3),
+#ad-keywords .ad-keyword-table td:nth-child(3) {
+  width: 88px;
+  text-align: center;
+}
+
+#keywords .keyword-table th:nth-child(4),
+#keywords .keyword-table td:nth-child(4),
+#ad-keywords .ad-keyword-table th:nth-child(4),
+#ad-keywords .ad-keyword-table td:nth-child(4) {
+  width: 172px;
+}
+
+.ad-action-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.ad-action-tag {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.ad-action-empty {
+  color: var(--muted-foreground);
+}
+
+#ak-modal .modal-card {
+  width: min(680px, 100%);
+}
+
+#ak-modal .ad-keyword-modal-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+}
+
+#kw-modal .ad-action-fieldset,
+#ak-modal .ad-action-fieldset {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+#kw-modal .ad-action-fieldset legend,
+#ak-modal .ad-action-fieldset legend {
+  margin-bottom: 7px;
+  color: var(--card-foreground);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+#kw-modal .ad-action-options,
+#ak-modal .ad-action-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+#kw-modal .ad-action-options .check-card,
+#ak-modal .ad-action-options .check-card {
+  min-width: 0;
+}
+
+#kw-modal .ad-action-options .check-card:has(input:checked),
+#ak-modal .ad-action-options .check-card:has(input:checked) {
+  border-color: color-mix(in srgb, var(--primary) 36%, var(--border));
+  background: color-mix(in srgb, var(--accent) 78%, var(--card));
+}
+
+#kw-modal .ad-action-duration[hidden],
+#ak-modal .ad-action-duration[hidden] {
+  display: none;
+}
+
+#ak-modal .ad-keyword-modal-enabled {
+  grid-column: 1 / -1;
+}
+
+.check-card-detail {
+  min-height: 58px;
+  align-items: flex-start;
+}
+
+.check-card-detail > input {
+  margin-top: 2px;
+}
+
+.check-card-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.check-card-copy > span {
+  line-height: 1.35;
+}
+
+.check-card-copy small {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+@media (max-width: 720px) {
+  #kw-modal .ad-action-options,
+  #ak-modal .ad-keyword-modal-grid,
+  #ak-modal .ad-action-options {
+    grid-template-columns: 1fr;
+  }
+}

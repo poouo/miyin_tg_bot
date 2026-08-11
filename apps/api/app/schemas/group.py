@@ -22,6 +22,7 @@ class GroupConfigBase(BaseModel):
     join_verify_fail_ban_minutes: int = Field(default=1440, ge=1, le=10080)
     ad_block_action: ModerationAction = "mute"
     ad_block_delete_message: bool = True
+    ad_block_apply_to_mentions: bool = False
     ad_block_kick_minutes: int = Field(default=1, ge=1, le=10080)
     ad_block_mute_minutes: int = Field(default=30, ge=1, le=10080)
     ad_block_ban_minutes: int = Field(default=1440, ge=1, le=10080)
@@ -54,6 +55,7 @@ class GroupConfigUpdate(BaseModel):
     join_verify_fail_ban_minutes: int | None = Field(default=None, ge=1, le=10080)
     ad_block_action: ModerationAction | None = None
     ad_block_delete_message: bool | None = None
+    ad_block_apply_to_mentions: bool | None = None
     ad_block_kick_minutes: int | None = Field(default=None, ge=1, le=10080)
     ad_block_mute_minutes: int | None = Field(default=None, ge=1, le=10080)
     ad_block_ban_minutes: int | None = Field(default=None, ge=1, le=10080)

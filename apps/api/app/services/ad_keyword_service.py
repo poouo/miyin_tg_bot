@@ -3,7 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.app.models.entities import AdKeyword
-from apps.api.app.schemas.ad_keyword import AdKeywordCreate, AdKeywordUpdate
+from apps.api.app.schemas.ad_keyword import AdKeywordCreate, AdKeywordUpdate, validate_ad_keyword_actions
 
 
 def _split_keywords(raw: str) -> list[str]:
@@ -62,6 +62,13 @@ async def update_ad_keyword(
         if key == "keyword" and isinstance(value, str):
             value = _normalize_keyword_field(value)
         setattr(entity, key, value)
+
+    validate_ad_keyword_actions(
+        entity.delete_message,
+        entity.mute_user,
+        entity.ban_user,
+        entity.apply_to_mentions,
+    )
 
     await db.commit()
     await db.refresh(entity)

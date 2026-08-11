@@ -6,6 +6,11 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery, ChatMemberUpdated, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from apps.api.app.core.db import SessionLocal
+from apps.api.app.services.chat_user_identity_service import (
+    find_chat_user_ids_by_username,
+    normalize_username,
+    record_chat_user_identity,
+)
 from apps.api.app.services.community_feature_service import (
     clear_afk,
     get_afk,
@@ -19,7 +24,7 @@ from apps.api.app.services.community_feature_service import (
 from apps.api.app.services.group_service import ensure_group
 from apps.api.app.services.log_service import add_log
 from apps.api.app.services.auto_reply_service import match_auto_reply
-from apps.api.app.services.moderation.auto_recover import add_mute_sanction, get_active_ban_sanction
+from apps.api.app.services.moderation.auto_recover import get_active_ban_sanction
 from apps.api.app.services.moderation.join_verification import (
     build_answer_options,
     challenge_failure_reason,
@@ -44,6 +49,7 @@ from apps.bot.bot_app.verification_notices import (
 router = Router()
 MANAGER_ROLES = {"administrator", "creator"}
 LOG_MESSAGE_TEXT_LIMIT = 1000
+MAX_MENTION_SANCTION_TARGETS = 5
 
 MEMBER_UNRESTRICT_PERMISSIONS = ChatPermissions(
     can_send_messages=True,
@@ -134,6 +140,103 @@ async def _is_callback_group_manager(callback: CallbackQuery) -> bool:
     except Exception:
         return False
     return getattr(member, "status", "") in MANAGER_ROLES
+
+
+async def _eligible_mentioned_member(message: Message, user_id: int, expected_username: str = "") -> tuple[int, str] | None:
+    sender_id = message.from_user.id if message.from_user else 0
+    bot_id = getattr(message.bot, "id", 0)
+    if user_id in {sender_id, bot_id}:
+        return None
+
+    try:
+        member = await message.bot.get_chat_member(message.chat.id, user_id)
+    except Exception:
+        return None
+
+    status = getattr(member, "status", "")
+    if status in MANAGER_ROLES or status in {"left", "kicked"}:
+        return None
+    target_user = getattr(member, "user", None)
+    if target_user is None or target_user.id != user_id:
+        return None
+    if status == "restricted" and not getattr(member, "is_member", True):
+        return None
+    if expected_username and normalize_username(target_user.username) != expected_username:
+        return None
+    return target_user.id, target_user.username or ""
+
+
+async def _resolve_mentioned_sanction_targets(message: Message, db) -> list[tuple[int, str]]:
+    targets: list[tuple[int, str]] = []
+    seen_user_ids = {message.from_user.id} if message.from_user else set()
+
+    async def add_target(user_id: int, expected_username: str = "") -> None:
+        if len(targets) >= MAX_MENTION_SANCTION_TARGETS or user_id in seen_user_ids:
+            return
+        candidate = await _eligible_mentioned_member(message, user_id, expected_username)
+        if candidate is None:
+            return
+        seen_user_ids.add(candidate[0])
+        targets.append(candidate)
+
+    for entity in message.entities or []:
+        entity_type = getattr(getattr(entity, "type", ""), "value", getattr(entity, "type", ""))
+        if entity_type != "text_mention":
+            continue
+        target_user = getattr(entity, "user", None)
+        if target_user is not None:
+            await add_target(target_user.id)
+        if len(targets) >= MAX_MENTION_SANCTION_TARGETS:
+            return targets
+
+    mentioned_usernames: list[str] = []
+    seen_usernames: set[str] = set()
+    for entity in message.entities or []:
+        entity_type = getattr(getattr(entity, "type", ""), "value", getattr(entity, "type", ""))
+        if entity_type != "mention":
+            continue
+        try:
+            entity_text = entity.extract_from(message.text or "")
+        except (AttributeError, TypeError, ValueError):
+            continue
+        normalized_username = normalize_username(entity_text)
+        if normalized_username and normalized_username not in seen_usernames:
+            seen_usernames.add(normalized_username)
+            mentioned_usernames.append(normalized_username)
+        if len(mentioned_usernames) >= MAX_MENTION_SANCTION_TARGETS:
+            break
+
+    for username in mentioned_usernames:
+        user_ids = await find_chat_user_ids_by_username(db, message.chat.id, username)
+        for user_id in user_ids:
+            await add_target(user_id, username)
+            if len(targets) >= MAX_MENTION_SANCTION_TARGETS:
+                return targets
+    return targets
+
+
+async def _apply_mention_sanctions(
+    message: Message,
+    db,
+    reason: str,
+    action_config: ModerationActionConfig,
+) -> None:
+    if action_config.action not in {"kick", "mute", "ban"}:
+        return
+
+    for user_id, username in await _resolve_mentioned_sanction_targets(message, db):
+        try:
+            await apply_moderation_action(
+                message.bot,
+                db,
+                message.chat.id,
+                user_id,
+                username,
+                f"{reason}:mentioned_by:{message.from_user.id}"[:255],
+                action_config,
+            )
+        except Exception:
+            continue
 
 
 def _message_lock_type(message: Message) -> str | None:
@@ -284,6 +387,7 @@ async def group_non_text_lock_handler(message: Message) -> None:
         return
     async with SessionLocal() as db:
         await ensure_group(db, message.chat.id, message.chat.title or "")
+        await record_chat_user_identity(db, message.chat.id, message.from_user.id, message.from_user.username)
         await _enforce_locks(message, db)
 
 
@@ -294,6 +398,8 @@ async def new_member_handler(message: Message) -> None:
         return
 
     async with SessionLocal() as db:
+        for member in message.new_chat_members:
+            await record_chat_user_identity(db, chat.id, member.id, member.username)
         runtime = await get_runtime_config(db)
         group = await ensure_group(db, chat.id, chat.title or "")
         welcome_config = await get_welcome_config(db, chat.id)
@@ -631,6 +737,7 @@ async def group_text_handler(message: Message) -> None:
     async with SessionLocal() as db:
         runtime = await get_runtime_config(db)
         group = await ensure_group(db, chat.id, chat.title or "")
+        await record_chat_user_identity(db, chat.id, user.id, user.username)
         gban = await is_globally_banned(db, user.id)
         if gban:
             try:
@@ -656,8 +763,22 @@ async def group_text_handler(message: Message) -> None:
         decision = None if is_manager else await policy_engine.check_message(db, chat.id, user.id, text)
         if decision is not None and decision.blocked:
             should_delete_message = (
-                decision.reason == "keyword_filter"
-                or (decision.reason == "ad_block" and group.ad_block_delete_message)
+                (
+                    decision.reason == "keyword_filter"
+                    and (
+                        decision.keyword_rule.delete_message
+                        if decision.keyword_rule is not None
+                        else True
+                    )
+                )
+                or (
+                    decision.reason == "ad_block"
+                    and (
+                        decision.ad_keyword_rule.delete_message
+                        if decision.ad_keyword_rule is not None
+                        else group.ad_block_delete_message
+                    )
+                )
                 or (decision.reason == "anti_spam" and group.anti_spam_delete_message)
             )
             if should_delete_message:
@@ -666,33 +787,65 @@ async def group_text_handler(message: Message) -> None:
                 except Exception:
                     pass
 
-            mute_minutes = 10
             reason = decision.reason
-            if decision.keyword_rule and decision.keyword_rule.action == "mute":
-                mute_minutes = decision.keyword_rule.mute_minutes
-                reason = f"{reason}:{decision.keyword_rule.keyword}"
-                await message.bot.restrict_chat_member(
-                    chat_id=chat.id,
-                    user_id=user.id,
-                    permissions=ChatPermissions(can_send_messages=False),
-                    until_date=datetime.now(timezone.utc) + timedelta(minutes=mute_minutes),
-                )
-                await add_mute_sanction(db, chat.id, user.id, reason, mute_minutes)
+            if decision.keyword_rule is not None:
+                keyword_rule = decision.keyword_rule
+                reason = f"keyword_filter:{keyword_rule.keyword}"
+                if keyword_rule.ban_user or keyword_rule.mute_user:
+                    await apply_moderation_action(
+                        message.bot,
+                        db,
+                        chat.id,
+                        user.id,
+                        user.username or "",
+                        reason,
+                        ModerationActionConfig(
+                            action="ban" if keyword_rule.ban_user else "mute",
+                            kick_minutes=1,
+                            mute_minutes=keyword_rule.mute_minutes,
+                            ban_minutes=keyword_rule.ban_minutes,
+                        ),
+                    )
             elif decision.reason == "ad_block":
-                await apply_moderation_action(
-                    message.bot,
-                    db,
-                    chat.id,
-                    user.id,
-                    user.username or "",
-                    reason,
-                    ModerationActionConfig(
+                if decision.ad_keyword_rule is not None:
+                    ad_keyword_rule = decision.ad_keyword_rule
+                    reason = f"ad_block:{ad_keyword_rule.keyword}"
+                    if ad_keyword_rule.ban_user or ad_keyword_rule.mute_user:
+                        action_config = ModerationActionConfig(
+                            action="ban" if ad_keyword_rule.ban_user else "mute",
+                            kick_minutes=1,
+                            mute_minutes=ad_keyword_rule.mute_minutes,
+                            ban_minutes=ad_keyword_rule.ban_minutes,
+                        )
+                        await apply_moderation_action(
+                            message.bot,
+                            db,
+                            chat.id,
+                            user.id,
+                            user.username or "",
+                            reason,
+                            action_config,
+                        )
+                        if ad_keyword_rule.apply_to_mentions:
+                            await _apply_mention_sanctions(message, db, reason, action_config)
+                else:
+                    action_config = ModerationActionConfig(
                         action=group.ad_block_action,
                         kick_minutes=group.ad_block_kick_minutes,
                         mute_minutes=group.ad_block_mute_minutes,
                         ban_minutes=group.ad_block_ban_minutes,
-                    ),
-                )
+                    )
+                    await apply_moderation_action(
+                        message.bot,
+                        db,
+                        chat.id,
+                        user.id,
+                        user.username or "",
+                        reason,
+                        action_config,
+                    )
+                    if group.ad_block_apply_to_mentions:
+                        await _apply_mention_sanctions(message, db, reason, action_config)
             elif decision.reason == "anti_spam":
                 await apply_moderation_action(
                     message.bot,

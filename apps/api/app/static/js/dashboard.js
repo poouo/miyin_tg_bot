@@ -68,8 +68,13 @@ const kwTableBody = document.getElementById("kw-table-body");
 const kwModal = document.getElementById("kw-modal");
 const kwModalTitle = document.getElementById("kw-modal-title");
 const kwModalKeyword = document.getElementById("kw-modal-keyword");
-const kwModalAction = document.getElementById("kw-modal-action");
+const kwModalDeleteMessage = document.getElementById("kw-modal-delete-message");
+const kwModalMuteUser = document.getElementById("kw-modal-mute-user");
+const kwModalBanUser = document.getElementById("kw-modal-ban-user");
+const kwModalMuteMinutesField = document.getElementById("kw-modal-mute-minutes-field");
 const kwModalMuteMinutes = document.getElementById("kw-modal-mute-minutes");
+const kwModalBanMinutesField = document.getElementById("kw-modal-ban-minutes-field");
+const kwModalBanMinutes = document.getElementById("kw-modal-ban-minutes");
 const kwModalEnabled = document.getElementById("kw-modal-enabled");
 const kwModalSave = document.getElementById("kw-modal-save");
 const kwModalCancel = document.getElementById("kw-modal-cancel");
@@ -82,6 +87,14 @@ const akTableBody = document.getElementById("ak-table-body");
 const akModal = document.getElementById("ak-modal");
 const akModalTitle = document.getElementById("ak-modal-title");
 const akModalKeyword = document.getElementById("ak-modal-keyword");
+const akModalDeleteMessage = document.getElementById("ak-modal-delete-message");
+const akModalMuteUser = document.getElementById("ak-modal-mute-user");
+const akModalBanUser = document.getElementById("ak-modal-ban-user");
+const akModalApplyToMentions = document.getElementById("ak-modal-apply-to-mentions");
+const akModalMuteMinutesField = document.getElementById("ak-modal-mute-minutes-field");
+const akModalMuteMinutes = document.getElementById("ak-modal-mute-minutes");
+const akModalBanMinutesField = document.getElementById("ak-modal-ban-minutes-field");
+const akModalBanMinutes = document.getElementById("ak-modal-ban-minutes");
 const akModalEnabled = document.getElementById("ak-modal-enabled");
 const akModalSave = document.getElementById("ak-modal-save");
 const akModalCancel = document.getElementById("ak-modal-cancel");
@@ -152,6 +165,7 @@ const gsJoinVerifyFailMuteMinutes = document.getElementById("gs-join-verify-fail
 const gsJoinVerifyFailBanMinutes = document.getElementById("gs-join-verify-fail-ban-minutes");
 const gsAdBlockAction = document.getElementById("gs-ad-block-action");
 const gsAdBlockDeleteMessage = document.getElementById("gs-ad-block-delete-message");
+const gsAdBlockApplyToMentions = document.getElementById("gs-ad-block-apply-to-mentions");
 const gsAdBlockKickMinutes = document.getElementById("gs-ad-block-kick-minutes");
 const gsAdBlockMuteMinutes = document.getElementById("gs-ad-block-mute-minutes");
 const gsAdBlockBanMinutes = document.getElementById("gs-ad-block-ban-minutes");
@@ -480,16 +494,85 @@ function resetKeywordModal() {
   kwEditingKeywordId = null;
   if (kwModalTitle) kwModalTitle.textContent = t("keyword_add", "Add Keyword Rule");
   if (kwModalKeyword) kwModalKeyword.value = "";
-  if (kwModalAction) kwModalAction.value = "delete";
+  if (kwModalDeleteMessage) kwModalDeleteMessage.checked = true;
+  if (kwModalMuteUser) kwModalMuteUser.checked = false;
+  if (kwModalBanUser) kwModalBanUser.checked = false;
   if (kwModalMuteMinutes) kwModalMuteMinutes.value = "10";
+  if (kwModalBanMinutes) kwModalBanMinutes.value = "1440";
   if (kwModalEnabled) kwModalEnabled.checked = true;
+  syncKeywordActionFields();
+}
+
+function syncKeywordActionFields(preferredPenalty = "") {
+  if (preferredPenalty === "mute" && kwModalMuteUser?.checked && kwModalBanUser) {
+    kwModalBanUser.checked = false;
+  } else if (preferredPenalty === "ban" && kwModalBanUser?.checked && kwModalMuteUser) {
+    kwModalMuteUser.checked = false;
+  } else if (kwModalMuteUser?.checked && kwModalBanUser?.checked) {
+    kwModalMuteUser.checked = false;
+  }
+
+  const muteEnabled = Boolean(kwModalMuteUser?.checked);
+  const banEnabled = Boolean(kwModalBanUser?.checked);
+  if (kwModalMuteMinutesField) kwModalMuteMinutesField.hidden = !muteEnabled;
+  if (kwModalMuteMinutes) kwModalMuteMinutes.disabled = !muteEnabled;
+  if (kwModalBanMinutesField) kwModalBanMinutesField.hidden = !banEnabled;
+  if (kwModalBanMinutes) kwModalBanMinutes.disabled = !banEnabled;
 }
 
 function resetAdKeywordModal() {
   akEditingKeywordId = null;
   if (akModalTitle) akModalTitle.textContent = t("ad_keyword_add", "Add Ad Keyword");
   if (akModalKeyword) akModalKeyword.value = "";
+  if (akModalDeleteMessage) akModalDeleteMessage.checked = true;
+  if (akModalMuteUser) akModalMuteUser.checked = false;
+  if (akModalBanUser) akModalBanUser.checked = false;
+  if (akModalApplyToMentions) akModalApplyToMentions.checked = false;
+  if (akModalMuteMinutes) akModalMuteMinutes.value = "30";
+  if (akModalBanMinutes) akModalBanMinutes.value = "1440";
   if (akModalEnabled) akModalEnabled.checked = true;
+  syncAdKeywordActionFields();
+}
+
+function syncAdKeywordActionFields(preferredPenalty = "") {
+  if (preferredPenalty === "mute" && akModalMuteUser?.checked && akModalBanUser) {
+    akModalBanUser.checked = false;
+  } else if (preferredPenalty === "ban" && akModalBanUser?.checked && akModalMuteUser) {
+    akModalMuteUser.checked = false;
+  } else if (akModalMuteUser?.checked && akModalBanUser?.checked) {
+    akModalMuteUser.checked = false;
+  }
+
+  const muteEnabled = Boolean(akModalMuteUser?.checked);
+  const banEnabled = Boolean(akModalBanUser?.checked);
+  if (akModalMuteMinutesField) akModalMuteMinutesField.hidden = !muteEnabled;
+  if (akModalMuteMinutes) akModalMuteMinutes.disabled = !muteEnabled;
+  if (akModalBanMinutesField) akModalBanMinutesField.hidden = !banEnabled;
+  if (akModalBanMinutes) akModalBanMinutes.disabled = !banEnabled;
+}
+
+function isValidModerationDuration(value) {
+  return Number.isInteger(value) && value >= 1 && value <= 10080;
+}
+
+function formatAdKeywordActions(item) {
+  const labels = [];
+  const minuteUnit = t("ad_keyword_minutes_unit", "min");
+  if (item.delete_message !== false) {
+    labels.push(t("action_delete", "Delete message"));
+  }
+  if (item.mute_user) {
+    const minutes = Number(item.mute_minutes || 30);
+    labels.push(`${t("action_mute", "Mute")} ${minutes} ${minuteUnit}`);
+  }
+  if (item.ban_user) {
+    const minutes = Number(item.ban_minutes || 1440);
+    labels.push(`${t("action_ban", "Ban")} ${minutes} ${minuteUnit}`);
+  }
+  if (item.apply_to_mentions) {
+    labels.push(t("ad_apply_to_mentions_tag", "Mentions included"));
+  }
+  return labels;
 }
 
 function renderAutoReplies(items) {
@@ -536,24 +619,48 @@ async function loadAutoReplies() {
   renderAutoReplies(result.data);
 }
 
-function formatKeywordAction(action) {
-  return action === "mute" ? t("action_mute", "Mute") : t("action_delete", "Delete message");
+function keywordActionState(item) {
+  const hasExplicitActions = ["delete_message", "mute_user", "ban_user"].some(
+    (key) => typeof item[key] === "boolean",
+  );
+  return {
+    deleteMessage: hasExplicitActions ? item.delete_message !== false : true,
+    muteUser: hasExplicitActions ? Boolean(item.mute_user) : item.action === "mute",
+    banUser: hasExplicitActions ? Boolean(item.ban_user) : item.action === "ban",
+  };
+}
+
+function formatKeywordActions(item) {
+  const labels = [];
+  const state = keywordActionState(item);
+  const minuteUnit = t("keyword_minutes_unit", "min");
+  if (state.deleteMessage) labels.push(t("action_delete", "Delete message"));
+  if (state.muteUser) {
+    labels.push(`${t("action_mute", "Mute")} ${Number(item.mute_minutes || 10)} ${minuteUnit}`);
+  }
+  if (state.banUser) {
+    labels.push(`${t("action_ban", "Ban")} ${Number(item.ban_minutes || 1440)} ${minuteUnit}`);
+  }
+  return labels;
 }
 
 function renderKeywords(items) {
   if (!kwTableBody) return;
   if (!Array.isArray(items) || !items.length) {
-    kwTableBody.innerHTML = `<tr><td colspan="5">${escapeHtml(t("no_data", "No data"))}</td></tr>`;
+    kwTableBody.innerHTML = `<tr><td colspan="4">${escapeHtml(t("no_data", "No data"))}</td></tr>`;
     return;
   }
   kwTableBody.innerHTML = items
     .map((item) => {
       const statusText = item.enabled ? t("switch_on", "on") : t("switch_off", "off");
       const toggleText = item.enabled ? t("disable", "Disable") : t("enable", "Enable");
+      const actionLabels = formatKeywordActions(item);
+      const actionHtml = actionLabels.length
+        ? actionLabels.map((label) => `<span class="ad-action-tag">${escapeHtml(label)}</span>`).join("")
+        : '<span class="ad-action-empty">&mdash;</span>';
       return `<tr>
         <td><div class="cell-keyword">${escapeHtml(item.keyword)}</div></td>
-        <td><div class="cell-center">${escapeHtml(formatKeywordAction(item.action))}</div></td>
-        <td><div class="cell-center">${Number(item.mute_minutes || 10)}</div></td>
+        <td><div class="ad-action-list">${actionHtml}</div></td>
         <td><div class="cell-center">${escapeHtml(statusText)}</div></td>
         <td>
           <div class="row-actions">
@@ -584,7 +691,7 @@ async function loadKeywords() {
 function renderAdKeywords(items) {
   if (!akTableBody) return;
   if (!Array.isArray(items) || !items.length) {
-    akTableBody.innerHTML = `<tr><td colspan="3">${escapeHtml(t("no_data", "No data"))}</td></tr>`;
+    akTableBody.innerHTML = `<tr><td colspan="4">${escapeHtml(t("no_data", "No data"))}</td></tr>`;
     return;
   }
 
@@ -592,8 +699,13 @@ function renderAdKeywords(items) {
     .map((item) => {
       const statusText = item.enabled ? t("switch_on", "on") : t("switch_off", "off");
       const toggleText = item.enabled ? t("disable", "Disable") : t("enable", "Enable");
+      const actionLabels = formatAdKeywordActions(item);
+      const actionHtml = actionLabels.length
+        ? actionLabels.map((label) => `<span class="ad-action-tag">${escapeHtml(label)}</span>`).join("")
+        : '<span class="ad-action-empty">&mdash;</span>';
       return `<tr>
         <td><div class="cell-keyword">${escapeHtml(item.keyword)}</div></td>
+        <td><div class="ad-action-list">${actionHtml}</div></td>
         <td><div class="cell-center">${escapeHtml(statusText)}</div></td>
         <td>
           <div class="row-actions">
@@ -1082,6 +1194,9 @@ function applyGroupSettings(chatIdValue) {
   if (gsJoinVerifyFailBanMinutes) gsJoinVerifyFailBanMinutes.value = String(Number(config.join_verify_fail_ban_minutes || 1440));
   if (gsAdBlockAction) gsAdBlockAction.value = config.ad_block_action || "mute";
   if (gsAdBlockDeleteMessage) gsAdBlockDeleteMessage.checked = config.ad_block_delete_message !== false;
+  if (gsAdBlockApplyToMentions) {
+    gsAdBlockApplyToMentions.checked = Boolean(config.ad_block_apply_to_mentions);
+  }
   if (gsAdBlockKickMinutes) gsAdBlockKickMinutes.value = String(Number(config.ad_block_kick_minutes || 1));
   if (gsAdBlockMuteMinutes) gsAdBlockMuteMinutes.value = String(Number(config.ad_block_mute_minutes || 30));
   if (gsAdBlockBanMinutes) gsAdBlockBanMinutes.value = String(Number(config.ad_block_ban_minutes || 1440));
@@ -1128,6 +1243,7 @@ async function saveGroupSettings() {
     join_verify_fail_ban_minutes: Number(gsJoinVerifyFailBanMinutes?.value || 1440),
     ad_block_action: gsAdBlockAction?.value || "mute",
     ad_block_delete_message: Boolean(gsAdBlockDeleteMessage?.checked),
+    ad_block_apply_to_mentions: Boolean(gsAdBlockApplyToMentions?.checked),
     ad_block_kick_minutes: Number(gsAdBlockKickMinutes?.value || 1),
     ad_block_mute_minutes: Number(gsAdBlockMuteMinutes?.value || 30),
     ad_block_ban_minutes: Number(gsAdBlockBanMinutes?.value || 1440),
@@ -1528,6 +1644,8 @@ kwModalClose?.addEventListener("click", () => closeModal(kwModal));
 kwModal?.addEventListener("click", (event) => {
   if (event.target === kwModal) closeModal(kwModal);
 });
+kwModalMuteUser?.addEventListener("change", () => syncKeywordActionFields("mute"));
+kwModalBanUser?.addEventListener("change", () => syncKeywordActionFields("ban"));
 
 kwModalSave?.addEventListener("click", async () => {
   const chatId = kwChatId?.value || "";
@@ -1535,15 +1653,31 @@ kwModalSave?.addEventListener("click", async () => {
     showStatus(t("select_group"), true);
     return;
   }
+  const muteMinutesRaw = (kwModalMuteMinutes?.value || "").trim();
+  const banMinutesRaw = (kwModalBanMinutes?.value || "").trim();
   const payload = {
     chat_id: Number(chatId),
     keyword: (kwModalKeyword?.value || "").trim(),
-    action: kwModalAction?.value || "delete",
-    mute_minutes: Number(kwModalMuteMinutes?.value || 10),
+    delete_message: Boolean(kwModalDeleteMessage?.checked),
+    mute_user: Boolean(kwModalMuteUser?.checked),
+    mute_minutes: Number(muteMinutesRaw || 10),
+    ban_user: Boolean(kwModalBanUser?.checked),
+    ban_minutes: Number(banMinutesRaw || 1440),
     enabled: Boolean(kwModalEnabled?.checked),
   };
   if (!payload.keyword) {
     showStatus(t("fill_required_fields"), true);
+    return;
+  }
+  if (!payload.delete_message && !payload.mute_user && !payload.ban_user) {
+    showStatus(t("keyword_actions_required"), true);
+    return;
+  }
+  if (
+    (payload.mute_user && (!muteMinutesRaw || !isValidModerationDuration(payload.mute_minutes))) ||
+    (payload.ban_user && (!banMinutesRaw || !isValidModerationDuration(payload.ban_minutes)))
+  ) {
+    showStatus(t("keyword_duration_invalid"), true);
     return;
   }
 
@@ -1555,8 +1689,11 @@ kwModalSave?.addEventListener("click", async () => {
   const bodyPayload = isEditing
     ? {
         keyword: payload.keyword,
-        action: payload.action,
+        delete_message: payload.delete_message,
+        mute_user: payload.mute_user,
         mute_minutes: payload.mute_minutes,
+        ban_user: payload.ban_user,
+        ban_minutes: payload.ban_minutes,
         enabled: payload.enabled,
       }
     : payload;
@@ -1632,9 +1769,14 @@ kwTableBody?.addEventListener("click", async (event) => {
     kwEditingKeywordId = found.id;
     if (kwModalTitle) kwModalTitle.textContent = t("keyword_update", "Update Keyword Rule");
     if (kwModalKeyword) kwModalKeyword.value = found.keyword || "";
-    if (kwModalAction) kwModalAction.value = found.action || "delete";
+    const actionState = keywordActionState(found);
+    if (kwModalDeleteMessage) kwModalDeleteMessage.checked = actionState.deleteMessage;
+    if (kwModalMuteUser) kwModalMuteUser.checked = actionState.muteUser;
+    if (kwModalBanUser) kwModalBanUser.checked = actionState.banUser;
     if (kwModalMuteMinutes) kwModalMuteMinutes.value = String(Number(found.mute_minutes || 10));
+    if (kwModalBanMinutes) kwModalBanMinutes.value = String(Number(found.ban_minutes || 1440));
     if (kwModalEnabled) kwModalEnabled.checked = Boolean(found.enabled);
+    syncKeywordActionFields(actionState.banUser ? "ban" : actionState.muteUser ? "mute" : "");
     openModal(kwModal);
   }
 });
@@ -1649,6 +1791,8 @@ akModalClose?.addEventListener("click", () => closeModal(akModal));
 akModal?.addEventListener("click", (event) => {
   if (event.target === akModal) closeModal(akModal);
 });
+akModalMuteUser?.addEventListener("change", () => syncAdKeywordActionFields("mute"));
+akModalBanUser?.addEventListener("change", () => syncAdKeywordActionFields("ban"));
 
 akModalSave?.addEventListener("click", async () => {
   const chatId = akChatId?.value || "";
@@ -1656,13 +1800,36 @@ akModalSave?.addEventListener("click", async () => {
     showStatus(t("select_group"), true);
     return;
   }
+  const muteMinutesRaw = (akModalMuteMinutes?.value || "").trim();
+  const banMinutesRaw = (akModalBanMinutes?.value || "").trim();
   const payload = {
     chat_id: Number(chatId),
     keyword: (akModalKeyword?.value || "").trim(),
+    delete_message: Boolean(akModalDeleteMessage?.checked),
+    mute_user: Boolean(akModalMuteUser?.checked),
+    mute_minutes: Number(muteMinutesRaw || 30),
+    ban_user: Boolean(akModalBanUser?.checked),
+    ban_minutes: Number(banMinutesRaw || 1440),
+    apply_to_mentions: Boolean(akModalApplyToMentions?.checked),
     enabled: Boolean(akModalEnabled?.checked),
   };
   if (!payload.keyword) {
     showStatus(t("fill_required_fields"), true);
+    return;
+  }
+  if (payload.apply_to_mentions && !payload.mute_user && !payload.ban_user) {
+    showStatus(t("ad_keyword_mentions_penalty_required"), true);
+    return;
+  }
+  if (!payload.delete_message && !payload.mute_user && !payload.ban_user) {
+    showStatus(t("ad_keyword_actions_required"), true);
+    return;
+  }
+  if (
+    (payload.mute_user && (!muteMinutesRaw || !isValidModerationDuration(payload.mute_minutes))) ||
+    (payload.ban_user && (!banMinutesRaw || !isValidModerationDuration(payload.ban_minutes)))
+  ) {
+    showStatus(t("ad_keyword_duration_invalid"), true);
     return;
   }
 
@@ -1671,7 +1838,18 @@ akModalSave?.addEventListener("click", async () => {
     ? `/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords/${encodeURIComponent(String(akEditingKeywordId))}`
     : `/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords`;
   const method = isEditing ? "PATCH" : "POST";
-  const bodyPayload = isEditing ? { keyword: payload.keyword, enabled: payload.enabled } : payload;
+  const bodyPayload = isEditing
+    ? {
+        keyword: payload.keyword,
+        delete_message: payload.delete_message,
+        mute_user: payload.mute_user,
+        mute_minutes: payload.mute_minutes,
+        ban_user: payload.ban_user,
+        ban_minutes: payload.ban_minutes,
+        apply_to_mentions: payload.apply_to_mentions,
+        enabled: payload.enabled,
+      }
+    : payload;
   const result = await requestJson(url, {
     method,
     headers: { "Content-Type": "application/json" },
@@ -1744,7 +1922,14 @@ akTableBody?.addEventListener("click", async (event) => {
     akEditingKeywordId = found.id;
     if (akModalTitle) akModalTitle.textContent = t("ad_keyword_update", "Update Ad Rule");
     if (akModalKeyword) akModalKeyword.value = found.keyword || "";
+    if (akModalDeleteMessage) akModalDeleteMessage.checked = found.delete_message !== false;
+    if (akModalMuteUser) akModalMuteUser.checked = Boolean(found.mute_user);
+    if (akModalBanUser) akModalBanUser.checked = Boolean(found.ban_user);
+    if (akModalApplyToMentions) akModalApplyToMentions.checked = Boolean(found.apply_to_mentions);
+    if (akModalMuteMinutes) akModalMuteMinutes.value = String(Number(found.mute_minutes || 30));
+    if (akModalBanMinutes) akModalBanMinutes.value = String(Number(found.ban_minutes || 1440));
     if (akModalEnabled) akModalEnabled.checked = Boolean(found.enabled);
+    syncAdKeywordActionFields(found.ban_user ? "ban" : found.mute_user ? "mute" : "");
     openModal(akModal);
   }
 });

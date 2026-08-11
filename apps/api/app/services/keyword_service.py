@@ -2,7 +2,28 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.app.models.entities import KeywordRule
-from apps.api.app.schemas.keyword import KeywordRuleCreate, KeywordRuleUpdate
+from apps.api.app.schemas.keyword import KeywordRuleCreate, KeywordRuleUpdate, validate_keyword_actions
+
+
+ACTION_FIELDS = {"delete_message", "mute_user", "ban_user"}
+
+
+def _apply_legacy_action(data: dict, fields_set: set[str]) -> None:
+    if "action" not in data or not ACTION_FIELDS.isdisjoint(fields_set):
+        return
+    action = data["action"]
+    data["delete_message"] = True
+    data["mute_user"] = action == "mute"
+    data["ban_user"] = action == "ban"
+
+
+def _sync_legacy_action(data: dict) -> None:
+    if data.get("ban_user"):
+        data["action"] = "ban"
+    elif data.get("mute_user"):
+        data["action"] = "mute"
+    else:
+        data["action"] = "delete"
 
 
 async def list_keywords(db: AsyncSession, chat_id: int) -> list[KeywordRule]:
@@ -13,7 +34,11 @@ async def list_keywords(db: AsyncSession, chat_id: int) -> list[KeywordRule]:
 
 
 async def create_keyword(db: AsyncSession, payload: KeywordRuleCreate) -> KeywordRule:
-    entity = KeywordRule(**payload.model_dump())
+    data = payload.model_dump()
+    _apply_legacy_action(data, payload.model_fields_set)
+    validate_keyword_actions(data["delete_message"], data["mute_user"], data["ban_user"])
+    _sync_legacy_action(data)
+    entity = KeywordRule(**data)
     db.add(entity)
     await db.commit()
     await db.refresh(entity)
@@ -30,7 +55,19 @@ async def update_keyword(
     if entity is None:
         return None
 
-    for key, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    _apply_legacy_action(updates, payload.model_fields_set)
+    merged = {
+        "delete_message": entity.delete_message,
+        "mute_user": entity.mute_user,
+        "ban_user": entity.ban_user,
+        **updates,
+    }
+    validate_keyword_actions(merged["delete_message"], merged["mute_user"], merged["ban_user"])
+    _sync_legacy_action(merged)
+    updates["action"] = merged["action"]
+
+    for key, value in updates.items():
         setattr(entity, key, value)
 
     await db.commit()
