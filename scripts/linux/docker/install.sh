@@ -25,8 +25,8 @@ DATABASE_URL=sqlite+aiosqlite:///./data/miyin.db
 
 WEB_HOST=0.0.0.0
 WEB_PORT=9800
-WEB_ADMIN_PASSWORD=admin
-WEB_AUTH_SECRET=change_me_to_a_long_random_string
+WEB_ADMIN_PASSWORD=
+WEB_AUTH_SECRET=
 WEB_TOKEN_EXPIRE_DAYS=10
 EOF
 }
@@ -90,10 +90,7 @@ fi
 
 ensure_env_example
 
-if [[ ! -f ".env" ]]; then
-  run_privileged cp .env.example .env
-  echo "[miyin] created .env, then set runtime bot/deepseek config in web admin"
-fi
+run_privileged bash "${APP_DIR}/scripts/linux/init_env.sh" "${APP_DIR}"
 
 run_privileged mkdir -p data logs
 run_privileged docker compose up -d --build

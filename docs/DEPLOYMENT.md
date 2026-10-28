@@ -2,11 +2,19 @@
 
 ## Docker (Single Container + SQLite)
 
-1. Edit `.env` (only web/db/base settings)
+1. Run `bash scripts/linux/init_env.sh .` to generate `.env` with random credentials, then edit web/db/base settings if needed
 2. Run `docker compose up -d --build`
 3. Open `http://<ip>:9800`
-4. Default admin password is `admin` (change it in dashboard after first login)
+4. Log in with the initial admin password printed when `.env` was generated
 5. Configure TG Bot and DeepSeek runtime parameters in dashboard
+
+Both one-click installers use the same credential generator. It creates a 64-character random signing secret and an independent random admin password, saves `.env` with permissions `600`, and never prints the signing secret. Existing `.env` files are preserved. Existing deployments must rotate default credentials separately; upgrading code alone does not replace them.
+
+## Docker Image Builds
+
+GitHub Actions runs tests and publishes `linux/amd64` and `linux/arm64` images to `ghcr.io/poouo/miyin_tg_bot` on pushes to `main`, version tag pushes, and manual workflow runs. Main builds publish `latest`, the version from `VERSION` (for example `1.0.04`), and a `sha-` tag. Version tag builds publish the version and `sha-` tags. The supplied Compose file continues to build from source.
+
+The Docker build context excludes `.env`, runtime data, databases, and Git metadata. Configure runtime credentials through `.env` and keep persistent data mounted at `/app/data`.
 
 ## Linux Local Deploy
 

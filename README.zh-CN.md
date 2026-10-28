@@ -1,9 +1,9 @@
 # Miyin TG 群组管理机器人
 
-当前版本：`V1.0.00`
+当前版本：`V1.0.04`
 
 默认 Web 语言：中文（可在后台切换英文）。
-默认后台密码：`admin`（登录后可在后台修改）。
+一键安装自动生成随机签名密钥和后台密码，初始密码显示在安装终端。已有 `.env` 不会覆盖，旧部署需单独更换默认密钥和密码。
 
 English readme: [README.en.md](./README.en.md)
 
@@ -26,10 +26,10 @@ English readme: [README.en.md](./README.en.md)
 
 ## 快速开始
 
-1. 复制环境变量文件
+1. 生成环境变量文件及随机后台凭据（已有 `.env` 会保留）
 
 ```bash
-cp .env.example .env
+bash scripts/linux/init_env.sh .
 ```
 
 2. 至少配置以下项

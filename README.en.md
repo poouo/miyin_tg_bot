@@ -1,9 +1,9 @@
 # Miyin TG Group Manager Bot
 
-Current version: `V1.0.00`
+Current version: `V1.0.04`
 
 Default Web language: Chinese (switchable to English in admin panel).
-Default admin password: `admin`.
+Installers generate a random signing secret and admin password, and display the initial password in the terminal. Existing `.env` files are preserved; rotate default credentials separately on existing deployments.
 
 Chinese readme: [README.md](./README.md)
 
@@ -26,10 +26,10 @@ Chinese readme: [README.md](./README.md)
 
 ## Quick Start
 
-1. Copy env file
+1. Generate the env file and random admin credentials (existing `.env` files are preserved)
 
 ```bash
-cp .env.example .env
+bash scripts/linux/init_env.sh .
 ```
 
 2. Configure web service items in `.env`:

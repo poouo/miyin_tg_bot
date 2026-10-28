@@ -148,8 +148,8 @@ DATABASE_URL=sqlite+aiosqlite:///./data/miyin.db
 
 WEB_HOST=0.0.0.0
 WEB_PORT=9800
-WEB_ADMIN_PASSWORD=admin
-WEB_AUTH_SECRET=change_me_to_a_long_random_string
+WEB_ADMIN_PASSWORD=
+WEB_AUTH_SECRET=
 WEB_TOKEN_EXPIRE_DAYS=10
 EOF
 }
@@ -186,9 +186,8 @@ if [[ ! -f "${APP_DIR}/.env" ]]; then
     echo "[miyin] .env.example missing, using built-in template"
     write_default_env_example
   fi
-  cp "${APP_DIR}/.env.example" "${APP_DIR}/.env"
-  echo "[miyin] created .env, then set runtime bot/deepseek config in web admin"
 fi
+bash "${APP_DIR}/scripts/linux/init_env.sh" "${APP_DIR}"
 
 start_app_nohup
 start_update_checker
