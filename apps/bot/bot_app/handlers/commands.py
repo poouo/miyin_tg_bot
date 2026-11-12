@@ -57,6 +57,7 @@ from apps.api.app.services.moderation.join_verification import (
     mark_challenge_passed,
 )
 from apps.api.app.services.runtime_config_service import get_runtime_config
+from apps.bot.bot_app.ai_access import AI_ALLOWED, AI_DENIED_TEXT, AI_DISABLED, check_ai_access
 from apps.bot.bot_app.ai_formatting import reply_ai_text
 from apps.bot.bot_app.moderation_actions import DEFAULT_KICK_MINUTES, ModerationActionConfig, apply_moderation_action
 from apps.bot.bot_app.state import deepseek_client
@@ -328,20 +329,21 @@ def resolve_moderation_target(message: Message, command: CommandObject) -> tuple
 async def ask_handler(message: Message, command: CommandObject) -> None:
     if await blocked_by_disable(message):
         return
-    question = (command.args or "").strip()
-    if not question:
-        await message.reply("Usage: /ask your question")
-        return
-
     chat = message.chat
     group = None
     async with SessionLocal() as db:
         if chat.type in {"group", "supergroup"}:
             await ensure_group(db, chat.id, chat.title or "")
             group = await get_group(db, chat.id)
-            if group and not group.deepseek_enabled:
-                await message.reply("AI is disabled in this group.")
-                return
+        runtime = await get_runtime_config(db)
+        access = await check_ai_access(message, group, runtime)
+        if access != AI_ALLOWED:
+            await message.reply(AI_DENIED_TEXT.get(access, AI_DENIED_TEXT[AI_DISABLED]))
+            return
+        question = (command.args or "").strip()
+        if not question:
+            await message.reply("Usage: /ask your question")
+            return
         answer = await deepseek_client.ask(question, db=db)
     sent = await reply_ai_text(message, answer)
     delete_after_seconds = int(getattr(group, "ai_reply_delete_after_seconds", 0) or 0)

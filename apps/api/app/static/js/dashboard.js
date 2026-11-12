@@ -99,6 +99,19 @@ const akModalEnabled = document.getElementById("ak-modal-enabled");
 const akModalSave = document.getElementById("ak-modal-save");
 const akModalCancel = document.getElementById("ak-modal-cancel");
 const akModalClose = document.getElementById("ak-modal-close");
+const aktOpen = document.getElementById("akt-open");
+const aktModal = document.getElementById("akt-modal");
+const aktModalClose = document.getElementById("akt-modal-close");
+const aktList = document.getElementById("akt-list");
+const aktDeleteMessage = document.getElementById("akt-delete-message");
+const aktMuteUser = document.getElementById("akt-mute-user");
+const aktBanUser = document.getElementById("akt-ban-user");
+const aktMuteMinutesField = document.getElementById("akt-mute-minutes-field");
+const aktMuteMinutes = document.getElementById("akt-mute-minutes");
+const aktBanMinutesField = document.getElementById("akt-ban-minutes-field");
+const aktBanMinutes = document.getElementById("akt-ban-minutes");
+const aktApply = document.getElementById("akt-apply");
+const aktCancel = document.getElementById("akt-cancel");
 
 const evChatId = document.getElementById("ev-chat-id");
 const evRefresh = document.getElementById("ev-refresh");
@@ -158,6 +171,7 @@ const gsAdBlock = document.getElementById("gs-ad-block");
 const gsAntiSpam = document.getElementById("gs-anti-spam");
 const gsAutoRecover = document.getElementById("gs-auto-recover");
 const gsAi = document.getElementById("gs-ai");
+const gsAiMember = document.getElementById("gs-ai-member");
 const gsAiReplyDeleteAfterSeconds = document.getElementById("gs-ai-reply-delete-after-seconds");
 const gsJoinVerifyFailAction = document.getElementById("gs-join-verify-fail-action");
 const gsJoinVerifyFailKickMinutes = document.getElementById("gs-join-verify-fail-kick-minutes");
@@ -1185,6 +1199,7 @@ function applyGroupSettings(chatIdValue) {
   if (gsAntiSpam) gsAntiSpam.checked = Boolean(config.anti_spam_enabled);
   if (gsAutoRecover) gsAutoRecover.checked = Boolean(config.auto_recover_enabled);
   if (gsAi) gsAi.checked = Boolean(config.deepseek_enabled);
+  if (gsAiMember) gsAiMember.checked = config.ai_member_enabled !== false;
   if (gsAiReplyDeleteAfterSeconds) {
     gsAiReplyDeleteAfterSeconds.value = String(Number(config.ai_reply_delete_after_seconds || 0));
   }
@@ -1236,6 +1251,7 @@ async function saveGroupSettings() {
     anti_spam_enabled: Boolean(gsAntiSpam?.checked),
     auto_recover_enabled: Boolean(gsAutoRecover?.checked),
     deepseek_enabled: Boolean(gsAi?.checked),
+    ai_member_enabled: Boolean(gsAiMember?.checked),
     ai_reply_delete_after_seconds: Number(gsAiReplyDeleteAfterSeconds?.value || 0),
     join_verify_fail_action: gsJoinVerifyFailAction?.value || "kick",
     join_verify_fail_kick_minutes: Number(gsJoinVerifyFailKickMinutes?.value || 1),
@@ -1866,6 +1882,138 @@ akModalSave?.addEventListener("click", async () => {
 
 akRefresh?.addEventListener("click", loadAdKeywords);
 akChatId?.addEventListener("change", loadAdKeywords);
+
+function syncAdTemplateActionFields(preferredPenalty = "") {
+  if (preferredPenalty === "mute" && aktMuteUser?.checked && aktBanUser) {
+    aktBanUser.checked = false;
+  } else if (preferredPenalty === "ban" && aktBanUser?.checked && aktMuteUser) {
+    aktMuteUser.checked = false;
+  } else if (aktMuteUser?.checked && aktBanUser?.checked) {
+    aktMuteUser.checked = false;
+  }
+
+  const muteEnabled = Boolean(aktMuteUser?.checked);
+  const banEnabled = Boolean(aktBanUser?.checked);
+  if (aktMuteMinutesField) aktMuteMinutesField.hidden = !muteEnabled;
+  if (aktMuteMinutes) aktMuteMinutes.disabled = !muteEnabled;
+  if (aktBanMinutesField) aktBanMinutesField.hidden = !banEnabled;
+  if (aktBanMinutes) aktBanMinutes.disabled = !banEnabled;
+}
+
+function resetAdTemplateModal() {
+  if (aktDeleteMessage) aktDeleteMessage.checked = true;
+  if (aktMuteUser) aktMuteUser.checked = false;
+  if (aktBanUser) aktBanUser.checked = false;
+  if (aktMuteMinutes) aktMuteMinutes.value = "30";
+  if (aktBanMinutes) aktBanMinutes.value = "1440";
+  syncAdTemplateActionFields();
+}
+
+async function loadAdTemplates() {
+  if (!aktList) return;
+  const chatId = akChatId?.value || "";
+  if (!chatId) {
+    aktList.innerHTML = "";
+    return;
+  }
+  const result = await requestJson(`/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords/templates`);
+  if (!result.ok || !Array.isArray(result.data)) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    aktList.innerHTML = "";
+    return;
+  }
+  aktList.innerHTML = result.data
+    .map((item) => {
+      const strict = item.risk === "strict";
+      const name = t(`ad_tpl_${item.id}_name`, item.id);
+      const desc = t(`ad_tpl_${item.id}_desc`, "");
+      const riskLabel = t(strict ? "ad_template_risk_strict" : "ad_template_risk_standard");
+      const imported =
+        item.imported_count > 0
+          ? ` · ${t("ad_template_imported")} ${item.imported_count}/${item.keyword_count}`
+          : "";
+      return `<label class="check-card check-card-detail">
+        <input type="checkbox" class="akt-template-check" value="${escapeHtml(item.id)}" />
+        <span class="check-card-copy">
+          <span>${escapeHtml(name)} <span class="ad-action-tag${strict ? " ad-template-strict" : ""}">${escapeHtml(riskLabel)}</span></span>
+          <small>${escapeHtml(desc)}</small>
+          <small>${item.keyword_count} ${escapeHtml(t("ad_template_words"))}${escapeHtml(imported)}</small>
+        </span>
+      </label>`;
+    })
+    .join("");
+}
+
+aktOpen?.addEventListener("click", async () => {
+  if (!akChatId?.value) {
+    showStatus(t("select_group"), true);
+    return;
+  }
+  resetAdTemplateModal();
+  openModal(aktModal);
+  await loadAdTemplates();
+});
+
+aktCancel?.addEventListener("click", () => closeModal(aktModal));
+aktModalClose?.addEventListener("click", () => closeModal(aktModal));
+aktModal?.addEventListener("click", (event) => {
+  if (event.target === aktModal) closeModal(aktModal);
+});
+aktMuteUser?.addEventListener("change", () => syncAdTemplateActionFields("mute"));
+aktBanUser?.addEventListener("change", () => syncAdTemplateActionFields("ban"));
+
+aktApply?.addEventListener("click", async () => {
+  const chatId = akChatId?.value || "";
+  if (!chatId) {
+    showStatus(t("select_group"), true);
+    return;
+  }
+  const templateIds = Array.from(aktList?.querySelectorAll(".akt-template-check:checked") || []).map((el) => el.value);
+  if (!templateIds.length) {
+    showStatus(t("ad_template_none_selected"), true);
+    return;
+  }
+  const muteMinutesRaw = (aktMuteMinutes?.value || "").trim();
+  const banMinutesRaw = (aktBanMinutes?.value || "").trim();
+  const payload = {
+    template_ids: templateIds,
+    delete_message: Boolean(aktDeleteMessage?.checked),
+    mute_user: Boolean(aktMuteUser?.checked),
+    mute_minutes: Number(muteMinutesRaw || 30),
+    ban_user: Boolean(aktBanUser?.checked),
+    ban_minutes: Number(banMinutesRaw || 1440),
+    apply_to_mentions: false,
+  };
+  if (!payload.delete_message && !payload.mute_user && !payload.ban_user) {
+    showStatus(t("ad_keyword_actions_required"), true);
+    return;
+  }
+  if (
+    (payload.mute_user && (!muteMinutesRaw || !isValidModerationDuration(payload.mute_minutes))) ||
+    (payload.ban_user && (!banMinutesRaw || !isValidModerationDuration(payload.ban_minutes)))
+  ) {
+    showStatus(t("ad_keyword_duration_invalid"), true);
+    return;
+  }
+
+  const result = await requestJson(`/api/v1/groups/${encodeURIComponent(chatId)}/ad-keywords/templates/apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
+    return;
+  }
+  closeModal(aktModal);
+  const summary = result.data || {};
+  showStatus(
+    `${t("ad_template_done")}: ${summary.added_keywords || 0} ${t("ad_template_added")} ` +
+      `(${summary.created_rules || 0} ${t("ad_template_rules")}), ${t("ad_template_skipped")} ${summary.skipped_keywords || 0}`,
+    false,
+  );
+  await loadAdKeywords();
+});
 
 akTableBody?.addEventListener("click", async (event) => {
   const target = event.target;

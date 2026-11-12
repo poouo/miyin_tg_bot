@@ -3645,6 +3645,75 @@ tbody tr:hover {
   grid-column: 1 / -1;
 }
 
+#akt-modal .modal-card {
+  width: min(680px, 100%);
+}
+
+#akt-modal .ad-keyword-modal-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+  margin-top: 14px;
+}
+
+#akt-modal .ad-action-fieldset {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+#akt-modal .ad-action-fieldset legend {
+  margin-bottom: 7px;
+  color: var(--card-foreground);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+#akt-modal .ad-action-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+#akt-modal .ad-action-options .check-card:has(input:checked),
+.ad-template-list .check-card:has(input:checked) {
+  border-color: color-mix(in srgb, var(--primary) 36%, var(--border));
+  background: color-mix(in srgb, var(--accent) 78%, var(--card));
+}
+
+#akt-modal .ad-action-duration[hidden] {
+  display: none;
+}
+
+.ad-template-hint {
+  margin: 0 0 12px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ad-template-list {
+  display: grid;
+  gap: 8px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.ad-template-list .ad-action-tag {
+  min-height: 20px;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.ad-template-list .ad-template-strict {
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, var(--card));
+}
+
 .check-card-detail {
   min-height: 58px;
   align-items: flex-start;
@@ -3673,6 +3742,8 @@ tbody tr:hover {
 
 @media (max-width: 720px) {
   #kw-modal .ad-action-options,
+  #akt-modal .ad-keyword-modal-grid,
+  #akt-modal .ad-action-options,
   #ak-modal .ad-keyword-modal-grid,
   #ak-modal .ad-action-options {
     grid-template-columns: 1fr;

@@ -81,6 +81,39 @@ class AdKeywordUpdate(BaseModel):
         return self
 
 
+class AdKeywordTemplateRead(BaseModel):
+    id: str
+    risk: str
+    keyword_count: int
+    imported_count: int
+
+
+class AdKeywordTemplateApply(BaseModel):
+    template_ids: list[str] = Field(min_length=1, max_length=20)
+    delete_message: bool = True
+    mute_user: bool = False
+    mute_minutes: int = Field(default=30, ge=1, le=10080)
+    ban_user: bool = False
+    ban_minutes: int = Field(default=1440, ge=1, le=10080)
+    apply_to_mentions: bool = False
+
+    @model_validator(mode="after")
+    def validate_actions(self) -> "AdKeywordTemplateApply":
+        validate_ad_keyword_actions(
+            self.delete_message,
+            self.mute_user,
+            self.ban_user,
+            self.apply_to_mentions,
+        )
+        return self
+
+
+class AdKeywordTemplateApplyResult(BaseModel):
+    created_rules: int
+    added_keywords: int
+    skipped_keywords: int
+
+
 class AdKeywordRead(AdKeywordBase):
     id: int
     chat_id: int

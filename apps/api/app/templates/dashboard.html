@@ -540,6 +540,7 @@
         </div>
         <div class="actions">
           <button id="ak-open-add" type="button" class="btn"><i class="ri-add-line" aria-hidden="true"></i>{{ t.ad_keyword_add }}</button>
+          <button id="akt-open" type="button" class="btn subtle"><i class="ri-stack-line" aria-hidden="true"></i>{{ t.ad_template_import }}</button>
           <button id="ak-refresh" type="button" class="btn subtle"><i class="ri-refresh-line" aria-hidden="true"></i>{{ t.refresh }}</button>
         </div>
         <div class="table-wrap">
@@ -939,6 +940,13 @@
           <label class="check-card"><input id="gs-anti-spam" type="checkbox" /> {{ t.anti_spam }}</label>
           <label class="check-card"><input id="gs-auto-recover" type="checkbox" /> {{ t.auto_recover }}</label>
           <label class="check-card"><input id="gs-ai" type="checkbox" /> {{ t.ai }}</label>
+          <label class="check-card check-card-detail">
+            <input id="gs-ai-member" type="checkbox" />
+            <span class="check-card-copy">
+              <span>{{ t.ai_member_enabled }}</span>
+              <small>{{ t.ai_member_enabled_hint }}</small>
+            </span>
+          </label>
           <label>
             {{ t.ai_reply_delete_after_seconds }}
             <input id="gs-ai-reply-delete-after-seconds" type="number" min="0" max="86400" value="0" />
@@ -1304,6 +1312,48 @@
       <div class="actions modal-actions">
         <button id="ak-modal-save" type="button" class="btn"><i class="ri-save-3-line" aria-hidden="true"></i>{{ t.save }}</button>
         <button id="ak-modal-cancel" type="button" class="btn subtle"><i class="ri-close-line" aria-hidden="true"></i>{{ t.cancel_edit }}</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="akt-modal" class="modal-backdrop" hidden>
+    <div class="modal-card glass-panel" role="dialog" aria-modal="true" aria-labelledby="akt-modal-title">
+      <div class="modal-head">
+        <h3 id="akt-modal-title">{{ t.ad_template_title }}</h3>
+        <button id="akt-modal-close" class="modal-close" type="button" aria-label="Close">&times;</button>
+      </div>
+      <p class="ad-template-hint">{{ t.ad_template_hint }}</p>
+      <div id="akt-list" class="ad-template-list"></div>
+      <div class="form-grid ad-keyword-modal-grid">
+        <fieldset class="ad-action-fieldset full-width">
+          <legend>{{ t.ad_keyword_actions }}</legend>
+          <div class="ad-action-options">
+            <label class="check-card">
+              <input id="akt-delete-message" type="checkbox" checked />
+              {{ t.action_delete }}
+            </label>
+            <label class="check-card">
+              <input id="akt-mute-user" type="checkbox" />
+              {{ t.action_mute }}
+            </label>
+            <label class="check-card">
+              <input id="akt-ban-user" type="checkbox" />
+              {{ t.action_ban }}
+            </label>
+          </div>
+        </fieldset>
+        <label id="akt-mute-minutes-field" class="ad-action-duration" hidden>
+          {{ t.policy_mute_minutes }}
+          <input id="akt-mute-minutes" type="number" min="1" max="10080" value="30" />
+        </label>
+        <label id="akt-ban-minutes-field" class="ad-action-duration" hidden>
+          {{ t.policy_ban_minutes }}
+          <input id="akt-ban-minutes" type="number" min="1" max="10080" value="1440" />
+        </label>
+      </div>
+      <div class="actions modal-actions">
+        <button id="akt-apply" type="button" class="btn"><i class="ri-download-2-line" aria-hidden="true"></i>{{ t.ad_template_apply }}</button>
+        <button id="akt-cancel" type="button" class="btn subtle"><i class="ri-close-line" aria-hidden="true"></i>{{ t.cancel_edit }}</button>
       </div>
     </div>
   </div>

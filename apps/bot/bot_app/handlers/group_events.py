@@ -1,9 +1,18 @@
 import asyncio
+import logging
 from datetime import datetime, timedelta, timezone
 from html import escape
 
 from aiogram import F, Router
-from aiogram.types import CallbackQuery, ChatMemberUpdated, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import (
+    BufferedInputFile,
+    CallbackQuery,
+    ChatMemberUpdated,
+    ChatPermissions,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
 
 from apps.api.app.core.db import SessionLocal
 from apps.api.app.services.chat_user_identity_service import (
@@ -28,6 +37,7 @@ from apps.api.app.services.moderation.auto_recover import get_active_ban_sanctio
 from apps.api.app.services.moderation.join_verification import (
     build_answer_options,
     challenge_failure_reason,
+    create_captcha_challenge,
     create_challenge,
     get_challenge,
     is_challenge_answer_correct,
@@ -36,6 +46,7 @@ from apps.api.app.services.moderation.join_verification import (
     set_challenge_message_id,
 )
 from apps.api.app.services.runtime_config_service import get_runtime_config
+from apps.bot.bot_app.ai_access import AI_ALLOWED, check_ai_access
 from apps.bot.bot_app.ai_formatting import reply_ai_text
 from apps.bot.bot_app.moderation_actions import ModerationActionConfig, apply_moderation_action
 from apps.bot.bot_app.state import deepseek_client, policy_engine
@@ -46,6 +57,7 @@ from apps.bot.bot_app.verification_notices import (
     send_verify_pass_notice,
 )
 
+logger = logging.getLogger(__name__)
 router = Router()
 MANAGER_ROLES = {"administrator", "creator"}
 LOG_MESSAGE_TEXT_LIMIT = 1000
@@ -490,23 +502,37 @@ async def new_member_handler(message: Message) -> None:
                 user_id=member.id,
                 permissions=ChatPermissions(can_send_messages=False),
             )
-            challenge = await create_challenge(db, chat.id, member.id)
-            options = build_answer_options(challenge.answer)
-            verify_message = await message.answer(
-                "\n".join(
-                    [
-                        "<b>入群验证</b>",
-                        f"欢迎 <b>{escape(member.full_name)}</b>",
-                        f"请在 <b>{runtime.join_verify_timeout_sec}</b> 秒内完成验证。",
-                        "",
-                        f"<code>{escape(challenge.question)}</code>",
-                        "",
-                        "请点击下方按钮选择答案。",
-                    ]
-                ),
-                parse_mode="HTML",
-                reply_markup=_build_verify_keyboard(member.id, options),
-            )
+            captcha_gif: bytes | None = None
+            try:
+                challenge, captcha_gif, options = await create_captcha_challenge(db, chat.id, member.id)
+            except Exception:
+                # e.g. Pillow missing after a manual upgrade: keep the group protected
+                # with the old math challenge instead of leaving the member stuck.
+                logger.exception("Captcha image generation failed, falling back to math challenge")
+                challenge = await create_challenge(db, chat.id, member.id)
+                options = build_answer_options(challenge.answer)
+            verify_lines = [
+                "<b>入群验证</b>",
+                f"欢迎 <b>{escape(member.full_name)}</b>",
+                f"请在 <b>{runtime.join_verify_timeout_sec}</b> 秒内完成验证。",
+                "",
+            ]
+            keyboard = _build_verify_keyboard(member.id, options)
+            if captcha_gif is not None:
+                verify_lines.append("请识别动图中的 4 个字母，并点击下方正确的选项。")
+                verify_message = await message.answer_animation(
+                    BufferedInputFile(captcha_gif, filename="captcha.gif"),
+                    caption="\n".join(verify_lines),
+                    parse_mode="HTML",
+                    reply_markup=keyboard,
+                )
+            else:
+                verify_lines.extend([f"<code>{escape(challenge.question)}</code>", "", "请点击下方按钮选择答案。"])
+                verify_message = await message.answer(
+                    "\n".join(verify_lines),
+                    parse_mode="HTML",
+                    reply_markup=keyboard,
+                )
             await set_challenge_message_id(db, chat.id, member.id, verify_message.message_id)
             await add_log(db, chat.id, member.id, member.username or "", "join_verify_created", challenge.question)
             await _send_log_channel(
@@ -900,7 +926,9 @@ async def group_text_handler(message: Message) -> None:
 
         bot_mention = runtime.telegram_bot_username.strip()
         has_mention = bool(bot_mention) and f"@{bot_mention.lower()}" in text.lower()
-        if group.deepseek_enabled and (has_mention or text.startswith("问:")):
+        wants_ai = has_mention or text.startswith("问:")
+        # Mentions / "问:" in normal chat are ignored silently when the sender may not use AI.
+        if wants_ai and await check_ai_access(message, group, runtime) == AI_ALLOWED:
             question = text.replace(f"@{bot_mention}", "").strip() if bot_mention else text.strip()
             if question.startswith("问:"):
                 question = question[2:].strip()

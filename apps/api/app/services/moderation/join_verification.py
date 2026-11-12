@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 from random import randint, shuffle
 
@@ -5,7 +6,16 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.app.models.entities import VerificationChallenge
+from apps.api.app.services.moderation.captcha_image import (
+    build_letter_options,
+    generate_captcha_text,
+    render_captcha_gif,
+)
 from apps.api.app.services.runtime_config_service import get_runtime_config
+
+# Stored in the `question` column for image challenges. The answer itself only
+# lives in the `answer` column, never in logs or messages.
+CAPTCHA_QUESTION = "图片验证码（4 个字母）"
 
 
 def _now() -> datetime:
@@ -18,6 +28,11 @@ def _as_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def _normalize_answer(value: str) -> str:
+    # letters are case-insensitive; digits (legacy math challenges) are unaffected
+    return value.strip().upper()
+
+
 def is_challenge_expired(challenge: VerificationChallenge) -> bool:
     return _as_utc(challenge.expires_at) < _now()
 
@@ -27,7 +42,7 @@ def is_challenge_answer_correct(challenge: VerificationChallenge | None, user_an
         return False
     if is_challenge_expired(challenge):
         return False
-    return challenge.answer.strip() == user_answer.strip()
+    return _normalize_answer(challenge.answer) == _normalize_answer(user_answer)
 
 
 def create_math_question() -> tuple[str, str]:
@@ -64,15 +79,38 @@ def challenge_failure_reason(challenge: VerificationChallenge | None, user_answe
         return "验证已处理"
     if is_challenge_expired(challenge):
         return "验证超时"
-    if challenge.answer.strip() != user_answer.strip():
+    if _normalize_answer(challenge.answer) != _normalize_answer(user_answer):
         return "答案错误"
     return "未通过验证"
 
 
-async def create_challenge(
+async def create_captcha_challenge(
     db: AsyncSession, chat_id: int, user_id: int, message_id: int = 0
+) -> tuple[VerificationChallenge, bytes, list[str]]:
+    """Create an animated-GIF letter challenge.
+
+    Returns (challenge entity, GIF bytes, four shuffled answer options).
+    Rendering is CPU bound, so it runs in a worker thread.
+    """
+    answer = generate_captcha_text()
+    gif_bytes = await asyncio.to_thread(render_captcha_gif, answer)
+    options = build_letter_options(answer)
+    challenge = await create_challenge(
+        db, chat_id, user_id, message_id, question=CAPTCHA_QUESTION, answer=answer
+    )
+    return challenge, gif_bytes, options
+
+
+async def create_challenge(
+    db: AsyncSession,
+    chat_id: int,
+    user_id: int,
+    message_id: int = 0,
+    question: str | None = None,
+    answer: str | None = None,
 ) -> VerificationChallenge:
-    question, answer = create_math_question()
+    if question is None or answer is None:
+        question, answer = create_math_question()
     runtime = await get_runtime_config(db)
     expires_at = _now() + timedelta(seconds=runtime.join_verify_timeout_sec)
 
