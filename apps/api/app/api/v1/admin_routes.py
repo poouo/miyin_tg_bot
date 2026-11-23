@@ -34,6 +34,7 @@ GROUP_FEATURE_FIELDS = (
     "anti_spam_enabled",
     "auto_recover_enabled",
     "deepseek_enabled",
+    "ai_ad_block_enabled",
 )
 
 
@@ -146,7 +147,7 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)) -> Respons
         "recent_logs": recent_logs,
         "overview_status": {
             "bot_configured": bool(runtime_config.telegram_bot_token),
-            "ai_configured": bool(runtime_config.deepseek_api_key),
+            "ai_configured": bool(runtime_config.ai_credentials.api_key),
             "version": _read_app_version(),
         },
         "security": security,

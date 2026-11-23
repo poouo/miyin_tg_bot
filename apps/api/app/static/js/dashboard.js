@@ -15,7 +15,7 @@ const btnCheck = document.getElementById("check-update");
 const btnTrigger = document.getElementById("trigger-update");
 const btnSaveSecurity = document.getElementById("save-security");
 const btnSaveRuntime = document.getElementById("save-runtime");
-const btnSaveDeepseek = document.getElementById("save-deepseek");
+const btnSaveAi = document.getElementById("save-ai");
 const btnSavePassword = document.getElementById("save-password");
 
 const loginBanEnabled = document.getElementById("login-ban-enabled");
@@ -32,7 +32,18 @@ const rtTelegramAdminIds = document.getElementById("rt-telegram-admin-ids");
 const rtDeepseekApiKey = document.getElementById("rt-deepseek-api-key");
 const rtDeepseekBaseUrl = document.getElementById("rt-deepseek-base-url");
 const rtDeepseekModel = document.getElementById("rt-deepseek-model");
-const rtDeepseekTimeoutSec = document.getElementById("rt-deepseek-timeout-sec");
+const rtOpencodeApiKey = document.getElementById("rt-opencode-api-key");
+const rtOpencodeBaseUrl = document.getElementById("rt-opencode-base-url");
+const rtOpencodeModel = document.getElementById("rt-opencode-model");
+const rtCustomApiKey = document.getElementById("rt-custom-api-key");
+const rtCustomBaseUrl = document.getElementById("rt-custom-base-url");
+const rtCustomModel = document.getElementById("rt-custom-model");
+const aiProviderRadios = Array.from(document.querySelectorAll('input[name="ai-provider"]'));
+const aiProviderPanels = Array.from(document.querySelectorAll("[data-provider-panel]"));
+const rtAiTimeoutSec = document.getElementById("rt-ai-timeout-sec");
+const rtAiTemperature = document.getElementById("rt-ai-temperature");
+const rtAiMaxTokens = document.getElementById("rt-ai-max-tokens");
+const rtAiSystemPrompt = document.getElementById("rt-ai-system-prompt");
 const rtJoinVerifyTimeoutSec = document.getElementById("rt-join-verify-timeout-sec");
 const rtSpamWindowSec = document.getElementById("rt-spam-window-sec");
 const rtSpamMaxMessages = document.getElementById("rt-spam-max-messages");
@@ -183,6 +194,15 @@ const gsAdBlockApplyToMentions = document.getElementById("gs-ad-block-apply-to-m
 const gsAdBlockKickMinutes = document.getElementById("gs-ad-block-kick-minutes");
 const gsAdBlockMuteMinutes = document.getElementById("gs-ad-block-mute-minutes");
 const gsAdBlockBanMinutes = document.getElementById("gs-ad-block-ban-minutes");
+const gsAiAdBlock = document.getElementById("gs-ai-ad-block");
+const gsAiAdBlockWindowSec = document.getElementById("gs-ai-ad-block-window-sec");
+const gsAiAdBlockHighConfidence = document.getElementById("gs-ai-ad-block-high-confidence");
+const gsAiAdBlockHighAction = document.getElementById("gs-ai-ad-block-high-action");
+const gsAiAdBlockMidConfidence = document.getElementById("gs-ai-ad-block-mid-confidence");
+const gsAiAdBlockMidAction = document.getElementById("gs-ai-ad-block-mid-action");
+const gsAiAdBlockMinConfidence = document.getElementById("gs-ai-ad-block-min-confidence");
+const gsAiAdBlockMinAction = document.getElementById("gs-ai-ad-block-min-action");
+const gsAiAdBlockPunishMentioner = document.getElementById("gs-ai-ad-block-punish-mentioner");
 const gsAntiSpamAction = document.getElementById("gs-anti-spam-action");
 const gsAntiSpamDeleteMessage = document.getElementById("gs-anti-spam-delete-message");
 const gsAntiSpamWindowSec = document.getElementById("gs-anti-spam-window-sec");
@@ -1215,6 +1235,17 @@ function applyGroupSettings(chatIdValue) {
   if (gsAdBlockKickMinutes) gsAdBlockKickMinutes.value = String(Number(config.ad_block_kick_minutes || 1));
   if (gsAdBlockMuteMinutes) gsAdBlockMuteMinutes.value = String(Number(config.ad_block_mute_minutes || 30));
   if (gsAdBlockBanMinutes) gsAdBlockBanMinutes.value = String(Number(config.ad_block_ban_minutes || 1440));
+  if (gsAiAdBlock) gsAiAdBlock.checked = Boolean(config.ai_ad_block_enabled);
+  if (gsAiAdBlockWindowSec) gsAiAdBlockWindowSec.value = String(Number(config.ai_ad_block_window_sec || 60));
+  if (gsAiAdBlockHighConfidence) gsAiAdBlockHighConfidence.value = String(Number(config.ai_ad_block_high_confidence ?? 90));
+  if (gsAiAdBlockHighAction) gsAiAdBlockHighAction.value = config.ai_ad_block_high_action || "ban";
+  if (gsAiAdBlockMidConfidence) gsAiAdBlockMidConfidence.value = String(Number(config.ai_ad_block_mid_confidence ?? 75));
+  if (gsAiAdBlockMidAction) gsAiAdBlockMidAction.value = config.ai_ad_block_mid_action || "mute";
+  if (gsAiAdBlockMinConfidence) gsAiAdBlockMinConfidence.value = String(Number(config.ai_ad_block_min_confidence ?? 60));
+  if (gsAiAdBlockMinAction) gsAiAdBlockMinAction.value = config.ai_ad_block_min_action || "warn";
+  if (gsAiAdBlockPunishMentioner) {
+    gsAiAdBlockPunishMentioner.checked = config.ai_ad_block_punish_mentioner !== false;
+  }
   if (gsAntiSpamAction) gsAntiSpamAction.value = config.anti_spam_action || "mute";
   if (gsAntiSpamDeleteMessage) gsAntiSpamDeleteMessage.checked = config.anti_spam_delete_message !== false;
   if (gsAntiSpamWindowSec) gsAntiSpamWindowSec.value = String(Number(config.anti_spam_window_sec || 10));
@@ -1263,6 +1294,15 @@ async function saveGroupSettings() {
     ad_block_kick_minutes: Number(gsAdBlockKickMinutes?.value || 1),
     ad_block_mute_minutes: Number(gsAdBlockMuteMinutes?.value || 30),
     ad_block_ban_minutes: Number(gsAdBlockBanMinutes?.value || 1440),
+    ai_ad_block_enabled: Boolean(gsAiAdBlock?.checked),
+    ai_ad_block_window_sec: Number(gsAiAdBlockWindowSec?.value || 60),
+    ai_ad_block_high_confidence: Number(gsAiAdBlockHighConfidence?.value ?? 90),
+    ai_ad_block_high_action: gsAiAdBlockHighAction?.value || "ban",
+    ai_ad_block_mid_confidence: Number(gsAiAdBlockMidConfidence?.value ?? 75),
+    ai_ad_block_mid_action: gsAiAdBlockMidAction?.value || "mute",
+    ai_ad_block_min_confidence: Number(gsAiAdBlockMinConfidence?.value ?? 60),
+    ai_ad_block_min_action: gsAiAdBlockMinAction?.value || "warn",
+    ai_ad_block_punish_mentioner: Boolean(gsAiAdBlockPunishMentioner?.checked),
     anti_spam_action: gsAntiSpamAction?.value || "mute",
     anti_spam_delete_message: Boolean(gsAntiSpamDeleteMessage?.checked),
     anti_spam_window_sec: Number(gsAntiSpamWindowSec?.value || 10),
@@ -1432,6 +1472,91 @@ btnTrigger?.addEventListener("click", async () => {
   await pollOnlineUpdateStatus();
 });
 
+function activeAiProvider() {
+  const checked = aiProviderRadios.find((radio) => radio.checked);
+  return checked ? checked.value : "deepseek";
+}
+
+function syncAiProviderPanels() {
+  const active = activeAiProvider();
+  aiProviderPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.providerPanel !== active;
+  });
+  aiProviderRadios.forEach((radio) => {
+    const option = radio.closest(".ai-provider-option");
+    if (option) option.classList.toggle("is-active", radio.checked);
+  });
+}
+
+function initAiProviderSwitch() {
+  aiProviderRadios.forEach((radio) => radio.addEventListener("change", syncAiProviderPanels));
+  syncAiProviderPanels();
+}
+
+const MODEL_PROVIDERS = ["deepseek", "opencode", "custom"];
+
+function modelField(provider, name) {
+  return document.getElementById(`rt-${provider}-${name}`);
+}
+
+async function fetchProviderModels(provider) {
+  const button = modelField(provider, "fetch-models");
+  const picker = modelField(provider, "model-picker");
+  const modelInput = modelField(provider, "model");
+  if (!button || !picker) return;
+
+  button.disabled = true;
+  const result = await requestJson("/api/v1/ai/models", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      provider,
+      api_key: modelField(provider, "api-key")?.value || "",
+      base_url: modelField(provider, "base-url")?.value || "",
+    }),
+  });
+  button.disabled = false;
+
+  if (!result.ok) {
+    showStatus(parseApiMessage(result.data) || t("ai_models_failed"), true);
+    return;
+  }
+
+  const models = Array.isArray(result.data?.models) ? result.data.models : [];
+  if (!models.length) {
+    picker.hidden = true;
+    showStatus(t("ai_models_empty"), true);
+    return;
+  }
+
+  picker.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = t("ai_select_model");
+  picker.appendChild(placeholder);
+  models.forEach((modelId) => {
+    const option = document.createElement("option");
+    option.value = modelId;
+    option.textContent = modelId;
+    picker.appendChild(option);
+  });
+  if (modelInput?.value && models.includes(modelInput.value)) picker.value = modelInput.value;
+  picker.hidden = false;
+  showStatus(`${t("ai_models_loaded")} (${models.length})`, false);
+}
+
+function initModelPickers() {
+  MODEL_PROVIDERS.forEach((provider) => {
+    const button = modelField(provider, "fetch-models");
+    const picker = modelField(provider, "model-picker");
+    const modelInput = modelField(provider, "model");
+    button?.addEventListener("click", () => fetchProviderModels(provider));
+    picker?.addEventListener("change", () => {
+      if (picker.value && modelInput) modelInput.value = picker.value;
+    });
+  });
+}
+
 function buildRuntimePayload() {
   return {
     telegram_bot_token: rtTelegramBotToken?.value || "",
@@ -1440,7 +1565,17 @@ function buildRuntimePayload() {
     deepseek_api_key: rtDeepseekApiKey?.value || "",
     deepseek_base_url: rtDeepseekBaseUrl?.value || "https://api.deepseek.com",
     deepseek_model: rtDeepseekModel?.value || "deepseek-chat",
-    deepseek_timeout_sec: Number(rtDeepseekTimeoutSec?.value || 30),
+    deepseek_timeout_sec: Number(rtAiTimeoutSec?.value || 30),
+    ai_provider: activeAiProvider(),
+    ai_temperature: Number(rtAiTemperature?.value ?? 0.3),
+    ai_max_tokens: Number(rtAiMaxTokens?.value || 0),
+    ai_system_prompt: rtAiSystemPrompt?.value || "",
+    opencode_api_key: rtOpencodeApiKey?.value || "",
+    opencode_base_url: rtOpencodeBaseUrl?.value || "",
+    opencode_model: rtOpencodeModel?.value || "",
+    custom_api_key: rtCustomApiKey?.value || "",
+    custom_base_url: rtCustomBaseUrl?.value || "",
+    custom_model: rtCustomModel?.value || "",
     join_verify_timeout_sec: Number(rtJoinVerifyTimeoutSec?.value || 180),
     spam_window_sec: Number(rtSpamWindowSec?.value || 10),
     spam_max_messages: Number(rtSpamMaxMessages?.value || 6),
@@ -1461,7 +1596,7 @@ async function saveRuntime() {
 }
 
 btnSaveRuntime?.addEventListener("click", saveRuntime);
-btnSaveDeepseek?.addEventListener("click", saveRuntime);
+btnSaveAi?.addEventListener("click", saveRuntime);
 
 btnSaveSecurity?.addEventListener("click", async () => {
   const payload = {
@@ -2199,5 +2334,8 @@ document.addEventListener("keydown", (event) => {
   if (akModal && !akModal.hidden) closeModal(akModal);
   if (arPreviewModal && !arPreviewModal.hidden) closeModal(arPreviewModal);
 });
+
+initAiProviderSwitch();
+initModelPickers();
 
 pollOnlineUpdateStatus();

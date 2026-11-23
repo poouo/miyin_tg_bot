@@ -16,7 +16,7 @@ from aiogram.utils.token import TokenValidationError, validate_token
 from apps.api.app.services.runtime_config_service import get_runtime_config
 from apps.bot.bot_app.handlers.commands import router as command_router
 from apps.bot.bot_app.handlers.group_events import router as group_router
-from apps.bot.bot_app.tasks import kick_unverified_task, recover_mute_task, rss_poll_task
+from apps.bot.bot_app.tasks import ai_ad_flush_task, kick_unverified_task, recover_mute_task, rss_poll_task
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +169,7 @@ class BotSupervisor:
         recover_task = asyncio.create_task(recover_mute_task(bot), name="recover-mute-task")
         kick_task = asyncio.create_task(kick_unverified_task(bot), name="kick-unverified-task")
         rss_task = asyncio.create_task(rss_poll_task(bot), name="rss-poll-task")
+        ai_ad_task = asyncio.create_task(ai_ad_flush_task(bot), name="ai-ad-flush-task")
         try:
             await setup_bot_commands(bot)
             await dp.start_polling(bot)
@@ -176,12 +177,15 @@ class BotSupervisor:
             recover_task.cancel()
             kick_task.cancel()
             rss_task.cancel()
+            ai_ad_task.cancel()
             with suppress(asyncio.CancelledError):
                 await recover_task
             with suppress(asyncio.CancelledError):
                 await kick_task
             with suppress(asyncio.CancelledError):
                 await rss_task
+            with suppress(asyncio.CancelledError):
+                await ai_ad_task
             await bot.session.close()
 
 

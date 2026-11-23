@@ -12,7 +12,8 @@
 
 - `group_service`: 群配置管理
 - `keyword_service`: 关键词规则
-- `deepseek_client`: DeepSeek 对接
+- `deepseek_client`: OpenAI 兼容 AI 对接（DeepSeek / OpenCode / 自定义，服务商在后台切换）
+- `ai_ad_guard`: AI 增强广告识别（按群窗口聚合消息，置信度分档处理；识别双号配合引流并连带处理 @ 发起人）
 - `moderation/policy.py`: 统一风控决策
 - `moderation/join_verification.py`: 入群验证
 - `moderation/anti_spam.py`: 防刷屏

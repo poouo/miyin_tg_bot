@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 ModerationAction = Literal["kick", "ban", "mute"]
+AIAdAction = Literal["delete", "warn", "kick", "ban", "mute"]
 
 
 class GroupConfigBase(BaseModel):
@@ -27,6 +28,15 @@ class GroupConfigBase(BaseModel):
     ad_block_kick_minutes: int = Field(default=1, ge=1, le=10080)
     ad_block_mute_minutes: int = Field(default=30, ge=1, le=10080)
     ad_block_ban_minutes: int = Field(default=1440, ge=1, le=10080)
+    ai_ad_block_enabled: bool = False
+    ai_ad_block_window_sec: int = Field(default=60, ge=1, le=60)
+    ai_ad_block_min_confidence: int = Field(default=60, ge=0, le=100)
+    ai_ad_block_min_action: AIAdAction = "warn"
+    ai_ad_block_punish_mentioner: bool = True
+    ai_ad_block_mid_confidence: int = Field(default=75, ge=0, le=100)
+    ai_ad_block_mid_action: AIAdAction = "mute"
+    ai_ad_block_high_confidence: int = Field(default=90, ge=0, le=100)
+    ai_ad_block_high_action: AIAdAction = "ban"
     anti_spam_action: ModerationAction = "mute"
     anti_spam_delete_message: bool = True
     anti_spam_window_sec: int = Field(default=10, ge=2, le=120)
@@ -61,6 +71,15 @@ class GroupConfigUpdate(BaseModel):
     ad_block_kick_minutes: int | None = Field(default=None, ge=1, le=10080)
     ad_block_mute_minutes: int | None = Field(default=None, ge=1, le=10080)
     ad_block_ban_minutes: int | None = Field(default=None, ge=1, le=10080)
+    ai_ad_block_enabled: bool | None = None
+    ai_ad_block_window_sec: int | None = Field(default=None, ge=1, le=60)
+    ai_ad_block_min_confidence: int | None = Field(default=None, ge=0, le=100)
+    ai_ad_block_min_action: AIAdAction | None = None
+    ai_ad_block_punish_mentioner: bool | None = None
+    ai_ad_block_mid_confidence: int | None = Field(default=None, ge=0, le=100)
+    ai_ad_block_mid_action: AIAdAction | None = None
+    ai_ad_block_high_confidence: int | None = Field(default=None, ge=0, le=100)
+    ai_ad_block_high_action: AIAdAction | None = None
     anti_spam_action: ModerationAction | None = None
     anti_spam_delete_message: bool | None = None
     anti_spam_window_sec: int | None = Field(default=None, ge=2, le=120)

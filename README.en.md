@@ -1,6 +1,6 @@
 # Miyin TG Group Manager Bot
 
-Current version: `V1.0.04`
+Current version: `V1.0.05`
 
 Default Web language: Chinese (switchable to English in admin panel).
 Installers generate a random signing secret and admin password, and display the initial password in the terminal. Existing `.env` files are preserved; rotate default credentials separately on existing deployments.
@@ -12,9 +12,12 @@ Chinese readme: [README.md](./README.md)
 - Join verification (challenge + timeout handling)
 - Keyword filtering (delete or mute)
 - Ad detection and block
+- AI ad detection (1-60s message batching with confidence tiers: delete / warn / mute / kick / ban)
+- Two-account spam bait detection: when a mentioned account posts an ad, the @-mention initiator is punished too
 - Anti-spam rate limit
 - Auto recovery (unmute after timeout)
-- DeepSeek API replies in groups
+- AI replies in groups (DeepSeek official / OpenCode / any OpenAI compatible API)
+- AI settings can fetch the endpoint model list and pick a model from a dropdown
 - Web admin panel (Chinese/English switch)
 - Password login for admin panel, token valid for 10 days
 - Admin password can be changed in dashboard
@@ -40,7 +43,7 @@ bash scripts/linux/init_env.sh .
 
 - `Bot Token`
 - `Bot Username`
-- `DeepSeek API Key`
+- `AI API Key` (choose DeepSeek / OpenCode / custom in the dashboard)
 
 4. Run locally
 

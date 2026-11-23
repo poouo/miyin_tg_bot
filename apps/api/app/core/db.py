@@ -64,6 +64,33 @@ async def _run_compat_migrations(conn: AsyncConnection) -> None:
             conn, "group_configs", "ad_block_ban_minutes", "INTEGER NOT NULL DEFAULT 1440"
         )
         await _add_sqlite_column_if_missing(
+            conn, "group_configs", "ai_ad_block_enabled", "BOOLEAN NOT NULL DEFAULT 0"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "group_configs", "ai_ad_block_window_sec", "INTEGER NOT NULL DEFAULT 60"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "group_configs", "ai_ad_block_min_confidence", "INTEGER NOT NULL DEFAULT 60"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "group_configs", "ai_ad_block_min_action", "VARCHAR(32) NOT NULL DEFAULT 'warn'"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "group_configs", "ai_ad_block_punish_mentioner", "BOOLEAN NOT NULL DEFAULT 1"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "group_configs", "ai_ad_block_mid_confidence", "INTEGER NOT NULL DEFAULT 75"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "group_configs", "ai_ad_block_mid_action", "VARCHAR(32) NOT NULL DEFAULT 'mute'"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "group_configs", "ai_ad_block_high_confidence", "INTEGER NOT NULL DEFAULT 90"
+        )
+        await _add_sqlite_column_if_missing(
+            conn, "group_configs", "ai_ad_block_high_action", "VARCHAR(32) NOT NULL DEFAULT 'ban'"
+        )
+        await _add_sqlite_column_if_missing(
             conn, "group_configs", "anti_spam_action", "VARCHAR(32) NOT NULL DEFAULT 'mute'"
         )
         await _add_sqlite_column_if_missing(
@@ -168,6 +195,33 @@ async def _run_compat_migrations(conn: AsyncConnection) -> None:
     )
     await _add_postgres_column_if_missing(
         conn, "group_configs", "ad_block_ban_minutes", "INTEGER NOT NULL DEFAULT 1440"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "group_configs", "ai_ad_block_enabled", "BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "group_configs", "ai_ad_block_window_sec", "INTEGER NOT NULL DEFAULT 60"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "group_configs", "ai_ad_block_min_confidence", "INTEGER NOT NULL DEFAULT 60"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "group_configs", "ai_ad_block_min_action", "VARCHAR(32) NOT NULL DEFAULT 'warn'"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "group_configs", "ai_ad_block_punish_mentioner", "BOOLEAN NOT NULL DEFAULT TRUE"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "group_configs", "ai_ad_block_mid_confidence", "INTEGER NOT NULL DEFAULT 75"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "group_configs", "ai_ad_block_mid_action", "VARCHAR(32) NOT NULL DEFAULT 'mute'"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "group_configs", "ai_ad_block_high_confidence", "INTEGER NOT NULL DEFAULT 90"
+    )
+    await _add_postgres_column_if_missing(
+        conn, "group_configs", "ai_ad_block_high_action", "VARCHAR(32) NOT NULL DEFAULT 'ban'"
     )
     await _add_postgres_column_if_missing(
         conn, "group_configs", "anti_spam_action", "VARCHAR(32) NOT NULL DEFAULT 'mute'"

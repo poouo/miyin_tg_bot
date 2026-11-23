@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="{{ lang }}">
 <head>
   <meta charset="UTF-8" />
@@ -286,11 +286,12 @@
                 <span class="{% if group.anti_spam_enabled %}is-on{% endif %}" role="img" title="{{ t.anti_spam }}" aria-label="{{ t.anti_spam }}: {{ t.switch_on if group.anti_spam_enabled else t.switch_off }}"><i class="ri-speed-up-line" aria-hidden="true"></i></span>
                 <span class="{% if group.auto_recover_enabled %}is-on{% endif %}" role="img" title="{{ t.auto_recover }}" aria-label="{{ t.auto_recover }}: {{ t.switch_on if group.auto_recover_enabled else t.switch_off }}"><i class="ri-message-2-line" aria-hidden="true"></i></span>
                 <span class="{% if group.deepseek_enabled %}is-on{% endif %}" role="img" title="{{ t.ai }}" aria-label="{{ t.ai }}: {{ t.switch_on if group.deepseek_enabled else t.switch_off }}"><i class="ri-sparkling-2-line" aria-hidden="true"></i></span>
+                <span class="{% if group.ai_ad_block_enabled %}is-on{% endif %}" role="img" title="{{ t.ai_ad_block }}" aria-label="{{ t.ai_ad_block }}: {{ t.switch_on if group.ai_ad_block_enabled else t.switch_off }}"><i class="ri-shield-star-line" aria-hidden="true"></i></span>
               </div>
               <div class="overview-coverage">
-                <span>{{ item.enabled_count }}/6 {{ t.overview_features_enabled }}</span>
-                <div role="progressbar" aria-valuemin="0" aria-valuemax="6" aria-valuenow="{{ item.enabled_count }}" aria-label="{{ t.overview_group_coverage }}">
-                  <span style="width: {{ item.enabled_count * 100 // 6 }}%"></span>
+                <span>{{ item.enabled_count }}/7 {{ t.overview_features_enabled }}</span>
+                <div role="progressbar" aria-valuemin="0" aria-valuemax="7" aria-valuenow="{{ item.enabled_count }}" aria-label="{{ t.overview_group_coverage }}">
+                  <span style="width: {{ item.enabled_count * 100 // 7 }}%"></span>
                 </div>
               </div>
             </div>
@@ -349,29 +350,119 @@
 
           <article class="glass-surface settings-block">
             <div class="settings-block-head">
-              <h4>{{ t.deepseek_title }}</h4>
-              <p>{{ t.deepseek_desc }}</p>
+              <h4>{{ t.ai_title }}</h4>
+              <p>{{ t.ai_desc }}</p>
+            </div>
+            <div class="ai-provider-switch" role="radiogroup" aria-label="{{ t.ai_provider }}">
+              <label class="ai-provider-option">
+                <input type="radio" name="ai-provider" value="deepseek" {% if runtime_config.ai_provider == "deepseek" %}checked{% endif %} />
+                <span>{{ t.ai_provider_deepseek }}</span>
+              </label>
+              <label class="ai-provider-option">
+                <input type="radio" name="ai-provider" value="opencode" {% if runtime_config.ai_provider == "opencode" %}checked{% endif %} />
+                <span>{{ t.ai_provider_opencode }}</span>
+              </label>
+              <label class="ai-provider-option">
+                <input type="radio" name="ai-provider" value="custom" {% if runtime_config.ai_provider == "custom" %}checked{% endif %} />
+                <span>{{ t.ai_provider_custom }}</span>
+              </label>
+            </div>
+
+            <div class="ai-provider-panel" data-provider-panel="deepseek" {% if runtime_config.ai_provider != "deepseek" %}hidden{% endif %}>
+              <div class="form-grid two-col">
+                <label>
+                  {{ t.ai_api_key }}
+                  <input id="rt-deepseek-api-key" type="password" value="{{ runtime_config.deepseek_api_key }}" autocomplete="off" placeholder="sk-..." />
+                </label>
+                <label>
+                  {{ t.ai_base_url }}
+                  <input id="rt-deepseek-base-url" type="text" value="{{ runtime_config.deepseek_base_url }}" placeholder="https://api.deepseek.com" />
+                </label>
+                <div class="field-block">
+                  <label for="rt-deepseek-model">{{ t.ai_model }}</label>
+                  <div class="model-picker-row">
+                    <input id="rt-deepseek-model" type="text" value="{{ runtime_config.deepseek_model }}" placeholder="deepseek-chat" />
+                    <button id="rt-deepseek-fetch-models" type="button" class="btn subtle model-fetch-btn" data-model-fetch="deepseek">
+                      <i class="ri-refresh-line" aria-hidden="true"></i>{{ t.ai_fetch_models }}
+                    </button>
+                  </div>
+                  <select id="rt-deepseek-model-picker" class="model-picker-select" aria-label="{{ t.ai_select_model }}" hidden></select>
+                </div>
+              </div>
+            </div>
+
+            <div class="ai-provider-panel" data-provider-panel="opencode" {% if runtime_config.ai_provider != "opencode" %}hidden{% endif %}>
+              <div class="form-grid two-col">
+                <label>
+                  {{ t.ai_api_key }}
+                  <input id="rt-opencode-api-key" type="password" value="{{ runtime_config.opencode_api_key }}" autocomplete="off" placeholder="sk-..." />
+                </label>
+                <label>
+                  {{ t.ai_base_url }}
+                  <input id="rt-opencode-base-url" type="text" value="{{ runtime_config.opencode_base_url }}" placeholder="https://opencode.ai/inference/openai/v1" />
+                </label>
+                <div class="field-block">
+                  <label for="rt-opencode-model">{{ t.ai_model }}</label>
+                  <div class="model-picker-row">
+                    <input id="rt-opencode-model" type="text" value="{{ runtime_config.opencode_model }}" placeholder="deepseek-v4.1-flash" />
+                    <button id="rt-opencode-fetch-models" type="button" class="btn subtle model-fetch-btn" data-model-fetch="opencode">
+                      <i class="ri-refresh-line" aria-hidden="true"></i>{{ t.ai_fetch_models }}
+                    </button>
+                  </div>
+                  <select id="rt-opencode-model-picker" class="model-picker-select" aria-label="{{ t.ai_select_model }}" hidden></select>
+                </div>
+              </div>
+              <p class="settings-hint">{{ t.ai_opencode_hint }}</p>
+            </div>
+
+            <div class="ai-provider-panel" data-provider-panel="custom" {% if runtime_config.ai_provider != "custom" %}hidden{% endif %}>
+              <div class="form-grid two-col">
+                <label>
+                  {{ t.ai_api_key }}
+                  <input id="rt-custom-api-key" type="password" value="{{ runtime_config.custom_api_key }}" autocomplete="off" />
+                </label>
+                <label>
+                  {{ t.ai_base_url }}
+                  <input id="rt-custom-base-url" type="text" value="{{ runtime_config.custom_base_url }}" placeholder="https://your-endpoint/v1" />
+                </label>
+                <div class="field-block">
+                  <label for="rt-custom-model">{{ t.ai_model }}</label>
+                  <div class="model-picker-row">
+                    <input id="rt-custom-model" type="text" value="{{ runtime_config.custom_model }}" placeholder="model-id" />
+                    <button id="rt-custom-fetch-models" type="button" class="btn subtle model-fetch-btn" data-model-fetch="custom">
+                      <i class="ri-refresh-line" aria-hidden="true"></i>{{ t.ai_fetch_models }}
+                    </button>
+                  </div>
+                  <select id="rt-custom-model-picker" class="model-picker-select" aria-label="{{ t.ai_select_model }}" hidden></select>
+                </div>
+              </div>
+              <p class="settings-hint">{{ t.ai_custom_hint }}</p>
+            </div>
+
+            <div class="settings-divider"></div>
+            <div class="settings-block-head">
+              <h4>{{ t.ai_general_title }}</h4>
             </div>
             <div class="form-grid two-col">
               <label>
-                {{ t.runtime_deepseek_key }}
-                <input id="rt-deepseek-api-key" type="password" value="{{ runtime_config.deepseek_api_key }}" autocomplete="off" />
+                {{ t.ai_timeout }}
+                <input id="rt-ai-timeout-sec" type="number" min="3" max="120" value="{{ runtime_config.deepseek_timeout_sec }}" />
               </label>
               <label>
-                {{ t.runtime_deepseek_base }}
-                <input id="rt-deepseek-base-url" type="text" value="{{ runtime_config.deepseek_base_url }}" />
+                {{ t.ai_temperature }}
+                <input id="rt-ai-temperature" type="number" min="0" max="2" step="0.1" value="{{ runtime_config.ai_temperature }}" />
               </label>
               <label>
-                {{ t.runtime_deepseek_model }}
-                <input id="rt-deepseek-model" type="text" value="{{ runtime_config.deepseek_model }}" />
+                {{ t.ai_max_tokens }}
+                <input id="rt-ai-max-tokens" type="number" min="0" max="32000" step="1" value="{{ runtime_config.ai_max_tokens }}" />
               </label>
-              <label>
-                {{ t.runtime_deepseek_timeout }}
-                <input id="rt-deepseek-timeout-sec" type="number" min="3" max="120" value="{{ runtime_config.deepseek_timeout_sec }}" />
+              <label class="full-width">
+                {{ t.ai_system_prompt }}
+                <textarea id="rt-ai-system-prompt" rows="3">{{ runtime_config.ai_system_prompt }}</textarea>
               </label>
             </div>
             <div class="actions">
-              <button id="save-deepseek" type="button" class="btn"><i class="ri-save-3-line" aria-hidden="true"></i>{{ t.deepseek_save }}</button>
+              <button id="save-ai" type="button" class="btn"><i class="ri-save-3-line" aria-hidden="true"></i>{{ t.ai_save }}</button>
             </div>
           </article>
 
@@ -620,6 +711,7 @@
             <select id="log-event-type">
               <option value="">{{ t.all_events }}</option>
               <option value="message_blocked">{{ t.event_message_blocked }}</option>
+              <option value="ai_ad_block">{{ t.event_ai_ad_block }}</option>
               <option value="lock_deleted">{{ t.event_lock_deleted }}</option>
               <option value="global_ban_enforced">{{ t.event_global_ban_enforced }}</option>
               <option value="auto_reply_triggered">{{ t.event_auto_reply_triggered }}</option>
@@ -1018,6 +1110,75 @@
               <label>
                 {{ t.policy_ban_minutes }}
                 <input id="gs-ad-block-ban-minutes" type="number" min="1" max="10080" value="1440" />
+              </label>
+            </div>
+          </article>
+
+          <article class="policy-card">
+            <div class="policy-card-head">
+              <h4>{{ t.policy_ai_ad_block_title }}</h4>
+              <p>{{ t.policy_ai_ad_block_desc }}</p>
+            </div>
+            <div class="form-grid two-col policy-form">
+              <label class="check-card check-card-detail full-width">
+                <input id="gs-ai-ad-block" type="checkbox" />
+                <span class="check-card-copy">
+                  <span>{{ t.policy_ai_ad_block_enable }}</span>
+                </span>
+              </label>
+              <label>
+                {{ t.policy_ai_ad_block_window }}
+                <input id="gs-ai-ad-block-window-sec" type="number" min="1" max="60" value="60" />
+              </label>
+              <span></span>
+              <label>
+                {{ t.policy_ai_ad_block_tier_high }}
+                <input id="gs-ai-ad-block-high-confidence" type="number" min="0" max="100" value="90" />
+              </label>
+              <label>
+                {{ t.policy_action }}
+                <select id="gs-ai-ad-block-high-action">
+                  <option value="delete">{{ t.ai_ad_action_delete }}</option>
+                  <option value="warn">{{ t.ai_ad_action_warn }}</option>
+                  <option value="mute">{{ t.action_mute }}</option>
+                  <option value="kick">{{ t.action_kick }}</option>
+                  <option value="ban">{{ t.action_ban }}</option>
+                </select>
+              </label>
+              <label>
+                {{ t.policy_ai_ad_block_tier_mid }}
+                <input id="gs-ai-ad-block-mid-confidence" type="number" min="0" max="100" value="75" />
+              </label>
+              <label>
+                {{ t.policy_action }}
+                <select id="gs-ai-ad-block-mid-action">
+                  <option value="delete">{{ t.ai_ad_action_delete }}</option>
+                  <option value="warn">{{ t.ai_ad_action_warn }}</option>
+                  <option value="mute">{{ t.action_mute }}</option>
+                  <option value="kick">{{ t.action_kick }}</option>
+                  <option value="ban">{{ t.action_ban }}</option>
+                </select>
+              </label>
+              <label>
+                {{ t.policy_ai_ad_block_tier_min }}
+                <input id="gs-ai-ad-block-min-confidence" type="number" min="0" max="100" value="60" />
+              </label>
+              <label>
+                {{ t.policy_action }}
+                <select id="gs-ai-ad-block-min-action">
+                  <option value="delete">{{ t.ai_ad_action_delete }}</option>
+                  <option value="warn">{{ t.ai_ad_action_warn }}</option>
+                  <option value="mute">{{ t.action_mute }}</option>
+                  <option value="kick">{{ t.action_kick }}</option>
+                  <option value="ban">{{ t.action_ban }}</option>
+                </select>
+              </label>
+              <label class="check-card check-card-detail full-width">
+                <input id="gs-ai-ad-block-punish-mentioner" type="checkbox" checked />
+                <span class="check-card-copy">
+                  <span>{{ t.ai_ad_block_punish_mentioner }}</span>
+                  <small>{{ t.ai_ad_block_punish_mentioner_hint }}</small>
+                </span>
               </label>
             </div>
           </article>

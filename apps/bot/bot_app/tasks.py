@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import xml.etree.ElementTree as ET
 
 from aiogram import Bot
@@ -7,12 +8,15 @@ import httpx
 
 from apps.api.app.core.db import SessionLocal
 from apps.api.app.services.community_feature_service import list_all_rss_subscriptions, update_rss_last_entry
-from apps.api.app.services.group_service import ensure_group
+from apps.api.app.services.group_service import ensure_group, get_group
 from apps.api.app.services.log_service import add_log
 from apps.api.app.services.moderation.auto_recover import list_recoverable_sanctions, mark_recovered
 from apps.api.app.services.moderation.join_verification import list_expired_unpassed
+from apps.bot.bot_app.ai_ad_guard import ai_ad_guard, handle_ai_ad_batch
 from apps.bot.bot_app.moderation_actions import ModerationActionConfig, apply_moderation_action
 from apps.bot.bot_app.verification_notices import send_verify_fail_notice
+
+logger = logging.getLogger(__name__)
 
 
 def _xml_text(node: ET.Element, names: list[str]) -> str:
@@ -169,3 +173,28 @@ async def rss_poll_task(bot: Bot) -> None:
         except Exception:
             pass
         await asyncio.sleep(300)
+
+
+async def flush_ai_ad_batches(bot: Bot) -> int:
+    """Handle every buffered batch whose window expired; returns flagged messages."""
+    handled = 0
+    for chat_id, batch in ai_ad_guard.take_ready():
+        try:
+            async with SessionLocal() as db:
+                group = await get_group(db, chat_id)
+                if group is None or not group.ai_ad_block_enabled:
+                    continue
+                handled += await handle_ai_ad_batch(bot, db, group, batch)
+        except Exception:
+            logger.warning("AI ad batch handling failed for chat %s", chat_id, exc_info=True)
+    return handled
+
+
+async def ai_ad_flush_task(bot: Bot) -> None:
+    """Flush AI ad detection batches once their per-group window expires."""
+    while True:
+        try:
+            await flush_ai_ad_batches(bot)
+        except Exception:
+            logger.warning("AI ad flush loop error", exc_info=True)
+        await asyncio.sleep(1)

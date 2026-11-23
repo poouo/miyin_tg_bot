@@ -6,7 +6,7 @@
 2. Run `docker compose up -d --build`
 3. Open `http://<ip>:9800`
 4. Log in with the initial admin password printed when `.env` was generated
-5. Configure TG Bot and DeepSeek runtime parameters in dashboard
+5. Configure TG Bot and AI provider (DeepSeek / OpenCode / custom) parameters in dashboard
 
 Both one-click installers use the same credential generator. It creates a 64-character random signing secret and an independent random admin password, saves `.env` with permissions `600`, and never prints the signing secret. Existing `.env` files are preserved. Existing deployments must rotate default credentials separately; upgrading code alone does not replace them.
 

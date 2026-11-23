@@ -47,6 +47,7 @@ from apps.api.app.services.moderation.join_verification import (
 )
 from apps.api.app.services.runtime_config_service import get_runtime_config
 from apps.bot.bot_app.ai_access import AI_ALLOWED, check_ai_access
+from apps.bot.bot_app.ai_ad_guard import ai_ad_guard
 from apps.bot.bot_app.ai_formatting import reply_ai_text
 from apps.bot.bot_app.moderation_actions import ModerationActionConfig, apply_moderation_action
 from apps.bot.bot_app.state import deepseek_client, policy_engine
@@ -890,6 +891,13 @@ async def group_text_handler(message: Message) -> None:
             await add_log(db, chat.id, user.id, user.username or "", "message_blocked", _log_message_detail(reason, text))
             return
 
+        bot_mention = runtime.telegram_bot_username.strip()
+        has_mention = bool(bot_mention) and f"@{bot_mention.lower()}" in text.lower()
+        wants_ai = has_mention or text.startswith("问:")
+        # Normal chat is buffered so AI ad detection can judge a whole window at once.
+        if group.ai_ad_block_enabled and not is_manager and not wants_ai:
+            ai_ad_guard.offer(message, int(getattr(group, "ai_ad_block_window_sec", 60) or 60))
+
         if group.auto_recover_enabled:
             auto_reply = await match_auto_reply(db, chat.id, text)
             if auto_reply:
@@ -924,9 +932,6 @@ async def group_text_handler(message: Message) -> None:
                     )
                 return
 
-        bot_mention = runtime.telegram_bot_username.strip()
-        has_mention = bool(bot_mention) and f"@{bot_mention.lower()}" in text.lower()
-        wants_ai = has_mention or text.startswith("问:")
         # Mentions / "问:" in normal chat are ignored silently when the sender may not use AI.
         if wants_ai and await check_ai_access(message, group, runtime) == AI_ALLOWED:
             question = text.replace(f"@{bot_mention}", "").strip() if bot_mention else text.strip()
