@@ -33,6 +33,8 @@ class GroupConfigBase(BaseModel):
     ai_ad_block_min_confidence: int = Field(default=60, ge=0, le=100)
     ai_ad_block_min_action: AIAdAction = "warn"
     ai_ad_block_punish_mentioner: bool = True
+    ai_ad_block_mentioner_warning_limit: int = Field(default=3, ge=1, le=10)
+    ai_ad_block_mentioner_action: ModerationAction = "mute"
     ai_ad_block_mid_confidence: int = Field(default=75, ge=0, le=100)
     ai_ad_block_mid_action: AIAdAction = "mute"
     ai_ad_block_high_confidence: int = Field(default=90, ge=0, le=100)
@@ -76,6 +78,8 @@ class GroupConfigUpdate(BaseModel):
     ai_ad_block_min_confidence: int | None = Field(default=None, ge=0, le=100)
     ai_ad_block_min_action: AIAdAction | None = None
     ai_ad_block_punish_mentioner: bool | None = None
+    ai_ad_block_mentioner_warning_limit: int | None = Field(default=None, ge=1, le=10)
+    ai_ad_block_mentioner_action: ModerationAction | None = None
     ai_ad_block_mid_confidence: int | None = Field(default=None, ge=0, le=100)
     ai_ad_block_mid_action: AIAdAction | None = None
     ai_ad_block_high_confidence: int | None = Field(default=None, ge=0, le=100)

@@ -36,6 +36,8 @@ class GroupConfig(Base, TimestampMixin):
     ai_ad_block_min_confidence: Mapped[int] = mapped_column(Integer, default=60)
     ai_ad_block_min_action: Mapped[str] = mapped_column(String(32), default="warn")
     ai_ad_block_punish_mentioner: Mapped[bool] = mapped_column(Boolean, default=True)
+    ai_ad_block_mentioner_warning_limit: Mapped[int] = mapped_column(Integer, default=3)
+    ai_ad_block_mentioner_action: Mapped[str] = mapped_column(String(32), default="mute")
     ai_ad_block_mid_confidence: Mapped[int] = mapped_column(Integer, default=75)
     ai_ad_block_mid_action: Mapped[str] = mapped_column(String(32), default="mute")
     ai_ad_block_high_confidence: Mapped[int] = mapped_column(Integer, default=90)

@@ -1232,8 +1232,19 @@ MIYIN_BUILD_REVISION="$revision" MIYIN_BUILD_BRANCH="$branch" docker compose up 
                 <input id="gs-ai-ad-block-punish-mentioner" type="checkbox" checked />
                 <span class="check-card-copy">
                   <span>{{ t.ai_ad_block_punish_mentioner }}</span>
-                  <small>{{ t.ai_ad_block_punish_mentioner_hint }}</small>
                 </span>
+              </label>
+              <label>
+                {{ t.ai_ad_block_mentioner_limit }}
+                <input id="gs-ai-ad-block-mentioner-warning-limit" type="number" min="1" max="10" value="3" />
+              </label>
+              <label>
+                {{ t.ai_ad_block_mentioner_action }}
+                <select id="gs-ai-ad-block-mentioner-action">
+                  <option value="mute">{{ t.action_mute }}</option>
+                  <option value="kick">{{ t.action_kick }}</option>
+                  <option value="ban">{{ t.action_ban }}</option>
+                </select>
               </label>
             </div>
           </article>

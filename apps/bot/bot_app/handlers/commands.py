@@ -60,6 +60,7 @@ from apps.api.app.services.moderation.join_verification import (
     mark_challenge_passed,
 )
 from apps.api.app.services.runtime_config_service import get_runtime_config
+from apps.api.app.services.deepseek_client import AICompletionError
 from apps.bot.bot_app.ai_access import AI_ALLOWED, AI_DENIED_TEXT, AI_DISABLED, check_ai_access, is_group_admin
 from apps.bot.bot_app.ai_ad_guard import ai_ad_guard, review_group_ai_reply
 from apps.bot.bot_app.ai_formatting import reply_ai_text
@@ -356,7 +357,11 @@ async def ask_handler(message: Message, command: CommandObject) -> None:
         if not question:
             await message.reply("Usage: /ask your question")
             return
-        answer = await deepseek_client.ask(question, db=db)
+        try:
+            answer = await deepseek_client.complete(question, db=db, mode="chat")
+        except AICompletionError as exc:
+            await message.reply(str(exc))
+            return
         answer = await review_group_ai_reply(message, db, group, question, answer)
         if answer is None:
             return

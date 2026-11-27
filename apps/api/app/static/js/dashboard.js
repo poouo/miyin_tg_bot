@@ -194,6 +194,8 @@ const gsAiAdBlockMidAction = document.getElementById("gs-ai-ad-block-mid-action"
 const gsAiAdBlockMinConfidence = document.getElementById("gs-ai-ad-block-min-confidence");
 const gsAiAdBlockMinAction = document.getElementById("gs-ai-ad-block-min-action");
 const gsAiAdBlockPunishMentioner = document.getElementById("gs-ai-ad-block-punish-mentioner");
+const gsAiAdBlockMentionerWarningLimit = document.getElementById("gs-ai-ad-block-mentioner-warning-limit");
+const gsAiAdBlockMentionerAction = document.getElementById("gs-ai-ad-block-mentioner-action");
 const gsAntiSpamAction = document.getElementById("gs-anti-spam-action");
 const gsAntiSpamDeleteMessage = document.getElementById("gs-anti-spam-delete-message");
 const gsAntiSpamWindowSec = document.getElementById("gs-anti-spam-window-sec");
@@ -211,6 +213,7 @@ const i18n = i18nEl ? JSON.parse(i18nEl.textContent || "{}") : {};
 const ACTIVE_SECTION_KEY = "miyin.dashboard.activeSection";
 const THEME_KEY = "miyin.dashboard.theme.v2";
 const COMMUNITY_CHAT_KEY = "miyin.dashboard.communityChatId";
+const AI_MODEL_CACHE_KEY = "miyin.dashboard.aiModels.v1";
 let actionStatusTimer = null;
 let arEditingRuleId = null;
 let kwEditingKeywordId = null;
@@ -1354,6 +1357,12 @@ function applyGroupSettings(chatIdValue) {
   if (gsAiAdBlockPunishMentioner) {
     gsAiAdBlockPunishMentioner.checked = config.ai_ad_block_punish_mentioner !== false;
   }
+  if (gsAiAdBlockMentionerWarningLimit) {
+    gsAiAdBlockMentionerWarningLimit.value = String(Number(config.ai_ad_block_mentioner_warning_limit ?? 3));
+  }
+  if (gsAiAdBlockMentionerAction) {
+    gsAiAdBlockMentionerAction.value = config.ai_ad_block_mentioner_action || "mute";
+  }
   if (gsAntiSpamAction) gsAntiSpamAction.value = config.anti_spam_action || "mute";
   if (gsAntiSpamDeleteMessage) gsAntiSpamDeleteMessage.checked = config.anti_spam_delete_message !== false;
   if (gsAntiSpamWindowSec) gsAntiSpamWindowSec.value = String(Number(config.anti_spam_window_sec || 10));
@@ -1437,6 +1446,8 @@ async function saveGroupSettings() {
     ai_ad_block_min_confidence: Number(gsAiAdBlockMinConfidence?.value ?? 60),
     ai_ad_block_min_action: gsAiAdBlockMinAction?.value || "warn",
     ai_ad_block_punish_mentioner: Boolean(gsAiAdBlockPunishMentioner?.checked),
+    ai_ad_block_mentioner_warning_limit: Number(gsAiAdBlockMentionerWarningLimit?.value || 3),
+    ai_ad_block_mentioner_action: gsAiAdBlockMentionerAction?.value || "mute",
     anti_spam_action: gsAntiSpamAction?.value || "mute",
     anti_spam_delete_message: Boolean(gsAntiSpamDeleteMessage?.checked),
     anti_spam_window_sec: Number(gsAntiSpamWindowSec?.value || 10),
@@ -1659,6 +1670,27 @@ function initAiProviderSwitch() {
 
 const modelControls = new Map();
 
+function readAiModelCache() {
+  try {
+    const value = JSON.parse(localStorage.getItem(AI_MODEL_CACHE_KEY) || "{}");
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeAiModelCache(cache) {
+  try {
+    localStorage.setItem(AI_MODEL_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // Private browsing and storage limits should not block the settings form.
+  }
+}
+
+function modelCacheKey(provider, baseUrl) {
+  return `${provider}|${providerBaseUrl(provider, baseUrl)}`;
+}
+
 function modelField(provider, name) {
   return document.getElementById(`rt-${provider}-${name}`);
 }
@@ -1681,6 +1713,8 @@ function initModelPickers() {
     const baseUrl = modelField(provider, "base-url");
     modelControls.set(provider, { picker, input, toggle, saved, apiKey, baseUrl });
     let request = null;
+    let cache = readAiModelCache();
+    let cacheEntry = cache[modelCacheKey(provider, baseUrl.value)];
 
     function setFeedback(text, isError = false) {
       feedback.textContent = text;
@@ -1693,16 +1727,50 @@ function initModelPickers() {
       picker.disabled = toggle.checked || picker.options.length < 2;
     }
 
+    function persistState() {
+      const key = modelCacheKey(provider, baseUrl.value);
+      cache = readAiModelCache();
+      cache[key] = {
+        models: Array.from(picker.options).map((option) => option.value).filter(Boolean),
+        selected: picker.value,
+        manual: toggle.checked,
+        manualModel: input.value.trim(),
+      };
+      writeAiModelCache(cache);
+      cacheEntry = cache[key];
+    }
+
+    function restoreState() {
+      if (!cacheEntry || !Array.isArray(cacheEntry.models)) return;
+      const models = [...new Set(cacheEntry.models.filter((model) => typeof model === "string" && model.trim()))];
+      if (!models.length) return;
+      picker.replaceChildren(new Option(t("ai_select_model"), ""), ...models.map((model) => new Option(model, model)));
+      const savedModel = saved.dataset.model || "";
+      const selected = models.includes(cacheEntry.selected) ? cacheEntry.selected : models.includes(savedModel) ? savedModel : "";
+      picker.value = selected;
+      toggle.checked = Boolean(cacheEntry.manual);
+      if (toggle.checked) input.value = cacheEntry.manualModel || savedModel;
+    }
+
     toggle.addEventListener("change", () => {
       if (toggle.checked && !input.value) input.value = picker.value || saved.dataset.model;
       syncMode();
+      persistState();
       if (toggle.checked) input.focus();
     });
+    picker.addEventListener("change", persistState);
+    input.addEventListener("input", persistState);
     [apiKey, baseUrl].forEach((field) => {
       field.addEventListener("input", () => {
         request?.abort();
         request = null;
         button.disabled = false;
+        cache = readAiModelCache();
+        Object.keys(cache)
+          .filter((key) => key.startsWith(`${provider}|`))
+          .forEach((key) => delete cache[key]);
+        cacheEntry = null;
+        writeAiModelCache(cache);
         picker.replaceChildren(new Option(t("ai_models_fetch_first"), ""));
         setFeedback("");
         syncMode();
@@ -1734,8 +1802,10 @@ function initModelPickers() {
       picker.replaceChildren(new Option(placeholder, ""), ...models.map((model) => new Option(model, model)));
       picker.value = models.includes(selected) ? selected : "";
       syncMode();
+      persistState();
       setFeedback(models.length ? `${t("ai_models_loaded")} (${models.length})` : "");
     });
+    restoreState();
     syncMode();
   });
 }
