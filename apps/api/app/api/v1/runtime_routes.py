@@ -47,3 +47,12 @@ async def put_runtime(payload: RuntimeConfigUpdate, db: AsyncSession = Depends(g
     config = await update_runtime_config(db, payload.model_dump())
     await request_bot_reload("runtime_config_updated")
     return _to_read_model(config)
+
+
+@router.patch("", response_model=RuntimeConfigRead)
+async def patch_runtime(payload: RuntimeConfigUpdate, db: AsyncSession = Depends(get_db)) -> RuntimeConfigRead:
+    changes = payload.model_dump(exclude_unset=True)
+    config = await update_runtime_config(db, changes) if changes else await get_runtime_config(db)
+    if changes.keys() & {"telegram_bot_token", "telegram_bot_username", "telegram_admin_ids"}:
+        await request_bot_reload("runtime_config_updated")
+    return _to_read_model(config)

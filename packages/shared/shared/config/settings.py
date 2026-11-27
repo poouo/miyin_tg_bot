@@ -23,11 +23,12 @@ class Settings(BaseSettings):
     deepseek_model: str = "deepseek-chat"
     deepseek_timeout_sec: int = 30
 
-    web_host: str = "0.0.0.0"
+    web_host: str = "127.0.0.1"
     web_port: int = 9800
     web_admin_password: str = "admin"
     web_auth_secret: str = "replace_with_long_random_string"
     web_token_expire_days: int = 10
+    web_trusted_proxies: str = "127.0.0.1,::1"
 
     join_verify_timeout_sec: int = 180
     spam_window_sec: int = 10

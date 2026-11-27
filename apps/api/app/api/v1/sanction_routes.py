@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.app.core.db import get_db
 from apps.api.app.schemas.sanction import BanSanctionRead
+from apps.api.app.services.community_feature_service import is_globally_banned
 from apps.api.app.services.group_service import get_group
 from apps.api.app.services.log_service import add_log
 from apps.api.app.services.moderation.auto_recover import list_active_ban_sanctions, mark_ban_recovered
@@ -37,6 +38,8 @@ async def list_bans(chat_id: int | None = None, db: AsyncSession = Depends(get_d
 
 @router.post("/bans/{chat_id}/{user_id}/unban")
 async def unban_user(chat_id: int, user_id: int, db: AsyncSession = Depends(get_db)) -> dict:
+    if await is_globally_banned(db, user_id):
+        raise HTTPException(status_code=409, detail="Remove the global ban first")
     runtime = await get_runtime_config(db)
     token = runtime.telegram_bot_token.strip()
     if not token:

@@ -4,6 +4,7 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.app.services.runtime_config_service import get_runtime_config
+from apps.api.app.services.runtime_health import record_ai
 
 logger = logging.getLogger(__name__)
 
@@ -51,17 +52,24 @@ class DeepSeekClient:
                 response.raise_for_status()
                 data = response.json()
         except httpx.HTTPStatusError as exc:
+            record_ai(credentials, False)
             logger.warning("AI request failed (%s %s): HTTP %s", credentials.label, url, exc.response.status_code)
             return (
                 f"{credentials.label} 接口返回错误（HTTP {exc.response.status_code}），"
                 "请检查 API Key、Base URL 与模型名称。"
             )
         except Exception as exc:
+            record_ai(credentials, False)
             logger.warning("AI request failed (%s %s): %s", credentials.label, url, exc)
             return f"{credentials.label} 接口请求失败，请检查 Base URL、网络与超时设置。"
 
         try:
-            return str(data["choices"][0]["message"]["content"]).strip()
-        except (KeyError, IndexError, TypeError, AttributeError):
+            content = data["choices"][0]["message"]["content"]
+            if not isinstance(content, str) or not content.strip():
+                raise ValueError("empty AI content")
+            record_ai(credentials, True)
+            return content.strip()
+        except (KeyError, IndexError, TypeError, AttributeError, ValueError):
+            record_ai(credentials, False)
             logger.warning("Unexpected AI response from %s: %s", url, str(data)[:400])
             return "AI 返回格式异常，请确认该接口兼容 OpenAI Chat Completions 协议。"

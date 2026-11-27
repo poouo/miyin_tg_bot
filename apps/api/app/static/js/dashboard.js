@@ -29,15 +29,6 @@ const confirmPassword = document.getElementById("confirm-password");
 const rtTelegramBotToken = document.getElementById("rt-telegram-bot-token");
 const rtTelegramBotUsername = document.getElementById("rt-telegram-bot-username");
 const rtTelegramAdminIds = document.getElementById("rt-telegram-admin-ids");
-const rtDeepseekApiKey = document.getElementById("rt-deepseek-api-key");
-const rtDeepseekBaseUrl = document.getElementById("rt-deepseek-base-url");
-const rtDeepseekModel = document.getElementById("rt-deepseek-model");
-const rtOpencodeApiKey = document.getElementById("rt-opencode-api-key");
-const rtOpencodeBaseUrl = document.getElementById("rt-opencode-base-url");
-const rtOpencodeModel = document.getElementById("rt-opencode-model");
-const rtCustomApiKey = document.getElementById("rt-custom-api-key");
-const rtCustomBaseUrl = document.getElementById("rt-custom-base-url");
-const rtCustomModel = document.getElementById("rt-custom-model");
 const aiProviderRadios = Array.from(document.querySelectorAll('input[name="ai-provider"]'));
 const aiProviderPanels = Array.from(document.querySelectorAll("[data-provider-panel]"));
 const rtAiTimeoutSec = document.getElementById("rt-ai-timeout-sec");
@@ -51,6 +42,7 @@ const rtSpamMaxMessages = document.getElementById("rt-spam-max-messages");
 const upgradeFill = document.getElementById("upgrade-fill");
 const upgradeTrack = document.querySelector(".upgrade-track");
 const upgradeStatus = document.getElementById("upgrade-status");
+const dockerUpdateInstructions = document.getElementById("docker-update-instructions");
 
 const arChatId = document.getElementById("ar-chat-id");
 const arOpenAdd = document.getElementById("ar-open-add");
@@ -159,7 +151,6 @@ const cmLogEnabled = document.getElementById("cm-log-enabled");
 const cmLogChatId = document.getElementById("cm-log-chat-id");
 const cmDisabledCommands = Array.from(document.querySelectorAll(".cm-disabled-command"));
 const cmSection = document.getElementById("community");
-const cmSave = document.getElementById("cm-save");
 const cmRefresh = document.getElementById("cm-refresh");
 const cmNoteName = document.getElementById("cm-note-name");
 const cmNoteParseMode = document.getElementById("cm-note-parse-mode");
@@ -217,7 +208,6 @@ const gsRefresh = document.getElementById("gs-refresh");
 const i18nEl = document.getElementById("i18n-data");
 const i18n = i18nEl ? JSON.parse(i18nEl.textContent || "{}") : {};
 
-let updatePollTimer = null;
 const ACTIVE_SECTION_KEY = "miyin.dashboard.activeSection";
 const THEME_KEY = "miyin.dashboard.theme.v2";
 const COMMUNITY_CHAT_KEY = "miyin.dashboard.communityChatId";
@@ -226,6 +216,22 @@ let arEditingRuleId = null;
 let kwEditingKeywordId = null;
 let akEditingKeywordId = null;
 const groupConfigCache = new Map();
+const managedGroup = document.getElementById("managed-group");
+const managedGroupScope = document.getElementById("managed-group-scope");
+const groupStatusBody = document.getElementById("group-status-body");
+const managedGroupTargets = new Map([
+  ["group-settings", gsChatId], ["auto-replies", arChatId], ["keywords", kwChatId],
+  ["ad-keywords", akChatId], ["community", cmChatId], ["member-events", evChatId],
+  ["moderation-logs", logChatId], ["bans", banChatId],
+]);
+const managesAllGroups = new Set(["moderation-logs", "bans"]);
+let selectedManagedGroup = "";
+let showingAllManagedGroups = false;
+let communityLoad = 0;
+let communityLoadedChat = "";
+let groupsRequest = 0;
+let groupSettingsLoadedChat = "";
+
 
 function t(key, fallback) {
   return i18n[key] || fallback || key;
@@ -427,7 +433,8 @@ async function requestJson(url, options = {}) {
 
 function parseApiMessage(payload) {
   if (!payload || typeof payload !== "object") return "";
-  return payload.message || payload.detail || payload.error || "";
+  const message = payload.message || payload.detail || payload.error || "";
+  return Array.isArray(message) ? message.map((item) => item.msg).filter(Boolean).join(" ") : message;
 }
 
 function setUpgradeStatus(progress, text, type = "normal") {
@@ -439,10 +446,12 @@ function setUpgradeStatus(progress, text, type = "normal") {
     if (type === "failed") upgradeFill.classList.add("failed");
   }
   if (upgradeTrack) {
+    upgradeTrack.hidden = progress === null;
     upgradeTrack.setAttribute("aria-valuenow", String(safeProgress));
   }
   if (upgradeStatus) {
-    upgradeStatus.textContent = `${safeProgress}% - ${text}`;
+    upgradeStatus.textContent = progress === null ? text : `${safeProgress}% · ${text}`;
+    upgradeStatus.dataset.type = type;
   }
 }
 
@@ -644,7 +653,10 @@ async function loadAutoReplies() {
     renderAutoReplies([]);
     return;
   }
+  const chatId = arChatId?.value;
+  renderAutoReplies([]);
   const result = await requestJson(`/api/v1/groups/${encodeURIComponent(arChatId.value)}/auto-replies`);
+  if (chatId !== arChatId?.value) return;
   if (!result.ok) {
     showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
     renderAutoReplies([]);
@@ -713,7 +725,10 @@ async function loadKeywords() {
     renderKeywords([]);
     return;
   }
+  const chatId = kwChatId?.value;
+  renderKeywords([]);
   const result = await requestJson(`/api/v1/groups/${encodeURIComponent(kwChatId.value)}/keywords`);
+  if (chatId !== kwChatId?.value) return;
   if (!result.ok) {
     showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
     renderKeywords([]);
@@ -758,7 +773,10 @@ async function loadAdKeywords() {
     renderAdKeywords([]);
     return;
   }
+  const chatId = akChatId?.value;
+  renderAdKeywords([]);
   const result = await requestJson(`/api/v1/groups/${encodeURIComponent(akChatId.value)}/ad-keywords`);
+  if (chatId !== akChatId?.value) return;
   if (!result.ok) {
     showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
     renderAdKeywords([]);
@@ -857,7 +875,10 @@ async function loadModerationLogs() {
   params.set("limit", String(Number(logLimit?.value || 200)));
   if (logChatId?.value) params.set("chat_id", logChatId.value);
   if (logEventType?.value) params.set("event_type", logEventType.value);
+  const chatId = logChatId?.value;
+  renderModerationLogs([]);
   const result = await requestJson(`/api/v1/logs/recent?${params.toString()}`);
+  if (chatId !== logChatId?.value) return;
   if (!result.ok) {
     showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
     renderModerationLogs([]);
@@ -874,7 +895,10 @@ async function loadMemberEvents() {
   const params = new URLSearchParams();
   params.set("limit", "200");
   params.set("chat_id", evChatId.value);
+  const chatId = evChatId?.value;
+  renderMemberEvents([]);
   const result = await requestJson(`/api/v1/logs/member-events?${params.toString()}`);
+  if (chatId !== evChatId?.value) return;
   if (!result.ok) {
     renderMemberEvents([]);
     return;
@@ -941,7 +965,10 @@ async function loadBans() {
   const params = new URLSearchParams();
   if (banChatId?.value) params.set("chat_id", banChatId.value);
   const query = params.toString();
+  const chatId = banChatId?.value;
+  renderBans([]);
   const result = await requestJson(`/api/v1/sanctions/bans${query ? `?${query}` : ""}`);
+  if (chatId !== banChatId?.value) return;
   if (!result.ok) {
     showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
     renderBans([]);
@@ -954,27 +981,71 @@ function getCommunityChatId() {
   return cmChatId?.value || "";
 }
 
-function rememberCommunityChatId() {
-  const chatId = getCommunityChatId();
+function rememberManagedGroup(chatId) {
   if (!chatId) return;
+  selectedManagedGroup = chatId;
   try {
     window.localStorage.setItem(COMMUNITY_CHAT_KEY, chatId);
   } catch (err) {
-    // ignore
+    // Storage may be unavailable in private browsing.
   }
 }
 
-function restoreCommunityChatId() {
-  if (!cmChatId) return;
+function restoreManagedGroup() {
   try {
-    const stored = window.localStorage.getItem(COMMUNITY_CHAT_KEY) || "";
-    if (stored && Array.from(cmChatId.options).some((option) => option.value === stored)) {
-      cmChatId.value = stored;
-    }
+    selectedManagedGroup = window.localStorage.getItem(COMMUNITY_CHAT_KEY) || "";
   } catch (err) {
-    // ignore
+    // Storage may be unavailable in private browsing.
   }
 }
+
+function currentSection() {
+  return sections.find((section) => !section.hidden)?.id || "overview";
+}
+
+function syncManagedGroup(target) {
+  if (!managedGroup || !managedGroupScope) return;
+  const control = managedGroupTargets.get(target);
+  managedGroupScope.hidden = !control;
+  if (!control) return;
+  const allOption = managedGroup.querySelector("[data-all-groups]");
+  const allowAll = managesAllGroups.has(target);
+  allOption.hidden = !allowAll;
+  allOption.disabled = !allowAll;
+  const groups = Array.from(managedGroup.options).filter((option) => option.value);
+  if (!groups.some((option) => option.value === selectedManagedGroup)) {
+    selectedManagedGroup = groups[0]?.value || "";
+  }
+  managedGroup.value = allowAll && showingAllManagedGroups ? "" : selectedManagedGroup;
+  control.value = managedGroup.value;
+}
+
+function updateGroupControls(groups) {
+  if (!managedGroup) return;
+  const allOption = managedGroup.querySelector("[data-all-groups]");
+  managedGroup.replaceChildren(allOption, ...groups.map((group) => new Option(group.title || group.chat_id, group.chat_id)));
+  managedGroupTargets.forEach((control, target) => {
+    if (!control) return;
+    const previous = control.value;
+    const options = groups.map((group) => new Option(group.title || group.chat_id, group.chat_id));
+    if (managesAllGroups.has(target)) options.unshift(new Option(t("all_groups"), ""));
+    control.replaceChildren(...options);
+    if (options.some((option) => option.value === previous)) control.value = previous;
+  });
+  syncManagedGroup(currentSection());
+}
+
+managedGroup?.addEventListener("change", async () => {
+  showingAllManagedGroups = !managedGroup.value;
+  rememberManagedGroup(managedGroup.value);
+  const target = currentSection();
+  syncManagedGroup(target);
+  if (target === "group-settings" && groupConfigCache.has(Number(gsChatId.value))) {
+    applyGroupSettings(gsChatId.value);
+  } else {
+    await handleSectionEnter(target);
+  }
+});
 
 function applyCommunityConfig(config) {
   if (!config) return;
@@ -1002,17 +1073,35 @@ function applyCommunityConfig(config) {
   });
 }
 
+function setCommunityReady(ready) {
+  cmSection?.querySelectorAll(".cm-config-save, #cm-note-save, #cm-rss-save").forEach((button) => {
+    button.disabled = !ready;
+  });
+}
+
 async function loadCommunityConfig() {
   const chatId = getCommunityChatId();
+  const request = ++communityLoad;
+  if (communityLoadedChat !== chatId) {
+    renderCommunityNotes([]);
+    renderCommunityRss([]);
+    [cmNoteName, cmNoteText, cmRssUrl, cmRssTitle].forEach((field) => {
+      if (field) field.value = "";
+    });
+  }
+  communityLoadedChat = "";
+  setCommunityReady(false);
   if (!chatId) return;
-  rememberCommunityChatId();
   const result = await requestJson(`/api/v1/community/${encodeURIComponent(chatId)}`);
+  if (request !== communityLoad || chatId !== getCommunityChatId()) return;
   if (!result.ok) {
     showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
     return;
   }
   applyCommunityConfig(result.data);
-  await Promise.all([loadCommunityNotes(), loadCommunityRss(), loadGlobalBans()]);
+  communityLoadedChat = chatId;
+  setCommunityReady(true);
+  await Promise.all([loadCommunityNotes(), loadCommunityRss()]);
 }
 
 function buildCommunityPayload() {
@@ -1039,22 +1128,35 @@ function buildCommunityPayload() {
   };
 }
 
-async function saveCommunityConfig() {
+const communitySaveFields = {
+  rules: ["rules_text"],
+  welcome: ["welcome_enabled", "goodbye_enabled", "clean_welcome", "welcome_text", "goodbye_text"],
+  warnings: ["warn_limit", "warn_action", "warn_mute_minutes", "warn_ban_minutes", "reports_enabled"],
+  locks: ["lock_links", "lock_forwards", "lock_media", "lock_stickers", "lock_commands"],
+  logs: ["log_enabled", "log_chat_id"],
+  commands: ["disabled_commands"],
+};
+
+async function saveCommunityConfig(button) {
   const chatId = getCommunityChatId();
-  if (!chatId) {
-    showStatus(t("select_group"), true);
-    return;
-  }
+  if (!chatId || chatId !== communityLoadedChat || button.disabled) return;
+  const fields = communitySaveFields[button.dataset.scope];
+  if (!fields) return;
+  const form = buildCommunityPayload();
+  const payload = Object.fromEntries(fields.map((field) => [field, form[field]]));
+  const request = communityLoad;
+  button.disabled = true;
   const result = await requestJson(`/api/v1/community/${encodeURIComponent(chatId)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(buildCommunityPayload()),
+    body: JSON.stringify(payload),
   });
+  if (request !== communityLoad || chatId !== getCommunityChatId()) return;
+  button.disabled = false;
   if (!result.ok) {
     showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
     return;
   }
-  await loadCommunityConfig();
   showStatus(t("saved"), false);
 }
 
@@ -1081,8 +1183,9 @@ async function loadCommunityNotes() {
     renderCommunityNotes([]);
     return;
   }
+  const request = communityLoad;
   const result = await requestJson(`/api/v1/community/${encodeURIComponent(chatId)}/notes`);
-  renderCommunityNotes(result.ok ? result.data : []);
+  if (request === communityLoad && chatId === getCommunityChatId()) renderCommunityNotes(result.ok ? result.data : []);
 }
 
 async function saveCommunityNote() {
@@ -1092,7 +1195,7 @@ async function saveCommunityNote() {
     text: (cmNoteText?.value || "").trim(),
     parse_mode: (cmNoteParseMode?.value || "plain").toLowerCase(),
   };
-  if (!chatId || !payload.name || !payload.text) {
+  if (!chatId || chatId !== communityLoadedChat || !payload.name || !payload.text) {
     showStatus(t("fill_required_fields"), true);
     return;
   }
@@ -1101,6 +1204,7 @@ async function saveCommunityNote() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  if (chatId !== getCommunityChatId()) return;
   if (!result.ok) {
     showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
     return;
@@ -1134,8 +1238,9 @@ async function loadCommunityRss() {
     renderCommunityRss([]);
     return;
   }
+  const request = communityLoad;
   const result = await requestJson(`/api/v1/community/${encodeURIComponent(chatId)}/rss`);
-  renderCommunityRss(result.ok ? result.data : []);
+  if (request === communityLoad && chatId === getCommunityChatId()) renderCommunityRss(result.ok ? result.data : []);
 }
 
 async function saveCommunityRss() {
@@ -1144,7 +1249,7 @@ async function saveCommunityRss() {
     url: (cmRssUrl?.value || "").trim(),
     title: (cmRssTitle?.value || "").trim(),
   };
-  if (!chatId || !payload.url) {
+  if (!chatId || chatId !== communityLoadedChat || !payload.url) {
     showStatus(t("fill_required_fields"), true);
     return;
   }
@@ -1153,6 +1258,7 @@ async function saveCommunityRss() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  if (chatId !== getCommunityChatId()) return;
   if (!result.ok) {
     showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
     return;
@@ -1174,7 +1280,7 @@ function renderGlobalBans(items) {
       (item) => `<tr>
         <td>${escapeHtml(String(item.user_id || ""))}</td>
         <td>${escapeHtml(item.reason || "")}</td>
-        <td><button class="table-btn" type="button" data-action="delete-gban" data-user-id="${item.user_id}">${escapeHtml(t("unban", "Unban"))}</button></td>
+        <td><button class="table-btn" type="button" data-action="delete-gban" data-user-id="${item.user_id}">${escapeHtml(t(item.active === false ? "retry_unban" : "unban"))}</button></td>
       </tr>`,
     )
     .join("");
@@ -1212,6 +1318,8 @@ async function saveGlobalBan() {
 function applyGroupSettings(chatIdValue) {
   const chatId = Number(chatIdValue || 0);
   const config = groupConfigCache.get(chatId);
+  groupSettingsLoadedChat = config ? String(chatId) : "";
+  if (gsSave) gsSave.disabled = !config;
   if (!config) return;
   if (gsJoinVerify) gsJoinVerify.checked = Boolean(config.join_verification_enabled);
   if (gsKeywordFilter) gsKeywordFilter.checked = Boolean(config.keyword_filter_enabled);
@@ -1256,8 +1364,32 @@ function applyGroupSettings(chatIdValue) {
   if (gsAntiSpamBanMinutes) gsAntiSpamBanMinutes.value = String(Number(config.anti_spam_ban_minutes || 1440));
 }
 
+function renderGroupStatuses() {
+  if (!groupStatusBody) return;
+  const groups = Array.from(groupConfigCache.values());
+  const features = [
+    "join_verification_enabled", "keyword_filter_enabled", "ad_block_enabled",
+    "anti_spam_enabled", "auto_recover_enabled", "deepseek_enabled", "ai_ad_block_enabled",
+  ];
+  groupStatusBody.innerHTML = groups.length ? groups.map((group) => `<tr>
+    <td>${escapeHtml(group.chat_id)}</td><td>${escapeHtml(group.title || "")}</td>
+    ${features.map((field) => `<td>${escapeHtml(t(group[field] ? "switch_on" : "switch_off"))}</td>`).join("")}
+    <td><button type="button" class="table-btn" data-open-group="${escapeHtml(group.chat_id)}">${escapeHtml(t("nav_group_settings"))}</button></td>
+  </tr>`).join("") : `<tr><td colspan="10">${escapeHtml(t("no_group_data"))}</td></tr>`;
+}
+
+groupStatusBody?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-open-group]");
+  if (!button) return;
+  showingAllManagedGroups = false;
+  rememberManagedGroup(button.dataset.openGroup);
+  navItems.find((item) => item.dataset.target === "group-settings")?.click();
+});
+
 async function loadGroupConfigs() {
+  const request = ++groupsRequest;
   const result = await requestJson("/api/v1/groups");
+  if (request !== groupsRequest) return;
   if (!result.ok || !Array.isArray(result.data)) {
     showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
     return;
@@ -1266,12 +1398,14 @@ async function loadGroupConfigs() {
   for (const item of result.data) {
     groupConfigCache.set(Number(item.chat_id), item);
   }
-  applyGroupSettings(gsChatId?.value || "");
+  updateGroupControls(result.data);
+  renderGroupStatuses();
+  if (currentSection() === "group-settings") applyGroupSettings(gsChatId?.value || "");
 }
 
 async function saveGroupSettings() {
   const chatId = gsChatId?.value || "";
-  if (!chatId) {
+  if (!chatId || chatId !== groupSettingsLoadedChat || gsSave?.disabled) {
     showStatus(t("select_group"), true);
     return;
   }
@@ -1312,20 +1446,25 @@ async function saveGroupSettings() {
     anti_spam_mute_minutes: Number(gsAntiSpamMuteMinutes?.value || 30),
     anti_spam_ban_minutes: Number(gsAntiSpamBanMinutes?.value || 1440),
   };
+  gsSave.disabled = true;
   const result = await requestJson(`/api/v1/groups/${encodeURIComponent(chatId)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  if (gsChatId.value === chatId) gsSave.disabled = false;
   if (!result.ok) {
     showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
     return;
   }
+  groupsRequest++;
   groupConfigCache.set(Number(chatId), result.data);
+  renderGroupStatuses();
   showStatus(t("saved"), false);
 }
 
 async function handleSectionEnter(target) {
+  syncManagedGroup(target);
   if (target === "overview") {
     formatOverviewTimes();
   } else if (target === "auto-replies") {
@@ -1342,7 +1481,10 @@ async function handleSectionEnter(target) {
     await loadBans();
   } else if (target === "community") {
     await loadCommunityConfig();
-  } else if (target === "group-settings") {
+  } else if (target === "global-bans") {
+    await loadGlobalBans();
+  } else if (target === "group-settings" || target === "groups") {
+    if (target === "group-settings") applyGroupSettings(gsChatId?.value || "");
     await loadGroupConfigs();
   }
 }
@@ -1393,83 +1535,105 @@ try {
 }
 setActiveNav(initialTarget);
 setActiveSection(initialTarget);
-restoreCommunityChatId();
+restoreManagedGroup();
 handleSectionEnter(initialTarget);
 window.setInterval(formatOverviewTimes, 60000);
 
-async function pollOnlineUpdateStatus() {
+function setUpdateBusy(busy) {
+  btnCheck.disabled = busy;
+  if (btnTrigger) btnTrigger.disabled = busy;
+}
+
+async function pollOnlineUpdateStatus(tracking = false) {
+  setUpdateBusy(true);
   const result = await requestJson("/api/v1/updates/online-status");
   if (!result.ok || !result.data?.ok) {
-    setUpgradeStatus(0, t("update_status_load_failed"), "failed");
-    stopPolling();
-    if (btnTrigger) btnTrigger.disabled = false;
-    return;
+    if (tracking && [0, 502, 503, 504].includes(result.status)) {
+      setUpgradeStatus(null, t("update_network_error"));
+      window.setTimeout(() => pollOnlineUpdateStatus(true), 2500);
+      return;
+    }
+    setUpgradeStatus(null, t("update_status_load_failed"), "failed");
+  } else {
+    const { state, progress, code } = result.data;
+    if (state === "running") {
+      setUpgradeStatus(progress, t(code, t("update_status_working")));
+      window.setTimeout(() => pollOnlineUpdateStatus(true), 1500);
+      return;
+    }
+    if (state === "success") {
+      setUpgradeStatus(null, t("update_success"), "success");
+    } else if (state === "failed") {
+      setUpgradeStatus(null, t(code, t("update_failed_retry")), "failed");
+    }
   }
-
-  const state = result.data.state || "idle";
-  const progress = result.data.progress || 0;
-  const message = result.data.message || t("update_status_working");
-
-  if (state === "running") {
-    setUpgradeStatus(progress, message, "normal");
-    if (btnTrigger) btnTrigger.disabled = true;
-    return;
-  }
-  if (state === "success") {
-    setUpgradeStatus(100, t("update_success_refreshing"), "success");
-    stopPolling();
-    if (btnTrigger) btnTrigger.disabled = false;
-    setTimeout(() => window.location.reload(), 1800);
-    return;
-  }
-  if (state === "failed") {
-    setUpgradeStatus(progress, t("update_failed_retry"), "failed");
-    stopPolling();
-    if (btnTrigger) btnTrigger.disabled = false;
-    return;
-  }
-
-  setUpgradeStatus(0, t("update_ready"), "normal");
-  stopPolling();
-  if (btnTrigger) btnTrigger.disabled = false;
-}
-
-function startPolling() {
-  if (updatePollTimer) return;
-  updatePollTimer = setInterval(pollOnlineUpdateStatus, 1500);
-}
-
-function stopPolling() {
-  if (!updatePollTimer) return;
-  clearInterval(updatePollTimer);
-  updatePollTimer = null;
+  setUpdateBusy(false);
 }
 
 btnCheck?.addEventListener("click", async () => {
-  setUpgradeStatus(0, t("update_checking"));
+  setUpdateBusy(true);
+  setUpgradeStatus(null, t("update_checking"));
+  if (dockerUpdateInstructions) dockerUpdateInstructions.hidden = true;
   const result = await requestJson("/api/v1/updates/check");
-  if (!result.ok || !result.data?.ok) {
-    setUpgradeStatus(0, t("update_check_failed"), "failed");
+  setUpdateBusy(false);
+  const data = result.data;
+  if (!result.ok || !data?.ok) {
+    const detail = parseApiMessage(data);
+    const message = [t("update_check_failed"), typeof detail === "string" ? detail : ""].filter(Boolean);
+    setUpgradeStatus(null, message.join(" "), "failed");
     return;
   }
-  if (result.data.has_update) {
-    setUpgradeStatus(0, t("update_available_click"));
-  } else {
-    setUpgradeStatus(100, t("update_uptodate"), "success");
+
+  let message = t("update_uptodate");
+  if (data.has_update) {
+    if (dockerUpdateInstructions) {
+      dockerUpdateInstructions.hidden = false;
+      message = t(data.compare_mode === "image" ? "update_docker_image_available" : "update_docker_available");
+    } else {
+      message = t(data.diverged || !btnTrigger ? "update_manual_available" : "update_available_click");
+    }
   }
+  if (data.local_version && data.remote_version && data.local_version !== data.remote_version) {
+    message += ` ${data.local_version} → ${data.remote_version}.`;
+  }
+  if (data.compare_mode === "version") message += ` ${t("update_version_only")}`;
+  setUpgradeStatus(null, message, data.has_update ? "normal" : "success");
 });
 
 btnTrigger?.addEventListener("click", async () => {
-  if (btnTrigger) btnTrigger.disabled = true;
+  setUpdateBusy(true);
   setUpgradeStatus(2, t("update_starting"));
   const result = await requestJson("/api/v1/updates/online", { method: "POST" });
-  if (!result.ok || !result.data?.ok) {
-    setUpgradeStatus(0, parseApiMessage(result.data) || t("update_start_failed"), "failed");
-    if (btnTrigger) btnTrigger.disabled = false;
+  if (result.data?.ok || result.data?.code === "update_already_running") {
+    await pollOnlineUpdateStatus(true);
     return;
   }
-  startPolling();
-  await pollOnlineUpdateStatus();
+  setUpgradeStatus(null, t(result.data?.code, t("update_start_failed")), "failed");
+  setUpdateBusy(false);
+});
+
+document.querySelectorAll("[data-copy-update]").forEach((button) => {
+  button.addEventListener("click", async () => {
+    const command = document.getElementById(button.dataset.copyUpdate);
+    try {
+      await navigator.clipboard.writeText(command.textContent);
+      showStatus(t("update_command_copied"));
+    } catch {
+      const range = document.createRange();
+      range.selectNodeContents(command);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      let copied = false;
+      try {
+        copied = document.execCommand("copy");
+      } catch {
+        // Leave the command selected for manual copying.
+      }
+      if (copied) selection.removeAllRanges();
+      showStatus(t(copied ? "update_command_copied" : "update_copy_failed"), !copied);
+    }
+  });
 });
 
 function activeAiProvider() {
@@ -1493,110 +1657,150 @@ function initAiProviderSwitch() {
   syncAiProviderPanels();
 }
 
-const MODEL_PROVIDERS = ["deepseek", "opencode", "custom"];
+const modelControls = new Map();
 
 function modelField(provider, name) {
   return document.getElementById(`rt-${provider}-${name}`);
 }
 
-async function fetchProviderModels(provider) {
-  const button = modelField(provider, "fetch-models");
-  const picker = modelField(provider, "model-picker");
-  const modelInput = modelField(provider, "model");
-  if (!button || !picker) return;
-
-  button.disabled = true;
-  const result = await requestJson("/api/v1/ai/models", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      provider,
-      api_key: modelField(provider, "api-key")?.value || "",
-      base_url: modelField(provider, "base-url")?.value || "",
-    }),
-  });
-  button.disabled = false;
-
-  if (!result.ok) {
-    showStatus(parseApiMessage(result.data) || t("ai_models_failed"), true);
-    return;
-  }
-
-  const models = Array.isArray(result.data?.models) ? result.data.models : [];
-  if (!models.length) {
-    picker.hidden = true;
-    showStatus(t("ai_models_empty"), true);
-    return;
-  }
-
-  picker.innerHTML = "";
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = t("ai_select_model");
-  picker.appendChild(placeholder);
-  models.forEach((modelId) => {
-    const option = document.createElement("option");
-    option.value = modelId;
-    option.textContent = modelId;
-    picker.appendChild(option);
-  });
-  if (modelInput?.value && models.includes(modelInput.value)) picker.value = modelInput.value;
-  picker.hidden = false;
-  showStatus(`${t("ai_models_loaded")} (${models.length})`, false);
+function providerBaseUrl(provider, value) {
+  return value.trim() || (provider === "deepseek" ? "https://api.deepseek.com" : "");
 }
 
 function initModelPickers() {
-  MODEL_PROVIDERS.forEach((provider) => {
+  aiProviderPanels.forEach((panel) => {
+    const provider = panel.dataset.providerPanel;
     const button = modelField(provider, "fetch-models");
     const picker = modelField(provider, "model-picker");
-    const modelInput = modelField(provider, "model");
-    button?.addEventListener("click", () => fetchProviderModels(provider));
-    picker?.addEventListener("change", () => {
-      if (picker.value && modelInput) modelInput.value = picker.value;
+    const input = modelField(provider, "model");
+    const toggle = modelField(provider, "manual-mode");
+    const manualField = modelField(provider, "manual-field");
+    const feedback = modelField(provider, "models-status");
+    const saved = modelField(provider, "saved-model");
+    const apiKey = modelField(provider, "api-key");
+    const baseUrl = modelField(provider, "base-url");
+    modelControls.set(provider, { picker, input, toggle, saved, apiKey, baseUrl });
+    let request = null;
+
+    function setFeedback(text, isError = false) {
+      feedback.textContent = text;
+      feedback.classList.toggle("is-error", isError);
+    }
+
+    function syncMode() {
+      manualField.hidden = !toggle.checked;
+      input.disabled = !toggle.checked;
+      picker.disabled = toggle.checked || picker.options.length < 2;
+    }
+
+    toggle.addEventListener("change", () => {
+      if (toggle.checked && !input.value) input.value = picker.value || saved.dataset.model;
+      syncMode();
+      if (toggle.checked) input.focus();
     });
+    [apiKey, baseUrl].forEach((field) => {
+      field.addEventListener("input", () => {
+        request?.abort();
+        request = null;
+        button.disabled = false;
+        picker.replaceChildren(new Option(t("ai_models_fetch_first"), ""));
+        setFeedback("");
+        syncMode();
+      });
+    });
+    button.addEventListener("click", async () => {
+      const controller = new AbortController();
+      request = controller;
+      button.disabled = true;
+      setFeedback(t("ai_models_fetching"));
+      const result = await requestJson("/api/v1/ai/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider, api_key: apiKey.value, base_url: providerBaseUrl(provider, baseUrl.value) }),
+        signal: controller.signal,
+      });
+      if (request !== controller) return;
+      request = null;
+      button.disabled = false;
+      if (!result.ok) {
+        setFeedback(parseApiMessage(result.data) || t("ai_models_failed"), true);
+        return;
+      }
+
+      const models = Array.isArray(result.data?.models) ? result.data.models : [];
+      const previous = picker.value || saved.dataset.model;
+      const selected = models.includes(previous) ? previous : saved.dataset.model;
+      const placeholder = models.length ? t("ai_select_model") : t("ai_models_empty");
+      picker.replaceChildren(new Option(placeholder, ""), ...models.map((model) => new Option(model, model)));
+      picker.value = models.includes(selected) ? selected : "";
+      syncMode();
+      setFeedback(models.length ? `${t("ai_models_loaded")} (${models.length})` : "");
+    });
+    syncMode();
   });
 }
 
-function buildRuntimePayload() {
-  return {
+async function saveRuntimeFields(button, payload) {
+  button.disabled = true;
+  const result = await requestJson("/api/v1/runtime", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  button.disabled = false;
+  if (!result.ok) {
+    const detail = parseApiMessage(result.data);
+    const message = Array.isArray(detail) ? detail.map((item) => item.msg).filter(Boolean).join(" ") : detail;
+    showStatus(message || t("operation_failed"), true);
+    return null;
+  }
+  showStatus(t("saved"), false);
+  return result.data;
+}
+
+btnSaveRuntime?.addEventListener("click", () => {
+  saveRuntimeFields(btnSaveRuntime, {
     telegram_bot_token: rtTelegramBotToken?.value || "",
     telegram_bot_username: rtTelegramBotUsername?.value || "",
     telegram_admin_ids: rtTelegramAdminIds?.value || "",
-    deepseek_api_key: rtDeepseekApiKey?.value || "",
-    deepseek_base_url: rtDeepseekBaseUrl?.value || "https://api.deepseek.com",
-    deepseek_model: rtDeepseekModel?.value || "deepseek-chat",
-    deepseek_timeout_sec: Number(rtAiTimeoutSec?.value || 30),
-    ai_provider: activeAiProvider(),
-    ai_temperature: Number(rtAiTemperature?.value ?? 0.3),
-    ai_max_tokens: Number(rtAiMaxTokens?.value || 0),
-    ai_system_prompt: rtAiSystemPrompt?.value || "",
-    opencode_api_key: rtOpencodeApiKey?.value || "",
-    opencode_base_url: rtOpencodeBaseUrl?.value || "",
-    opencode_model: rtOpencodeModel?.value || "",
-    custom_api_key: rtCustomApiKey?.value || "",
-    custom_base_url: rtCustomBaseUrl?.value || "",
-    custom_model: rtCustomModel?.value || "",
     join_verify_timeout_sec: Number(rtJoinVerifyTimeoutSec?.value || 180),
     spam_window_sec: Number(rtSpamWindowSec?.value || 10),
     spam_max_messages: Number(rtSpamMaxMessages?.value || 6),
-  };
-}
-
-async function saveRuntime() {
-  const result = await requestJson("/api/v1/runtime", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(buildRuntimePayload()),
   });
-  if (!result.ok) {
-    showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
-    return;
-  }
-  showStatus(t("saved"), false);
-}
+});
 
-btnSaveRuntime?.addEventListener("click", saveRuntime);
-btnSaveAi?.addEventListener("click", saveRuntime);
+btnSaveAi?.addEventListener("click", async () => {
+  const active = activeAiProvider();
+  const payload = {
+    deepseek_timeout_sec: Number(rtAiTimeoutSec?.value || 30),
+    ai_provider: active,
+    ai_temperature: Number(rtAiTemperature?.value || 0.3),
+    ai_max_tokens: Number(rtAiMaxTokens?.value || 0),
+    ai_system_prompt: rtAiSystemPrompt?.value || "",
+  };
+  for (const [provider, fields] of modelControls) {
+    const { picker, input, toggle, saved, apiKey, baseUrl } = fields;
+    const model = toggle.checked ? input.value.trim() : picker.value;
+    if (!model && (toggle.checked || (provider === active && (!saved.dataset.model || picker.options.length > 1)))) {
+      showStatus(t(toggle.checked ? "ai_model_manual_required" : "ai_model_required"), true);
+      aiProviderRadios.find((radio) => radio.value === provider).checked = true;
+      syncAiProviderPanels();
+      const target = toggle.checked ? input : picker.disabled ? modelField(provider, "fetch-models") : picker;
+      target.focus();
+      return;
+    }
+    if (model) payload[`${provider}_model`] = model;
+    payload[`${provider}_api_key`] = apiKey.value;
+    payload[`${provider}_base_url`] = providerBaseUrl(provider, baseUrl.value);
+  }
+  const config = await saveRuntimeFields(btnSaveAi, payload);
+  if (!config) return;
+  modelControls.forEach(({ saved }, provider) => {
+    const model = config[`${provider}_model`];
+    saved.dataset.model = model;
+    saved.textContent = model || t("ai_no_saved_model");
+  });
+});
 
 btnSaveSecurity?.addEventListener("click", async () => {
   const payload = {
@@ -2222,16 +2426,14 @@ gsSave?.addEventListener("click", saveGroupSettings);
 gsRefresh?.addEventListener("click", loadGroupConfigs);
 
 cmChatId?.addEventListener("change", async () => {
-  rememberCommunityChatId();
   await loadCommunityConfig();
 });
-cmSave?.addEventListener("click", saveCommunityConfig);
 cmSection?.addEventListener("click", async (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
   const button = target.closest(".cm-config-save");
   if (!(button instanceof HTMLButtonElement)) return;
-  await saveCommunityConfig();
+  await saveCommunityConfig(button);
 });
 cmRefresh?.addEventListener("click", loadCommunityConfig);
 cmNoteSave?.addEventListener("click", saveCommunityNote);
@@ -2244,7 +2446,7 @@ cmNotesBody?.addEventListener("click", async (event) => {
   if (target.dataset.action !== "delete-note") return;
   const chatId = getCommunityChatId();
   const name = target.dataset.name || "";
-  if (!chatId || !name) return;
+  if (!chatId || chatId !== communityLoadedChat || !name) return;
   const result = await requestJson(
     `/api/v1/community/${encodeURIComponent(chatId)}/notes/${encodeURIComponent(name)}`,
     { method: "DELETE" },
@@ -2263,7 +2465,7 @@ cmRssBody?.addEventListener("click", async (event) => {
   if (target.dataset.action !== "delete-rss") return;
   const chatId = getCommunityChatId();
   const url = target.dataset.url || "";
-  if (!chatId || !url) return;
+  if (!chatId || chatId !== communityLoadedChat || !url) return;
   const params = new URLSearchParams({ url });
   const result = await requestJson(`/api/v1/community/${encodeURIComponent(chatId)}/rss?${params.toString()}`, {
     method: "DELETE",
@@ -2289,7 +2491,15 @@ cmGbanBody?.addEventListener("click", async (event) => {
     showStatus(parseApiMessage(result.data) || t("operation_failed"), true);
     return;
   }
-  showStatus(t("saved"), false);
+  if (result.data?.failed?.length) {
+    showStatus(`${t("global_unban_partial")} (${result.data.failed.length})`, true);
+  }
+  if (result.data?.legacy_groups?.length) {
+    showStatus(`${t("global_unban_legacy")} · ${result.data.legacy_groups.slice(0, 10).join(", ")}`, true);
+  }
+  if (!result.data?.failed?.length && !result.data?.legacy_groups?.length) {
+    showStatus(t("saved"), false);
+  }
   await loadGlobalBans();
 });
 
@@ -2338,4 +2548,50 @@ document.addEventListener("keydown", (event) => {
 initAiProviderSwitch();
 initModelPickers();
 
-pollOnlineUpdateStatus();
+if (btnTrigger) pollOnlineUpdateStatus();
+
+let checkingRuntimeHealth = false;
+
+function renderHealth(id, state, timestamp) {
+  const label = document.getElementById(id);
+  if (!label) return;
+  const labels = {
+    online: "overview_online",
+    not_configured: "overview_not_configured",
+    starting: "health_starting",
+    error: "health_error",
+    untested: "health_untested",
+  };
+  let description = t(labels[state] || "overview_unknown");
+  if (timestamp) {
+    const date = new Date(timestamp);
+    if (Number.isFinite(date.valueOf())) description += ` · ${date.toLocaleString()}`;
+  }
+  label.textContent = description;
+  label.closest("li")?.querySelectorAll(".overview-status-dot, .overview-service-icon").forEach((indicator) => {
+    indicator.classList.toggle("is-good", state === "online");
+    indicator.classList.toggle("is-warning", state !== "online");
+  });
+}
+
+async function refreshRuntimeHealth() {
+  if (checkingRuntimeHealth || document.hidden) return;
+  checkingRuntimeHealth = true;
+  const result = await requestJson("/api/v1/status");
+  checkingRuntimeHealth = false;
+  const healthy = result.ok && result.data?.database && result.data?.bot?.state !== "error"
+    && result.data?.ai?.state !== "error";
+  for (const id of ["health-summary", "health-overview"]) {
+    const element = document.getElementById(id);
+    if (element) {
+      element.textContent = t(healthy ? "system_running" : "health_degraded");
+      element.dataset.state = healthy ? "online" : "error";
+    }
+  }
+  renderHealth("health-database", result.data?.database ? "online" : "error");
+  renderHealth("health-bot", result.data?.bot?.state, result.data?.bot?.last_success);
+  renderHealth("health-ai", result.data?.ai?.state, result.data?.ai?.checked_at);
+}
+
+refreshRuntimeHealth();
+window.setInterval(refreshRuntimeHealth, 15000);

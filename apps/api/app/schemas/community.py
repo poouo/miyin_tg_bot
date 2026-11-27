@@ -94,6 +94,7 @@ class GlobalBanRead(BaseModel):
     user_id: int
     reason: str
     admin_id: int
+    active: bool = True
     created_at: datetime
     updated_at: datetime
 

@@ -19,73 +19,12 @@ else
 fi
 
 CHECK_INTERVAL_SEC="${CHECK_INTERVAL_SEC:-600}"
-VERSION_FILE="${APP_DIR}/VERSION"
-
-version_key() {
-  local v="${1#V}"
-  v="${v#v}"
-  if [[ "${v}" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-    printf "%06d%06d%06d" "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
-    return 0
-  fi
-  return 1
-}
 
 ensure_runtime_dirs
 cd "${APP_DIR}"
 
 while true; do
-  status="ok"
-  message=""
-  local_version=""
-  remote_version=""
-  has_update="false"
-  checked_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-
-  if [[ ! -d ".git" ]]; then
-    status="error"
-    message="not a git repo"
-  else
-    if git fetch origin "${BRANCH}" >/dev/null 2>&1; then
-      if [[ -f "${VERSION_FILE}" ]]; then
-        local_version="$(tr -d '\r\n' < "${VERSION_FILE}")"
-      else
-        status="error"
-        message="VERSION file not found"
-      fi
-
-      remote_version="$(git show "origin/${BRANCH}:VERSION" 2>/dev/null | tr -d '\r\n' || true)"
-
-      if [[ "${status}" == "ok" && -n "${local_version}" && -n "${remote_version}" ]]; then
-        if local_key="$(version_key "${local_version}")" && remote_key="$(version_key "${remote_version}")"; then
-          if [[ "${remote_key}" > "${local_key}" ]]; then
-            has_update="true"
-          fi
-        elif [[ "${local_version}" != "${remote_version}" ]]; then
-          has_update="true"
-        fi
-      elif [[ "${status}" == "ok" && -z "${remote_version}" ]]; then
-        status="error"
-        message="failed to read remote VERSION"
-      fi
-    else
-      status="error"
-      message="git fetch failed"
-    fi
-  fi
-
-  cat > "${UPDATE_STATUS_FILE}" <<EOF
-{
-  "status": "${status}",
-  "message": "${message}",
-  "branch": "${BRANCH}",
-  "local_version": "${local_version}",
-  "remote_version": "${remote_version}",
-  "has_update": ${has_update},
-  "compare_mode": "version",
-  "checked_at": "${checked_at}"
-}
-EOF
-
+  "${VENV_DIR}/bin/python" -c 'from apps.api.app.services.update_service import write_background_status; write_background_status()' ||
+    echo "Failed to write update status."
   sleep "${CHECK_INTERVAL_SEC}"
 done

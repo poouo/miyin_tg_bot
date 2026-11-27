@@ -5,8 +5,8 @@ from apps.api.app.schemas.runtime_config import AIProvider
 
 class ModelListRequest(BaseModel):
     provider: AIProvider
-    api_key: str = ""
-    base_url: str = ""
+    api_key: str | None = None
+    base_url: str | None = None
 
 
 class ModelListResponse(BaseModel):

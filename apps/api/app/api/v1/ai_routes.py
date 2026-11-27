@@ -25,8 +25,8 @@ async def list_models(payload: ModelListRequest, db: AsyncSession = Depends(get_
     """Fetch the model catalog for the provider form, using unsaved (draft) values when given."""
     runtime = await get_runtime_config(db)
     saved = runtime.credentials_for(payload.provider)
-    api_key = payload.api_key.strip() or saved.api_key
-    base_url = payload.base_url.strip() or saved.base_url
+    api_key = saved.api_key if payload.api_key is None else payload.api_key.strip()
+    base_url = saved.base_url if payload.base_url is None else payload.base_url.strip()
     try:
         models, used_base_url = await fetch_model_ids(
             base_url,

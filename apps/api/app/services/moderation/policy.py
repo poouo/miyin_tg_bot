@@ -24,7 +24,9 @@ class ModerationPolicyEngine:
         self.ad_guard = AdBlockGuard()
         self.spam_guard = AntiSpamGuard()
 
-    async def check_message(self, db: AsyncSession, chat_id: int, user_id: int, text: str) -> ModerationDecision:
+    async def check_message(
+        self, db: AsyncSession, chat_id: int, user_id: int, text: str, *, count_for_spam: bool = True,
+    ) -> ModerationDecision:
         config = await get_group(db, chat_id)
         if config is None:
             return ModerationDecision(blocked=False)
@@ -46,13 +48,15 @@ class ModerationPolicyEngine:
             if keyword_rule:
                 return ModerationDecision(blocked=True, reason="keyword_filter", keyword_rule=keyword_rule)
 
-        if config.anti_spam_enabled and self.spam_guard.hit(
+        if count_for_spam and config.anti_spam_enabled and self.spam_guard.hit(
             chat_id,
             user_id,
             text,
             config.anti_spam_window_sec or runtime.spam_window_sec,
             config.anti_spam_same_text_max,
             config.anti_spam_different_text_max,
+            global_window_sec=runtime.spam_window_sec,
+            global_max_messages=runtime.spam_max_messages,
         ):
             return ModerationDecision(blocked=True, reason="anti_spam")
 

@@ -1,6 +1,6 @@
 # Miyin TG Group Manager Bot
 
-Current version: `V1.0.05`
+Current version: `V1.0.06`
 
 Default Web language: Chinese (switchable to English in admin panel).
 Installers generate a random signing secret and admin password, and display the initial password in the terminal. Existing `.env` files are preserved; rotate default credentials separately on existing deployments.
@@ -13,6 +13,7 @@ Chinese readme: [README.md](./README.md)
 - Keyword filtering (delete or mute)
 - Ad detection and block
 - AI ad detection (1-60s message batching with confidence tiers: delete / warn / mute / kick / ban)
+- Confirmed requests to post ads on someone's behalf receive three public warnings in a rolling 30-day window before the group's warning action applies.
 - Two-account spam bait detection: when a mentioned account posts an ad, the @-mention initiator is punished too
 - Anti-spam rate limit
 - Auto recovery (unmute after timeout)

@@ -21,7 +21,7 @@ _MANAGER_ROLES = {"administrator", "creator"}
 _GROUP_CHAT_TYPES = {"group", "supergroup"}
 
 
-async def _is_group_admin(message: Any) -> bool:
+async def is_group_admin(message: Any) -> bool:
     chat = message.chat
     # Anonymous admins post as the group itself.
     sender_chat = getattr(message, "sender_chat", None)
@@ -50,7 +50,7 @@ async def check_ai_access(message: Any, group: Any, runtime: Any) -> str:
         return AI_DISABLED
     if getattr(group, "ai_member_enabled", True):
         return AI_ALLOWED
-    if is_bot_admin or await _is_group_admin(message):
+    if is_bot_admin or await is_group_admin(message):
         return AI_ALLOWED
     return AI_ADMIN_ONLY
 

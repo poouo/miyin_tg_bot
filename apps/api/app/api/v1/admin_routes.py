@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.api.app.core.auth import ADMIN_COOKIE_NAME, create_admin_token, get_client_ip, is_admin_authenticated
+from apps.api.app.core.auth import ADMIN_COOKIE_NAME, get_client_ip, is_admin_authenticated, require_admin_api, set_admin_cookie
 from apps.api.app.core.db import get_db
 from apps.api.app.core.i18n import get_translations, tr
 from apps.api.app.services.admin_password_service import verify_admin_password
@@ -20,9 +20,10 @@ from apps.api.app.services.security_service import (
 )
 from apps.api.app.services.stats_service import dashboard_stats
 from apps.api.app.services.runtime_config_service import get_runtime_config
+from apps.api.app.services.runtime_health import ai_health, bot_health, database_healthy
+from apps.api.app.services.update_service import get_update_deployment
 from apps.api.app.services.web_language_service import read_web_language
 from apps.api.app.services.community_feature_service import DISABLEABLE_COMMANDS
-from packages.shared.shared.config.settings import settings
 
 router = APIRouter(tags=["admin"])
 templates = Jinja2Templates(directory="apps/api/app/templates")
@@ -36,13 +37,6 @@ GROUP_FEATURE_FIELDS = (
     "deepseek_enabled",
     "ai_ad_block_enabled",
 )
-
-
-def _read_app_version() -> str:
-    try:
-        return Path("VERSION").read_text(encoding="utf-8").strip()
-    except Exception:
-        return "dev"
 
 
 def _build_i18n_context(lang: str) -> dict:
@@ -109,16 +103,8 @@ async def login_submit(
         )
 
     await clear_login_attempt(db, ip)
-    token = create_admin_token()
     response = RedirectResponse(url="/", status_code=303)
-    response.set_cookie(
-        key=ADMIN_COOKIE_NAME,
-        value=token,
-        max_age=settings.web_token_expire_days * 24 * 60 * 60,
-        httponly=True,
-        samesite="lax",
-        secure=False,
-    )
+    set_admin_cookie(request, response)
     return response
 
 
@@ -127,6 +113,17 @@ async def logout() -> Response:
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie(ADMIN_COOKIE_NAME)
     return response
+
+
+@router.get("/api/v1/status", dependencies=[Depends(require_admin_api)])
+async def admin_status(db: AsyncSession = Depends(get_db)) -> dict:
+    database = await database_healthy(db)
+    runtime = await get_runtime_config(db) if database else None
+    return {
+        "database": database,
+        "bot": bot_health(),
+        "ai": ai_health(runtime.ai_credentials) if runtime else {"state": "error"},
+    }
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -153,7 +150,9 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)) -> Respons
         "security": security,
         "runtime_config": runtime_config,
         "disableable_commands": sorted(DISABLEABLE_COMMANDS),
-        "app_version": _read_app_version(),
+        "dashboard_css_version": (PROJECT_ROOT / "apps/api/app/static/css/dashboard.fast.css").stat().st_mtime_ns,
+        "dashboard_js_version": (PROJECT_ROOT / "apps/api/app/static/js/dashboard.js").stat().st_mtime_ns,
+        "update_deployment": get_update_deployment(),
         **_build_i18n_context(lang),
     }
     return templates.TemplateResponse(request=request, name="dashboard.html", context=context)

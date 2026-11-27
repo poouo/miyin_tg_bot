@@ -5,9 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{{ t.dashboard_title }}</title>
   <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/dashboard.fast.css" />
+  <link rel="stylesheet" href="/static/css/dashboard.fast.css?v={{ dashboard_css_version }}" />
 </head>
 <body>
+  {% macro ai_model_picker(provider, model, placeholder) %}
+  <div class="field-block full-width">
+    <p class="model-saved">{{ t.ai_saved_model }} <strong id="rt-{{ provider }}-saved-model" data-model="{{ model }}">{{ model or t.ai_no_saved_model }}</strong></p>
+    <label for="rt-{{ provider }}-model-picker">{{ t.ai_model }}</label>
+    <div class="model-picker-row">
+      <select id="rt-{{ provider }}-model-picker" aria-describedby="rt-{{ provider }}-models-status" disabled>
+        <option value="">{{ t.ai_models_fetch_first }}</option>
+      </select>
+      <button id="rt-{{ provider }}-fetch-models" type="button" class="btn subtle model-fetch-btn">
+        <i class="ri-refresh-line" aria-hidden="true"></i>{{ t.ai_fetch_models }}
+      </button>
+    </div>
+    <p id="rt-{{ provider }}-models-status" class="model-feedback" aria-live="polite"></p>
+    <label class="model-manual-toggle">
+      <input id="rt-{{ provider }}-manual-mode" type="checkbox" aria-controls="rt-{{ provider }}-manual-field" />
+      {{ t.ai_manual_model }}
+    </label>
+    <label id="rt-{{ provider }}-manual-field" hidden>
+      {{ t.ai_model_id }}
+      <input id="rt-{{ provider }}-model" type="text" placeholder="{{ placeholder }}" autocomplete="off" disabled />
+    </label>
+  </div>
+  {% endmacro %}
+
   <div class="bg-layer bg-layer-a"></div>
   <div class="bg-layer bg-layer-b"></div>
   <div class="bg-layer bg-layer-c"></div>
@@ -79,6 +103,10 @@
 
         <div class="nav-group">
           <p class="nav-group-title">{{ t.nav_group_security }}</p>
+          <button class="nav-item" type="button" data-target="global-bans">
+            <span class="nav-item-icon"><i class="ri-shield-cross-line"></i></span>
+            <span class="nav-item-label">{{ t.community_global_bans_title }}</span>
+          </button>
           <button class="nav-item" type="button" data-target="settings">
             <span class="nav-item-icon"><i class="ri-settings-5-line"></i></span>
             <span class="nav-item-label">{{ t.nav_system_settings }}</span>
@@ -113,13 +141,23 @@
           <h2 id="workspace-title">{{ t.nav_overview }}</h2>
           <p>{{ t.dashboard_subtitle }}</p>
         </div>
-        <span class="runtime-pill"><span></span>{{ t.system_running }}</span>
+        <span id="health-summary" class="runtime-pill">{{ t.overview_unknown }}</span>
       </header>
+
+      <label id="managed-group-scope" class="managed-group-scope glass-surface" hidden>
+        <span>{{ t.current_group_context }}</span>
+        <select id="managed-group">
+          <option value="" data-all-groups>{{ t.all_groups }}</option>
+          {% for group in groups %}
+          <option value="{{ group.chat_id }}">{{ group.title or group.chat_id }}</option>
+          {% endfor %}
+        </select>
+      </label>
 
       <section id="overview" class="glass-panel panel section">
         <div class="panel-head overview-heading">
           <h3>{{ t.nav_overview }}</h3>
-          <span class="overview-live-badge"><span></span>{{ t.system_running }}</span>
+          <span id="health-overview" class="overview-live-badge">{{ t.overview_unknown }}</span>
         </div>
 
         <div class="overview-stats">
@@ -229,17 +267,17 @@
                 </li>
                 <li>
                   <span class="overview-service-icon is-good"><i class="ri-database-2-line"></i></span>
-                  <div><strong>{{ t.overview_database_service }}</strong><small>{{ t.overview_connected }}</small></div>
+                  <div><strong>{{ t.overview_database_service }}</strong><small id="health-database">{{ t.overview_connected }}</small></div>
                   <span class="overview-status-dot is-good"></span>
                 </li>
                 <li>
                   <span class="overview-service-icon {% if overview_status.bot_configured %}is-good{% else %}is-warning{% endif %}"><i class="ri-telegram-line"></i></span>
-                  <div><strong>{{ t.overview_bot_service }}</strong><small>{{ t.overview_configured if overview_status.bot_configured else t.overview_not_configured }}</small></div>
+                  <div><strong>{{ t.overview_bot_service }}</strong><small id="health-bot">{{ t.overview_configured if overview_status.bot_configured else t.overview_not_configured }}</small></div>
                   <span class="overview-status-dot {% if overview_status.bot_configured %}is-good{% else %}is-warning{% endif %}"></span>
                 </li>
                 <li>
                   <span class="overview-service-icon {% if overview_status.ai_configured %}is-good{% else %}is-warning{% endif %}"><i class="ri-sparkling-2-line"></i></span>
-                  <div><strong>{{ t.overview_ai_service }}</strong><small>{{ t.overview_configured if overview_status.ai_configured else t.overview_not_configured }}</small></div>
+                  <div><strong>{{ t.overview_ai_service }}</strong><small id="health-ai">{{ t.overview_configured if overview_status.ai_configured else t.overview_not_configured }}</small></div>
                   <span class="overview-status-dot {% if overview_status.ai_configured %}is-good{% else %}is-warning{% endif %}"></span>
                 </li>
                 <li>
@@ -378,16 +416,7 @@
                   {{ t.ai_base_url }}
                   <input id="rt-deepseek-base-url" type="text" value="{{ runtime_config.deepseek_base_url }}" placeholder="https://api.deepseek.com" />
                 </label>
-                <div class="field-block">
-                  <label for="rt-deepseek-model">{{ t.ai_model }}</label>
-                  <div class="model-picker-row">
-                    <input id="rt-deepseek-model" type="text" value="{{ runtime_config.deepseek_model }}" placeholder="deepseek-chat" />
-                    <button id="rt-deepseek-fetch-models" type="button" class="btn subtle model-fetch-btn" data-model-fetch="deepseek">
-                      <i class="ri-refresh-line" aria-hidden="true"></i>{{ t.ai_fetch_models }}
-                    </button>
-                  </div>
-                  <select id="rt-deepseek-model-picker" class="model-picker-select" aria-label="{{ t.ai_select_model }}" hidden></select>
-                </div>
+                {{ ai_model_picker("deepseek", runtime_config.deepseek_model, "deepseek-chat") }}
               </div>
             </div>
 
@@ -401,16 +430,7 @@
                   {{ t.ai_base_url }}
                   <input id="rt-opencode-base-url" type="text" value="{{ runtime_config.opencode_base_url }}" placeholder="https://opencode.ai/inference/openai/v1" />
                 </label>
-                <div class="field-block">
-                  <label for="rt-opencode-model">{{ t.ai_model }}</label>
-                  <div class="model-picker-row">
-                    <input id="rt-opencode-model" type="text" value="{{ runtime_config.opencode_model }}" placeholder="deepseek-v4.1-flash" />
-                    <button id="rt-opencode-fetch-models" type="button" class="btn subtle model-fetch-btn" data-model-fetch="opencode">
-                      <i class="ri-refresh-line" aria-hidden="true"></i>{{ t.ai_fetch_models }}
-                    </button>
-                  </div>
-                  <select id="rt-opencode-model-picker" class="model-picker-select" aria-label="{{ t.ai_select_model }}" hidden></select>
-                </div>
+                {{ ai_model_picker("opencode", runtime_config.opencode_model, "deepseek-v4.1-flash") }}
               </div>
               <p class="settings-hint">{{ t.ai_opencode_hint }}</p>
             </div>
@@ -425,16 +445,7 @@
                   {{ t.ai_base_url }}
                   <input id="rt-custom-base-url" type="text" value="{{ runtime_config.custom_base_url }}" placeholder="https://your-endpoint/v1" />
                 </label>
-                <div class="field-block">
-                  <label for="rt-custom-model">{{ t.ai_model }}</label>
-                  <div class="model-picker-row">
-                    <input id="rt-custom-model" type="text" value="{{ runtime_config.custom_model }}" placeholder="model-id" />
-                    <button id="rt-custom-fetch-models" type="button" class="btn subtle model-fetch-btn" data-model-fetch="custom">
-                      <i class="ri-refresh-line" aria-hidden="true"></i>{{ t.ai_fetch_models }}
-                    </button>
-                  </div>
-                  <select id="rt-custom-model-picker" class="model-picker-select" aria-label="{{ t.ai_select_model }}" hidden></select>
-                </div>
+                {{ ai_model_picker("custom", runtime_config.custom_model, "model-id") }}
               </div>
               <p class="settings-hint">{{ t.ai_custom_hint }}</p>
             </div>
@@ -466,73 +477,104 @@
             </div>
           </article>
 
-          <article class="glass-surface settings-block">
-            <div class="settings-block-head">
-              <h4>{{ t.update_control }}</h4>
-            </div>
-            <div class="actions">
-              <button id="check-update" type="button" class="btn subtle"><i class="ri-search-line" aria-hidden="true"></i>{{ t.check_update }}</button>
-              <button id="trigger-update" type="button" class="btn"><i class="ri-upload-cloud-2-line" aria-hidden="true"></i>{{ t.online_update }}</button>
-            </div>
-            <div class="upgrade-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="upgrade-status">
-              <div id="upgrade-fill" class="upgrade-fill"></div>
-            </div>
-            <p id="upgrade-status" class="upgrade-status" role="status" aria-live="polite">{{ t.ready }}.</p>
-          </article>
+          <div class="settings-side">
+            <article class="glass-surface settings-block update-card">
+              <div class="settings-block-head">
+                <h4>{{ t.update_control }}</h4>
+                {% if update_deployment.mode == "docker" %}
+                <p>{{ t.update_docker_only }}</p>
+                {% elif not update_deployment.can_online_update %}
+                <p>{{ t.update_online_unavailable }}</p>
+                {% endif %}
+              </div>
+              <div class="actions">
+                <button id="check-update" type="button" class="btn subtle"><i class="ri-search-line" aria-hidden="true"></i>{{ t.check_update }}</button>
+                {% if update_deployment.can_online_update %}
+                <button id="trigger-update" type="button" class="btn"><i class="ri-upload-cloud-2-line" aria-hidden="true"></i>{{ t.online_update }}</button>
+                {% endif %}
+              </div>
+              <div class="upgrade-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="upgrade-status" hidden>
+                <div id="upgrade-fill" class="upgrade-fill"></div>
+              </div>
+              <p id="upgrade-status" class="upgrade-status" role="status" aria-live="polite"></p>
+              {% if update_deployment.mode == "docker" %}
+              <div id="docker-update-instructions" class="docker-upgrade" hidden>
+                {% if update_deployment.docker_source != "image" %}
+                <div class="docker-upgrade-option">
+                  <p>{{ t.update_docker_source }}</p>
+                  <pre><code id="docker-upgrade-source">branch="$(git symbolic-ref --short HEAD)" &amp;&amp;
+git pull --ff-only --no-rebase origin "$branch" &amp;&amp;
+revision="$(git rev-parse HEAD)" &amp;&amp;
+MIYIN_BUILD_REVISION="$revision" MIYIN_BUILD_BRANCH="$branch" docker compose up -d --build</code></pre>
+                  <button type="button" class="btn subtle" data-copy-update="docker-upgrade-source"><i class="ri-file-copy-line" aria-hidden="true"></i>{{ t.update_copy_command }}</button>
+                </div>
+                {% endif %}
+                {% if update_deployment.docker_source != "source" %}
+                <div class="docker-upgrade-option">
+                  <p>{{ t.update_docker_image }}</p>
+                  <pre><code id="docker-upgrade-image">docker compose pull &amp;&amp; docker compose up -d</code></pre>
+                  <button type="button" class="btn subtle" data-copy-update="docker-upgrade-image"><i class="ri-file-copy-line" aria-hidden="true"></i>{{ t.update_copy_command }}</button>
+                  <p>{{ t.update_docker_run }}</p>
+                </div>
+                {% endif %}
+              </div>
+              {% endif %}
+            </article>
 
-          <article class="glass-surface settings-block">
-            <div class="settings-block-head">
-              <h4>{{ t.login_protection }}</h4>
-              <p>{{ t.token_expire_desc }}</p>
-            </div>
-            <div class="form-grid">
-              <label class="check-card">
-                <input type="checkbox" id="login-ban-enabled" {% if security.login_ban_enabled %}checked{% endif %} />
-                {{ t.enable_temp_ban }}
-              </label>
-              <label>
-                {{ t.max_failed_attempts }}
-                <input id="login-max-attempts" type="number" min="2" max="20" value="{{ security.login_max_attempts }}" />
-              </label>
-              <label>
-                {{ t.ban_minutes }}
-                <input id="login-ban-minutes" type="number" min="1" max="120" value="{{ security.login_ban_minutes }}" />
-              </label>
-              <label>
-                {{ t.web_language }}
-                <select id="web-language">
-                  <option value="zh" {% if lang == "zh" %}selected{% endif %}>{{ t.lang_zh }}</option>
-                  <option value="en" {% if lang == "en" %}selected{% endif %}>{{ t.lang_en }}</option>
-                </select>
-              </label>
-            </div>
-            <div class="actions">
-              <button id="save-security" type="button" class="btn"><i class="ri-save-3-line" aria-hidden="true"></i>{{ t.save_login_security }}</button>
-            </div>
-          </article>
+            <article class="glass-surface settings-block">
+              <div class="settings-block-head">
+                <h4>{{ t.login_protection }}</h4>
+                <p>{{ t.token_expire_desc }}</p>
+              </div>
+              <div class="form-grid">
+                <label class="check-card">
+                  <input type="checkbox" id="login-ban-enabled" {% if security.login_ban_enabled %}checked{% endif %} />
+                  {{ t.enable_temp_ban }}
+                </label>
+                <label>
+                  {{ t.max_failed_attempts }}
+                  <input id="login-max-attempts" type="number" min="2" max="20" value="{{ security.login_max_attempts }}" />
+                </label>
+                <label>
+                  {{ t.ban_minutes }}
+                  <input id="login-ban-minutes" type="number" min="1" max="120" value="{{ security.login_ban_minutes }}" />
+                </label>
+                <label>
+                  {{ t.web_language }}
+                  <select id="web-language">
+                    <option value="zh" {% if lang == "zh" %}selected{% endif %}>{{ t.lang_zh }}</option>
+                    <option value="en" {% if lang == "en" %}selected{% endif %}>{{ t.lang_en }}</option>
+                  </select>
+                </label>
+              </div>
+              <div class="actions">
+                <button id="save-security" type="button" class="btn"><i class="ri-save-3-line" aria-hidden="true"></i>{{ t.save_login_security }}</button>
+              </div>
+            </article>
 
-          <article class="glass-surface settings-block">
-            <div class="settings-block-head">
-              <h4>{{ t.password_change }}</h4>
-            </div>
-            <div class="form-grid">
-              <label>
-                {{ t.current_password }}
-                <input id="current-password" type="password" autocomplete="current-password" />
-              </label>
-              <label>
-                {{ t.new_password }}
-                <input id="new-password" type="password" autocomplete="new-password" />
-              </label>
-              <label>
-                {{ t.confirm_password }}
-                <input id="confirm-password" type="password" autocomplete="new-password" />
-              </label>
-            </div>
-            <div class="actions">
-              <button id="save-password" type="button" class="btn"><i class="ri-key-2-line" aria-hidden="true"></i>{{ t.save_password }}</button>
-            </div>
-          </article>
+            <article class="glass-surface settings-block">
+              <div class="settings-block-head">
+                <h4>{{ t.password_change }}</h4>
+              </div>
+              <div class="form-grid">
+                <label>
+                  {{ t.current_password }}
+                  <input id="current-password" type="password" autocomplete="current-password" />
+                </label>
+                <label>
+                  {{ t.new_password }}
+                  <input id="new-password" type="password" autocomplete="new-password" />
+                </label>
+                <label>
+                  {{ t.confirm_password }}
+                  <input id="confirm-password" type="password" autocomplete="new-password" />
+                </label>
+              </div>
+              <div class="actions">
+                <button id="save-password" type="button" class="btn"><i class="ri-key-2-line" aria-hidden="true"></i>{{ t.save_password }}</button>
+              </div>
+            </article>
+          </div>
         </div>
       </section>
 
@@ -542,7 +584,7 @@
           <p>{{ t.auto_reply_desc }}</p>
         </div>
         <div class="form-grid two-col">
-          <label>
+          <label hidden>
             {{ t.select_group }}
             <select id="ar-chat-id">
               {% for group in groups %}
@@ -582,7 +624,7 @@
           <p>{{ t.keywords_desc }}</p>
         </div>
         <div class="form-grid two-col">
-          <label>
+          <label hidden>
             {{ t.select_group }}
             <select id="kw-chat-id">
               {% for group in groups %}
@@ -620,7 +662,7 @@
           <p>{{ t.ad_keywords_desc }}</p>
         </div>
         <div class="form-grid two-col">
-          <label>
+          <label hidden>
             {{ t.select_group }}
             <select id="ak-chat-id">
               {% for group in groups %}
@@ -659,7 +701,7 @@
           <p>{{ t.member_events_desc }}</p>
         </div>
         <div class="form-grid two-col">
-          <label>
+          <label hidden>
             {{ t.select_group }}
             <select id="ev-chat-id">
               {% for group in groups %}
@@ -697,7 +739,7 @@
           <p>{{ t.moderation_logs_desc }}</p>
         </div>
         <div class="form-grid three-col">
-          <label>
+          <label hidden>
             {{ t.select_group }}
             <select id="log-chat-id">
               <option value="">{{ t.all_groups }}</option>
@@ -756,7 +798,7 @@
           <p>{{ t.community_desc }}</p>
         </div>
         <div class="form-grid two-col">
-          <label>
+          <label hidden>
             {{ t.select_group }}
             <select id="cm-chat-id">
               {% for group in groups %}
@@ -766,7 +808,7 @@
           </label>
         </div>
         <div class="actions community-actions">
-          <button id="cm-save" type="button" class="btn"><i class="ri-save-3-line" aria-hidden="true"></i>{{ t.save }}</button>
+
           <button id="cm-refresh" type="button" class="btn subtle"><i class="ri-refresh-line" aria-hidden="true"></i>{{ t.refresh }}</button>
         </div>
 
@@ -783,7 +825,7 @@
               </label>
             </div>
             <div class="actions">
-              <button type="button" class="btn cm-config-save">{{ t.save }}</button>
+              <button type="button" class="btn cm-config-save" data-scope="rules" disabled>{{ t.save }}</button>
             </div>
           </article>
 
@@ -808,7 +850,7 @@
               </label>
             </div>
             <div class="actions">
-              <button type="button" class="btn cm-config-save">{{ t.save }}</button>
+              <button type="button" class="btn cm-config-save" data-scope="welcome" disabled>{{ t.save }}</button>
             </div>
           </article>
 
@@ -842,7 +884,7 @@
                 <label class="check-card full-width"><input id="cm-reports-enabled" type="checkbox" /> {{ t.community_reports_enabled }}</label>
               </div>
               <div class="actions">
-                <button type="button" class="btn cm-config-save">{{ t.save }}</button>
+                <button type="button" class="btn cm-config-save" data-scope="warnings" disabled>{{ t.save }}</button>
               </div>
             </article>
 
@@ -859,7 +901,7 @@
                 <label class="check-card"><input id="cm-lock-commands" type="checkbox" /> {{ t.lock_commands }}</label>
               </div>
               <div class="actions">
-                <button type="button" class="btn cm-config-save">{{ t.save }}</button>
+                <button type="button" class="btn cm-config-save" data-scope="locks" disabled>{{ t.save }}</button>
               </div>
             </article>
 
@@ -876,7 +918,7 @@
                 </label>
               </div>
               <div class="actions">
-                <button type="button" class="btn cm-config-save">{{ t.save }}</button>
+                <button type="button" class="btn cm-config-save" data-scope="logs" disabled>{{ t.save }}</button>
               </div>
             </article>
 
@@ -891,7 +933,7 @@
                 {% endfor %}
               </div>
               <div class="actions">
-                <button type="button" class="btn cm-config-save">{{ t.save }}</button>
+                <button type="button" class="btn cm-config-save" data-scope="commands" disabled>{{ t.save }}</button>
               </div>
             </article>
           </div>
@@ -973,41 +1015,49 @@
               </div>
             </article>
 
-            <article class="glass-surface settings-block stagger-card">
-              <div class="settings-block-head">
-                <h4>{{ t.community_global_bans_title }}</h4>
-                <p>{{ t.community_global_bans_desc }}</p>
-              </div>
-              <div class="form-grid">
-                <label>
-                  {{ t.user_id }}
-                  <input id="cm-gban-user-id" type="number" />
-                </label>
-                <label>
-                  {{ t.reason }}
-                  <input id="cm-gban-reason" type="text" maxlength="1000" />
-                </label>
-              </div>
-              <div class="actions">
-                <button id="cm-gban-save" type="button" class="btn warning"><i class="ri-forbid-2-line" aria-hidden="true"></i>{{ t.global_ban_add }}</button>
-              </div>
-              <div class="table-wrap compact-table">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>{{ t.user_id }}</th>
-                      <th>{{ t.reason }}</th>
-                      <th>{{ t.actions }}</th>
-                    </tr>
-                  </thead>
-                  <tbody id="cm-gban-body">
-                    <tr><td colspan="3">{{ t.no_data }}</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </article>
+
           </div>
         </div>
+      </section>
+
+      <section id="global-bans" class="glass-panel panel section">
+        <div class="panel-head">
+          <h3>{{ t.community_global_bans_title }}</h3>
+          <p>{{ t.community_global_bans_desc }}</p>
+        </div>
+        <article class="glass-surface settings-block stagger-card">
+          <div class="settings-block-head">
+            <h4>{{ t.community_global_bans_title }}</h4>
+            <p>{{ t.community_global_bans_desc }}</p>
+          </div>
+          <div class="form-grid">
+            <label>
+              {{ t.user_id }}
+              <input id="cm-gban-user-id" type="number" />
+            </label>
+            <label>
+              {{ t.reason }}
+              <input id="cm-gban-reason" type="text" maxlength="1000" />
+            </label>
+          </div>
+          <div class="actions">
+            <button id="cm-gban-save" type="button" class="btn warning"><i class="ri-forbid-2-line" aria-hidden="true"></i>{{ t.global_ban_add }}</button>
+          </div>
+          <div class="table-wrap compact-table">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>{{ t.user_id }}</th>
+                  <th>{{ t.reason }}</th>
+                  <th>{{ t.actions }}</th>
+                </tr>
+              </thead>
+              <tbody id="cm-gban-body">
+                <tr><td colspan="3">{{ t.no_data }}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
       </section>
 
       <section id="group-settings" class="glass-panel panel section">
@@ -1016,7 +1066,7 @@
           <p>{{ t.group_settings_desc }}</p>
         </div>
         <div class="form-grid two-col">
-          <label>
+          <label hidden>
             {{ t.select_group }}
             <select id="gs-chat-id">
               {% for group in groups %}
@@ -1250,9 +1300,11 @@
                 <th>{{ t.anti_spam }}</th>
                 <th>{{ t.auto_recover }}</th>
                 <th>{{ t.ai }}</th>
+                <th>{{ t.ai_ad_block }}</th>
+                <th>{{ t.actions }}</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="group-status-body">
               {% for group in groups %}
               <tr>
                 <td>{{ group.chat_id }}</td>
@@ -1263,10 +1315,12 @@
                 <td>{{ t.switch_on if group.anti_spam_enabled else t.switch_off }}</td>
                 <td>{{ t.switch_on if group.auto_recover_enabled else t.switch_off }}</td>
                 <td>{{ t.switch_on if group.deepseek_enabled else t.switch_off }}</td>
+                <td>{{ t.switch_on if group.ai_ad_block_enabled else t.switch_off }}</td>
+                <td><button type="button" class="table-btn" data-open-group="{{ group.chat_id }}">{{ t.nav_group_settings }}</button></td>
               </tr>
               {% else %}
               <tr>
-                <td colspan="8">{{ t.no_group_data }}</td>
+                <td colspan="10">{{ t.no_group_data }}</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -1280,7 +1334,7 @@
           <p>{{ t.bans_desc }}</p>
         </div>
         <div class="form-grid two-col">
-          <label>
+          <label hidden>
             {{ t.select_group }}
             <select id="ban-chat-id">
               <option value="">{{ t.all_groups }}</option>
@@ -1520,6 +1574,6 @@
   </div>
 
   <script id="i18n-data" type="application/json">{{ t_json | safe }}</script>
-  <script src="/static/js/dashboard.js?v={{ app_version }}"></script>
+  <script src="/static/js/dashboard.js?v={{ dashboard_js_version }}"></script>
 </body>
 </html>

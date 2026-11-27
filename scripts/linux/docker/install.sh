@@ -76,9 +76,12 @@ if [[ ! -d "${APP_DIR}/.git" ]]; then
   run_privileged git clone -b "${BRANCH}" "${REPO_URL}" "${APP_DIR}"
 else
   cd "${APP_DIR}"
-  run_privileged git fetch origin "${BRANCH}"
-  run_privileged git checkout -B "${BRANCH}" "origin/${BRANCH}"
-  run_privileged git reset --hard "origin/${BRANCH}"
+  current_branch="$(run_privileged git symbolic-ref --short HEAD)"
+  if [[ "${current_branch}" != "${BRANCH}" ]]; then
+    echo "Check out ${BRANCH} before reinstalling."
+    exit 1
+  fi
+  run_privileged git pull --ff-only --no-rebase origin "${BRANCH}"
 fi
 
 cd "${APP_DIR}"
@@ -93,6 +96,7 @@ ensure_env_example
 run_privileged bash "${APP_DIR}/scripts/linux/init_env.sh" "${APP_DIR}"
 
 run_privileged mkdir -p data logs
-run_privileged docker compose up -d --build
+revision="$(run_privileged git rev-parse HEAD)"
+run_privileged env MIYIN_BUILD_REVISION="${revision}" MIYIN_BUILD_BRANCH="${BRANCH}" docker compose up -d --build
 echo "[miyin] docker install done"
 echo "[miyin] web: http://<server-ip>:9800"

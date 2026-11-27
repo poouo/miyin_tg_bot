@@ -30,7 +30,8 @@ from apps.api.app.services.community_feature_service import (
     render_template,
     update_welcome_config,
 )
-from apps.api.app.services.group_service import ensure_group
+from apps.api.app.services.global_ban_sync import apply_global_ban
+from apps.api.app.services.group_service import ensure_group, get_group
 from apps.api.app.services.log_service import add_log
 from apps.api.app.services.auto_reply_service import match_auto_reply
 from apps.api.app.services.moderation.auto_recover import get_active_ban_sanction
@@ -47,7 +48,7 @@ from apps.api.app.services.moderation.join_verification import (
 )
 from apps.api.app.services.runtime_config_service import get_runtime_config
 from apps.bot.bot_app.ai_access import AI_ALLOWED, check_ai_access
-from apps.bot.bot_app.ai_ad_guard import ai_ad_guard
+from apps.bot.bot_app.ai_ad_guard import ai_ad_guard, review_group_ai_reply
 from apps.bot.bot_app.ai_formatting import reply_ai_text
 from apps.bot.bot_app.moderation_actions import ModerationActionConfig, apply_moderation_action
 from apps.bot.bot_app.state import deepseek_client, policy_engine
@@ -252,47 +253,51 @@ async def _apply_mention_sanctions(
             continue
 
 
-def _message_lock_type(message: Message) -> str | None:
+def _message_lock_types(message: Message) -> set[str]:
     text = message.text or message.caption or ""
     entities = list(message.entities or []) + list(message.caption_entities or [])
+    kinds = set()
     if text.startswith("/"):
-        return "commands"
+        kinds.add("commands")
     if getattr(message, "forward_origin", None) or getattr(message, "forward_date", None):
-        return "forwards"
+        kinds.add("forwards")
     if getattr(message, "sticker", None):
-        return "stickers"
-    if (
-        getattr(message, "photo", None)
-        or getattr(message, "video", None)
-        or getattr(message, "animation", None)
-        or getattr(message, "document", None)
-        or getattr(message, "audio", None)
-        or getattr(message, "voice", None)
-    ):
-        return "media"
-    if any(item.type in {"url", "text_link"} for item in entities):
-        return "links"
+        kinds.add("stickers")
+    if any(getattr(message, kind, None) for kind in ("photo", "video", "animation", "document", "audio", "voice", "video_note")):
+        kinds.add("media")
     lowered = text.lower()
-    if "http://" in lowered or "https://" in lowered or "t.me/" in lowered:
-        return "links"
-    return None
+    if any(item.type in {"url", "text_link"} for item in entities) or any(
+        link in lowered for link in ("http://", "https://", "t.me/")
+    ):
+        kinds.add("links")
+    return kinds
 
 
 async def _enforce_locks(message: Message, db) -> bool:
-    if await _is_group_manager(message):
-        return False
-    lock_type = _message_lock_type(message)
-    if lock_type is None:
+    kinds = _message_lock_types(message)
+    if not kinds:
         return False
     config = await get_lock_config(db, message.chat.id)
-    if not getattr(config, lock_type):
+    locked = sorted(kind for kind in kinds if getattr(config, kind))
+    if not locked or await _is_group_manager(message):
         return False
     try:
         await message.delete()
     except Exception:
-        pass
-    await add_log(db, message.chat.id, message.from_user.id if message.from_user else 0, "", "lock_deleted", lock_type)
+        logger.warning("Could not delete locked message %s in chat %s", message.message_id, message.chat.id)
+    else:
+        await add_log(db, message.chat.id, message.from_user.id if message.from_user else 0, "", "lock_deleted", ",".join(locked))
     return True
+
+
+async def group_lock_middleware(handler, message: Message, data):
+    if message.chat.type in {"group", "supergroup"} and message.from_user and not message.from_user.is_bot:
+        if _message_lock_types(message):
+            async with SessionLocal() as db:
+                if await _enforce_locks(message, db):
+                    return None
+        data["locks_checked"] = True
+    return await handler(message, data)
 
 
 async def _send_log_channel(bot, db, chat_id: int, text: str) -> None:
@@ -395,13 +400,17 @@ def _log_message_detail(reason: str, text: str) -> str:
     ~F.new_chat_members,
     ~F.left_chat_member,
 )
-async def group_non_text_lock_handler(message: Message) -> None:
+async def group_non_text_lock_handler(message: Message, locks_checked: bool = False) -> None:
+    if message.caption:
+        await group_text_handler(message, locks_checked=locks_checked, moderation_only=True)
+        return
     if message.from_user is None or message.from_user.is_bot:
         return
     async with SessionLocal() as db:
         await ensure_group(db, message.chat.id, message.chat.title or "")
         await record_chat_user_identity(db, message.chat.id, message.from_user.id, message.from_user.username)
-        await _enforce_locks(message, db)
+        if not locks_checked:
+            await _enforce_locks(message, db)
 
 
 @router.message(F.chat.type.in_({"group", "supergroup"}), F.new_chat_members)
@@ -423,7 +432,7 @@ async def new_member_handler(message: Message) -> None:
                 gban = await is_globally_banned(db, member.id)
                 if gban:
                     try:
-                        await message.bot.ban_chat_member(chat.id, member.id)
+                        await apply_global_ban(message.bot, db, chat.id, member.id)
                     except Exception:
                         pass
                     await add_log(db, chat.id, member.id, member.username or "", "global_ban_enforced", gban.reason)
@@ -461,7 +470,7 @@ async def new_member_handler(message: Message) -> None:
             gban = await is_globally_banned(db, member.id)
             if gban:
                 try:
-                    await message.bot.ban_chat_member(chat.id, member.id)
+                    await apply_global_ban(message.bot, db, chat.id, member.id)
                 except Exception:
                     pass
                 await add_log(db, chat.id, member.id, member.username or "", "global_ban_enforced", gban.reason)
@@ -754,10 +763,12 @@ async def verify_admin_remove_handler(callback: CallbackQuery) -> None:
 
 
 @router.message(F.chat.type.in_({"group", "supergroup"}), F.text)
-async def group_text_handler(message: Message) -> None:
+async def group_text_handler(
+    message: Message, locks_checked: bool = False, *, moderation_only: bool = False, edited: bool = False,
+) -> None:
     if message.from_user is None or message.from_user.is_bot:
         return
-    text = message.text or ""
+    text = message.text or message.caption or ""
     chat = message.chat
     user = message.from_user
 
@@ -768,7 +779,7 @@ async def group_text_handler(message: Message) -> None:
         gban = await is_globally_banned(db, user.id)
         if gban:
             try:
-                await message.bot.ban_chat_member(chat.id, user.id)
+                await apply_global_ban(message.bot, db, chat.id, user.id)
             except Exception:
                 pass
             try:
@@ -783,11 +794,14 @@ async def group_text_handler(message: Message) -> None:
                 f"<b>全局封禁执行</b>\n用户：<code>{user.id}</code>\n原因：{escape(gban.reason or '')}",
             )
             return
-        await _handle_afk(message, db)
-        if await _enforce_locks(message, db):
+        if not moderation_only:
+            await _handle_afk(message, db)
+        if not locks_checked and await _enforce_locks(message, db):
             return
         is_manager = await _is_group_manager(message)
-        decision = None if is_manager else await policy_engine.check_message(db, chat.id, user.id, text)
+        decision = None if is_manager else await policy_engine.check_message(
+            db, chat.id, user.id, text, count_for_spam=not edited,
+        )
         if decision is not None and decision.blocked:
             should_delete_message = (
                 (
@@ -891,12 +905,14 @@ async def group_text_handler(message: Message) -> None:
             await add_log(db, chat.id, user.id, user.username or "", "message_blocked", _log_message_detail(reason, text))
             return
 
+        if group.ai_ad_block_enabled and not is_manager:
+            ai_ad_guard.offer(message, int(getattr(group, "ai_ad_block_window_sec", 60) or 60))
+        if moderation_only:
+            return
+
         bot_mention = runtime.telegram_bot_username.strip()
         has_mention = bool(bot_mention) and f"@{bot_mention.lower()}" in text.lower()
         wants_ai = has_mention or text.startswith("问:")
-        # Normal chat is buffered so AI ad detection can judge a whole window at once.
-        if group.ai_ad_block_enabled and not is_manager and not wants_ai:
-            ai_ad_guard.offer(message, int(getattr(group, "ai_ad_block_window_sec", 60) or 60))
 
         if group.auto_recover_enabled:
             auto_reply = await match_auto_reply(db, chat.id, text)
@@ -939,6 +955,9 @@ async def group_text_handler(message: Message) -> None:
                 question = question[2:].strip()
             if question:
                 answer = await deepseek_client.ask(question, db=db)
+                answer = await review_group_ai_reply(message, db, group, question, answer)
+                if answer is None:
+                    return
                 sent = await reply_ai_text(message, answer)
                 delete_after_seconds = int(getattr(group, "ai_reply_delete_after_seconds", 0) or 0)
                 if sent is not None and delete_after_seconds > 0:
@@ -950,3 +969,21 @@ async def group_text_handler(message: Message) -> None:
                             delete_after_seconds,
                         )
                     )
+
+
+@router.edited_message(F.chat.type.in_({"group", "supergroup"}), F.text | F.caption)
+async def group_edited_message_handler(message: Message, locks_checked: bool = False) -> None:
+    await group_text_handler(message, locks_checked=locks_checked, moderation_only=True, edited=True)
+
+
+async def bot_ad_message_handler(message: Message) -> None:
+    if message.chat.type not in {"group", "supergroup"} or message.sender_chat is not None:
+        return
+    if message.from_user is None or message.from_user.id == message.bot.id:
+        return
+    if not (message.text or message.caption):
+        return
+    async with SessionLocal() as db:
+        group = await get_group(db, message.chat.id)
+        if group is not None and group.ai_ad_block_enabled and not await _is_group_manager(message):
+            ai_ad_guard.offer(message, group.ai_ad_block_window_sec)

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.app.core.db import SessionLocal
 from apps.api.app.models.entities import AppSetting
+from packages.shared.shared.config.settings import settings
 
 AI_PROVIDER_LABELS: dict[str, str] = {
     "deepseek": "DeepSeek",
@@ -181,10 +182,14 @@ async def _ensure_defaults(db: AsyncSession) -> None:
     result = await db.execute(select(AppSetting))
     existing = {row.key: row for row in result.scalars().all()}
     dirty = False
+    environment_defaults = {
+        **{key: value for key, value in settings.model_dump().items() if key in CONFIG_DEFAULTS},
+        "telegram_admin_ids": settings.telegram_admin_ids_raw,
+    }
     for key, default in CONFIG_DEFAULTS.items():
         if key in existing:
             continue
-        db.add(AppSetting(key=key, value=default))
+        db.add(AppSetting(key=key, value=str(environment_defaults.get(key, default))))
         dirty = True
     legacy_ad_regex = existing.get("ad_regex")
     if legacy_ad_regex is not None and legacy_ad_regex.value == LEGACY_DEFAULT_AD_REGEX:

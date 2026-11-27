@@ -67,6 +67,9 @@ jobs:
         with:
           context: .
           file: infra/docker/app.Dockerfile
+          build-args: |
+            MIYIN_DOCKER_SOURCE=image
+            MIYIN_BUILD_REVISION=${{ github.sha }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}

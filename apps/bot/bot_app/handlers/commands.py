@@ -33,7 +33,7 @@ from apps.api.app.services.community_feature_service import (
     list_global_bans,
     list_rss_subscriptions,
     list_warnings,
-    remove_global_ban,
+    is_globally_banned,
     remove_rss_subscription,
     reset_warnings,
     set_afk,
@@ -49,7 +49,10 @@ from apps.api.app.services.community_feature_service import (
 )
 from apps.api.app.services.group_service import ensure_group, get_group, list_groups
 from apps.api.app.services.log_service import add_log
-from apps.api.app.services.moderation.auto_recover import add_ban_sanction, mark_ban_recovered
+from apps.api.app.services.global_ban_sync import apply_global_ban, release_global_ban
+from apps.api.app.services.moderation.auto_recover import (
+    add_ban_sanction, add_mute_sanction, mark_ban_recovered, mark_member_sanctions_recovered,
+)
 from apps.api.app.services.moderation.join_verification import (
     challenge_failure_reason,
     get_challenge,
@@ -57,7 +60,8 @@ from apps.api.app.services.moderation.join_verification import (
     mark_challenge_passed,
 )
 from apps.api.app.services.runtime_config_service import get_runtime_config
-from apps.bot.bot_app.ai_access import AI_ALLOWED, AI_DENIED_TEXT, AI_DISABLED, check_ai_access
+from apps.bot.bot_app.ai_access import AI_ALLOWED, AI_DENIED_TEXT, AI_DISABLED, check_ai_access, is_group_admin
+from apps.bot.bot_app.ai_ad_guard import ai_ad_guard, review_group_ai_reply
 from apps.bot.bot_app.ai_formatting import reply_ai_text
 from apps.bot.bot_app.moderation_actions import DEFAULT_KICK_MINUTES, ModerationActionConfig, apply_moderation_action
 from apps.bot.bot_app.state import deepseek_client
@@ -171,6 +175,12 @@ async def is_group_manager(message: Message) -> bool:
 
 async def is_private_admin(message: Message) -> bool:
     if message.from_user is None or message.chat.type != "private":
+        return False
+    return await is_bot_admin(message)
+
+
+async def is_bot_admin(message: Message) -> bool:
+    if message.from_user is None:
         return False
     async with SessionLocal() as db:
         runtime = await get_runtime_config(db)
@@ -335,6 +345,8 @@ async def ask_handler(message: Message, command: CommandObject) -> None:
         if chat.type in {"group", "supergroup"}:
             await ensure_group(db, chat.id, chat.title or "")
             group = await get_group(db, chat.id)
+            if group is not None and group.ai_ad_block_enabled and not await is_group_admin(message):
+                ai_ad_guard.offer(message, group.ai_ad_block_window_sec)
         runtime = await get_runtime_config(db)
         access = await check_ai_access(message, group, runtime)
         if access != AI_ALLOWED:
@@ -345,6 +357,9 @@ async def ask_handler(message: Message, command: CommandObject) -> None:
             await message.reply("Usage: /ask your question")
             return
         answer = await deepseek_client.ask(question, db=db)
+        answer = await review_group_ai_reply(message, db, group, question, answer)
+        if answer is None:
+            return
     sent = await reply_ai_text(message, answer)
     delete_after_seconds = int(getattr(group, "ai_reply_delete_after_seconds", 0) or 0)
     if sent is not None and delete_after_seconds > 0:
@@ -1009,7 +1024,8 @@ async def unsetlog_handler(message: Message) -> None:
 
 @router.message(Command("gban"))
 async def gban_handler(message: Message, command: CommandObject) -> None:
-    if not await require_moderation_admin(message):
+    if not await is_bot_admin(message):
+        await message.reply("全局封禁仅限后台配置的机器人管理员。")
         return
     if message.from_user is None:
         return
@@ -1027,32 +1043,43 @@ async def gban_handler(message: Message, command: CommandObject) -> None:
     async with SessionLocal() as db:
         await add_global_ban(db, target_user_id, message.from_user.id, reason[:1000])
         await add_log(db, chat_id, target_user_id, message.from_user.username or "", "global_ban", reason)
-    try:
-        await message.bot.ban_chat_member(chat_id, target_user_id)
-    except Exception:
-        pass
+        try:
+            member = await message.bot.get_chat_member(chat_id, target_user_id)
+            if member.status != "kicked":
+                await apply_global_ban(message.bot, db, chat_id, target_user_id)
+        except Exception:
+            await message.reply("已加入全局名单，当前群的立即封禁失败。")
+            return
     await message.reply(f"用户 <code>{target_user_id}</code> 已加入全局封禁。", parse_mode="HTML")
 
 
 @router.message(Command("ungban"))
 async def ungban_handler(message: Message, command: CommandObject) -> None:
-    if not await require_moderation_admin(message):
+    if not await is_bot_admin(message):
+        await message.reply("解除全局封禁仅限后台配置的机器人管理员。")
         return
     target_user_id = parse_target_user_id(message, command)
-    if message.chat.type == "private":
+    if message.chat.type == "private" and target_user_id is not None and target_user_id < 0:
         parsed = parse_private_admin_args(command)
         target_user_id = parsed[1] if parsed else None
     if target_user_id is None:
         await message.reply("Usage: /ungban 用户ID")
         return
     async with SessionLocal() as db:
-        removed = await remove_global_ban(db, target_user_id)
-    await message.reply("全局封禁已解除。" if removed else "该用户不在全局封禁列表。")
+        result = await release_global_ban(message.bot, db, target_user_id)
+    if result["failed"]:
+        await message.reply(f"全局名单已解除，{len(result['failed'])} 个群未能解封，可重试。")
+    if result["legacy_groups"]:
+        groups = ", ".join(map(str, result["legacy_groups"][:20]))
+        await message.reply(f"以下群的历史封禁需要手动核对：{groups}")
+    if not result["failed"] and not result["legacy_groups"]:
+        await message.reply("全局封禁已解除。" if result["found"] else "该用户不在全局封禁列表。")
 
 
 @router.message(Command("gbanlist"))
 async def gbanlist_handler(message: Message) -> None:
-    if not await require_moderation_admin(message):
+    if not await is_bot_admin(message):
+        await message.reply("全局封禁列表仅限后台配置的机器人管理员。")
         return
     async with SessionLocal() as db:
         items = await list_global_bans(db)
@@ -1061,7 +1088,8 @@ async def gbanlist_handler(message: Message) -> None:
         return
     lines = ["<b>全局封禁</b>"]
     for item in items[:80]:
-        lines.append(f"<code>{item.user_id}</code> - {escape(item.reason or '无原因')}")
+        status = "（待同步解封）" if not item.active else ""
+        lines.append(f"<code>{item.user_id}</code> - {escape(item.reason or '无原因')}{status}")
     await message.reply("\n".join(lines), parse_mode="HTML")
 
 
@@ -1306,8 +1334,11 @@ async def unban_handler(message: Message, command: CommandObject) -> None:
         return
     chat_id, target_user_id, _ = resolved
 
-    await message.bot.unban_chat_member(chat_id, target_user_id, only_if_banned=True)
     async with SessionLocal() as db:
+        if await is_globally_banned(db, target_user_id):
+            await message.reply("该用户仍在全局封禁名单，请由机器人管理员先解除全局封禁。")
+            return
+        await message.bot.unban_chat_member(chat_id, target_user_id, only_if_banned=True)
         await mark_ban_recovered(db, chat_id, target_user_id)
         await add_log(
             db,
@@ -1379,6 +1410,7 @@ async def mute_handler(message: Message, command: CommandObject) -> None:
             "manual_mute",
             f"target={target_user_id}, minutes={minutes}",
         )
+        await add_mute_sanction(db, chat_id, target_user_id, "manual_mute", minutes)
     await message.reply(f"User {target_user_id} muted for {minutes} minutes.")
 
 
@@ -1398,9 +1430,10 @@ async def unmute_handler(message: Message, command: CommandObject) -> None:
     await message.bot.restrict_chat_member(
         chat_id=chat_id,
         user_id=target_user_id,
-        permissions=ChatPermissions(can_send_messages=True),
+        permissions=ChatPermissions(**dict.fromkeys(ChatPermissions.model_fields, True)),
     )
     async with SessionLocal() as db:
+        await mark_member_sanctions_recovered(db, chat_id, target_user_id, "mute")
         await add_log(
             db,
             chat_id,

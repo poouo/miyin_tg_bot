@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.app.models.entities import UserSanction
+
+GLOBAL_BAN_REASON = "global_ban"
 
 
 def _now() -> datetime:
@@ -37,9 +39,9 @@ async def add_ban_sanction(
     chat_id: int,
     user_id: int,
     reason: str,
-    ban_minutes: int,
+    ban_minutes: int | None,
 ) -> UserSanction:
-    expires_at = _now() + timedelta(minutes=ban_minutes)
+    expires_at = _now() + timedelta(minutes=ban_minutes) if ban_minutes is not None else None
     entity = UserSanction(
         chat_id=chat_id,
         user_id=user_id,
@@ -87,9 +89,12 @@ async def list_active_ban_sanctions(db: AsyncSession, chat_id: int | None = None
     result = await db.execute(
         select(UserSanction)
         .where(and_(*conditions, or_(UserSanction.expires_at.is_(None), UserSanction.expires_at > _now())))
-        .order_by(UserSanction.created_at.desc())
+        .order_by(UserSanction.created_at.desc(), UserSanction.id.desc())
     )
-    return list(result.scalars().all())
+    latest = {}
+    for item in result.scalars():
+        latest.setdefault((item.chat_id, item.user_id), item)
+    return list(latest.values())
 
 
 async def get_active_ban_sanction(db: AsyncSession, chat_id: int, user_id: int) -> UserSanction | None:
@@ -109,24 +114,20 @@ async def get_active_ban_sanction(db: AsyncSession, chat_id: int, user_id: int) 
     return result.scalars().first()
 
 
-async def mark_ban_recovered(db: AsyncSession, chat_id: int, user_id: int) -> UserSanction | None:
-    result = await db.execute(
-        select(UserSanction)
-        .where(
-            and_(
-                UserSanction.chat_id == chat_id,
-                UserSanction.user_id == user_id,
-                UserSanction.sanction_type == "ban",
-                UserSanction.recovered.is_(False),
-            )
-        )
-        .order_by(UserSanction.created_at.desc())
+async def mark_ban_recovered(db: AsyncSession, chat_id: int, user_id: int) -> None:
+    await mark_member_sanctions_recovered(db, chat_id, user_id, "ban")
+
+
+async def mark_member_sanctions_recovered(
+    db: AsyncSession, chat_id: int, user_id: int, sanction_type: str
+) -> None:
+    await db.execute(
+        update(UserSanction).where(
+            UserSanction.chat_id == chat_id,
+            UserSanction.user_id == user_id,
+            UserSanction.sanction_type == sanction_type,
+            UserSanction.recovered.is_(False),
+        ).values(recovered=True)
     )
-    entity = result.scalars().first()
-    if entity is None:
-        return None
-    entity.recovered = True
     await db.commit()
-    await db.refresh(entity)
-    return entity
 

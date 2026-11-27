@@ -2,6 +2,7 @@ import json
 import tempfile
 import time
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -11,7 +12,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import apps.api.app.models.entities  # noqa: F401  (registers tables on Base)
 from apps.api.app.models.base import Base
-from apps.api.app.models.entities import ModerationLog, UserSanction, UserWarning
+from apps.api.app.models.entities import AIAdMentionWarning, ModerationLog, UserSanction, UserWarning
 from apps.api.app.services import runtime_config_service as config_service
 from apps.api.app.services.community_feature_service import update_warning_setting
 from apps.api.app.services.group_service import ensure_group
@@ -27,12 +28,15 @@ from apps.bot.bot_app.ai_ad_guard import (
     ai_ad_guard,
     BufferedMessage,
     build_batch_prompt,
+    clear_expired_mention_warnings,
     confidence_tiers,
     find_linked_mentioners,
     handle_ai_ad_batch,
     parse_ad_verdicts,
     resolve_tier_action,
+    review_group_ai_reply,
     tier_cutoff,
+    warn_ad_requester,
 )
 from apps.bot.bot_app.state import deepseek_client
 
@@ -51,15 +55,16 @@ def _message(message_id, text, user_id=SPAMMER_ID, username="spammer", chat_id=C
     )
 
 
-def _buffered(message_id, text, user_id=SPAMMER_ID, username="spammer", mentions=frozenset(), mentioned_ids=frozenset()):
+def _buffered(message_id, text, user_id=SPAMMER_ID, username="spammer", mentions=frozenset(), mentioned_ids=frozenset(), **metadata):
     return BufferedMessage(
         message_id=message_id,
         user_id=user_id,
         username=username,
         text=text,
-        queued_at=0.0,
+        queued_at=metadata.pop("queued_at", 0.0),
         mentions=mentions,
         mentioned_ids=mentioned_ids,
+        **metadata,
     )
 
 
@@ -90,11 +95,8 @@ class ParseAdVerdictTests(unittest.TestCase):
         raw = fence + 'json\n{"ads":[{"id":11,"confidence":88}]}\n' + fence
         self.assertEqual([item.message_id for item in parse_ad_verdicts(raw, {11})], [11])
 
-    def test_plain_id_list(self):
-        self.assertEqual(
-            [item.message_id for item in parse_ad_verdicts("[11, 12]", {11, 12, 13})],
-            [11, 12],
-        )
+    def test_plain_ids_are_ignored_without_confidence(self):
+        self.assertEqual(parse_ad_verdicts("[11, 12]", {11, 12, 13}), [])
 
     def test_message_id_key_and_text_prefix(self):
         raw = '这里是结果：{"ads":[{"message_id":12,"score":80,"reason":"引流"}]}'
@@ -121,9 +123,9 @@ class ParseAdVerdictTests(unittest.TestCase):
         for raw in ("", "抱歉，我无法判断", "[]", "null", "42", '"text"'):
             self.assertEqual(parse_ad_verdicts(raw, {11}), [], raw)
 
-    def test_missing_confidence_defaults_to_threshold(self):
-        raw = json.dumps({"ads": [{"id": 11}]})
-        self.assertEqual(parse_ad_verdicts(raw, {11})[0].confidence, MIN_CONFIDENCE)
+    def test_missing_and_out_of_range_confidence_are_ignored(self):
+        raw = json.dumps({"ads": [{"id": 11}, {"id": 12, "confidence": 999}, {"id": 13, "confidence": 90.5}]})
+        self.assertEqual(parse_ad_verdicts(raw, {11, 12, 13}), [])
 
 
 class BuildBatchPromptTests(unittest.TestCase):
@@ -195,7 +197,7 @@ class MentionLinkingTests(unittest.TestCase):
             _buffered(10, "@spammer 快来看", user_id=8001, username="bait", mentions=frozenset({"spammer"})),
             _buffered(11, "进群领福利 日赚500"),
         ]
-        links = find_linked_mentioners(batch, {11})
+        links = find_linked_mentioners(batch, {11}, {10})
         self.assertEqual(links, [(8001, 10, 11, "bait")])
 
     def test_link_via_text_mention_user_id(self):
@@ -203,43 +205,67 @@ class MentionLinkingTests(unittest.TestCase):
             _buffered(10, "快来看", user_id=8001, username="bait", mentioned_ids=frozenset({SPAMMER_ID})),
             _buffered(11, "广告内容"),
         ]
-        self.assertEqual(find_linked_mentioners(batch, {11}), [(8001, 10, 11, "bait")])
+        self.assertEqual(find_linked_mentioners(batch, {11}, {10}), [(8001, 10, 11, "bait")])
 
     def test_mention_after_the_ad_is_not_linked(self):
         batch = [
             _buffered(11, "广告内容"),
             _buffered(12, "@spammer 收到", user_id=8001, username="bait", mentions=frozenset({"spammer"})),
         ]
-        self.assertEqual(find_linked_mentioners(batch, {11}), [])
+        self.assertEqual(find_linked_mentioners(batch, {11}, {12}, history=[batch[1]]), [])
 
     def test_mentioning_someone_else_is_not_linked(self):
         batch = [
             _buffered(10, "@someoneelse 你好", user_id=8001, username="bait", mentions=frozenset({"someoneelse"})),
             _buffered(11, "广告内容"),
         ]
-        self.assertEqual(find_linked_mentioners(batch, {11}), [])
+        self.assertEqual(find_linked_mentioners(batch, {11}, {10}), [])
 
     def test_history_mention_links_across_split_windows(self):
         history = [
             _buffered(20, "@spammer 快来看", user_id=8001, username="bait", mentions=frozenset({"spammer"})),
         ]
         batch = [_buffered(21, "广告内容")]
-        self.assertEqual(find_linked_mentioners(batch, {21}, history=history), [(8001, 20, 21, "bait")])
+        self.assertEqual(find_linked_mentioners(batch, {21}, {20}, history=history), [(8001, 20, 21, "bait")])
 
     def test_history_and_batch_duplicate_is_counted_once(self):
         mention = _buffered(20, "@spammer 快来看", user_id=8001, username="bait", mentions=frozenset({"spammer"}))
         batch = [mention, _buffered(21, "广告内容")]
-        self.assertEqual(find_linked_mentioners(batch, {21}, history=[mention]), [(8001, 20, 21, "bait")])
+        self.assertEqual(find_linked_mentioners(batch, {21}, {20}, history=[mention]), [(8001, 20, 21, "bait")])
 
     def test_self_mention_is_ignored(self):
         batch = [
             _buffered(10, "@spammer 我来了", mentions=frozenset({"spammer"})),
             _buffered(11, "广告内容"),
         ]
-        self.assertEqual(find_linked_mentioners(batch, {11}), [])
+        self.assertEqual(find_linked_mentioners(batch, {11}, {10}), [])
+
+    def test_plain_or_expired_mention_is_not_linked(self):
+        mention = _buffered(10, "@spammer 你好", user_id=8001, mentions=frozenset({"spammer"}))
+        ad = _buffered(11, "广告内容", reply_to_id=10)
+        self.assertEqual(find_linked_mentioners([ad], {11}, set(), history=[mention]), [])
+        late_ad = _buffered(11, "广告内容", reply_to_id=10, queued_at=121)
+        self.assertEqual(find_linked_mentioners([late_ad], {11}, {10}, history=[mention]), [])
+
+    def test_bare_bot_mention_counts_only_when_the_bot_directly_replies_with_an_ad(self):
+        mention = _buffered(10, "@SPAMMER", user_id=8001, mentions=frozenset({"spammer"}))
+        ad = _buffered(11, "广告内容", is_bot=True, reply_to_id=10)
+        self.assertEqual(find_linked_mentioners([mention, ad], {11}, set()), [(8001, 10, 11, "spammer")])
+        standalone_ad = _buffered(11, "广告内容", is_bot=True)
+        self.assertEqual(find_linked_mentioners([mention, standalone_ad], {11}, set()), [])
 
 
 class AIAdGuardTests(unittest.TestCase):
+    def test_large_queue_stays_partitioned_into_ordered_batches(self):
+        guard = AIAdGuard()
+        for message_id in range(1, 101):
+            guard.offer(_message(message_id, "sample"))
+        ready = guard.take_ready(now=time.monotonic() + 60)
+        self.assertEqual([item.message_id for item in ready[0][1]], list(range(1, 41)))
+        self.assertEqual(guard.take_ready(exclude={CHAT_ID}), [])
+        self.assertEqual([item.message_id for item in guard.take_ready()[0][1]], list(range(41, 81)))
+        self.assertEqual(guard.pending(), 20)
+
     def test_offer_and_window(self):
         guard = AIAdGuard()
         guard.offer(_message(11, "加我微信返利"), window_sec=30)
@@ -465,9 +491,9 @@ class HandleBatchTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(bot.banned), 1)
             self.assertEqual(bot.restricted, [])
 
-    async def test_linked_mentioner_is_deleted_and_punished(self):
+    async def test_linked_mentioner_gets_warning_and_advertiser_gets_ban(self):
         group = await self._prepare()
-        self.ask_mock.return_value = json.dumps({"ads": [{"id": 11, "confidence": 95}]})
+        self.ask_mock.return_value = json.dumps({"ads": [{"id": 11, "confidence": 95}], "requests": [10]})
         bot = _FakeBot()
         batch = [
             _buffered(10, "@spammer 快来看", user_id=8001, username="bait", mentions=frozenset({"spammer"})),
@@ -477,14 +503,9 @@ class HandleBatchTests(unittest.IsolatedAsyncioTestCase):
             handled = await handle_ai_ad_batch(bot, db, group, batch)
             self.assertEqual(handled, 2)
             self.assertEqual(sorted(bot.deleted), [(CHAT_ID, 10), (CHAT_ID, 11)])
-            self.assertEqual({item[1] for item in bot.banned}, {SPAMMER_ID, 8001})
-            details = [
-                row.detail
-                for row in (
-                    await db.execute(select(ModerationLog).where(ModerationLog.event_type == AI_AD_EVENT))
-                ).scalars().all()
-            ]
-            self.assertTrue(any("mentioner_of=11" in detail for detail in details), details)
+            self.assertEqual({item[1] for item in bot.banned}, {SPAMMER_ID})
+            self.assertIn("警告 1/3", bot.messages[0][1])
+            self.assertEqual((await db.get(AIAdMentionWarning, (CHAT_ID, 10))).user_id, 8001)
 
     async def test_mention_from_previous_window_is_linked(self):
         group = await self._prepare()
@@ -494,13 +515,14 @@ class HandleBatchTests(unittest.IsolatedAsyncioTestCase):
             window_sec=5,
         )
         ai_ad_guard._buffers.clear()  # simulate the mention being flushed in an earlier window
-        self.ask_mock.return_value = json.dumps({"ads": [{"id": 21, "confidence": 95}]})
+        self.ask_mock.return_value = json.dumps({"ads": [{"id": 21, "confidence": 95}], "requests": [20]})
         bot = _FakeBot()
         async with self.sessions() as db:
-            handled = await handle_ai_ad_batch(bot, db, group, [_buffered(21, "广告内容")])
+            handled = await handle_ai_ad_batch(bot, db, group, [_buffered(21, "广告内容", queued_at=time.monotonic())])
             self.assertEqual(handled, 2)
             self.assertEqual(sorted(bot.deleted), [(CHAT_ID, 20), (CHAT_ID, 21)])
-            self.assertEqual({item[1] for item in bot.banned}, {SPAMMER_ID, 8001})
+            self.assertEqual({item[1] for item in bot.banned}, {SPAMMER_ID})
+            self.assertIn("警告 1/3", bot.messages[0][1])
 
     async def test_linked_mention_is_not_reused_for_later_ads(self):
         group = await self._prepare()
@@ -509,31 +531,37 @@ class HandleBatchTests(unittest.IsolatedAsyncioTestCase):
             _message(20, "@spammer 快来看", user_id=8001, username="bait", entities=entities),
             window_sec=30,
         )
-        self.ask_mock.return_value = json.dumps({"ads": [{"id": 21, "confidence": 95}]})
+        ai_ad_guard.offer(_message(21, "广告内容"), window_sec=30)
+        batch = ai_ad_guard.take_ready(now=time.monotonic() + 31)[0][1]
+        self.ask_mock.return_value = json.dumps({"ads": [{"id": 21, "confidence": 95}], "requests": [20]})
         bot_first = _FakeBot()
         async with self.sessions() as db:
-            await handle_ai_ad_batch(
-                bot_first,
-                db,
-                group,
-                [
-                    _buffered(20, "@spammer 快来看", user_id=8001, username="bait", mentions=frozenset({"spammer"})),
-                    _buffered(21, "广告内容"),
-                ],
-            )
+            await handle_ai_ad_batch(bot_first, db, group, batch)
         self.assertEqual(ai_ad_guard.mention_history(CHAT_ID), [])
 
-        self.ask_mock.return_value = json.dumps({"ads": [{"id": 31, "confidence": 95}]})
+        self.ask_mock.return_value = json.dumps({"ads": [{"id": 31, "confidence": 95}], "requests": [20]})
         bot_second = _FakeBot()
         async with self.sessions() as db:
             handled = await handle_ai_ad_batch(bot_second, db, group, [_buffered(31, "又一条广告")])
             self.assertEqual(handled, 1)
             self.assertEqual({item[1] for item in bot_second.banned}, {SPAMMER_ID})
 
+    async def test_queued_edit_supersedes_in_flight_verdict(self):
+        group = await self._prepare()
+        ai_ad_guard.offer(_message(21, "original content"), window_sec=1)
+        batch = ai_ad_guard.take_ready(now=time.monotonic() + 2)[0][1]
+        ai_ad_guard.offer(_message(21, "corrected content"), window_sec=1)
+        self.ask_mock.return_value = json.dumps({"ads": [{"id": 21, "confidence": 95}]})
+        bot = _FakeBot()
+        async with self.sessions() as db:
+            handled = await handle_ai_ad_batch(bot, db, group, batch)
+        self.assertEqual(handled, 0)
+        self.assertEqual(bot.deleted, [])
+
     async def test_mentioner_link_can_be_disabled(self):
         group = await self._prepare()
         group.ai_ad_block_punish_mentioner = False
-        self.ask_mock.return_value = json.dumps({"ads": [{"id": 11, "confidence": 95}]})
+        self.ask_mock.return_value = json.dumps({"ads": [{"id": 11, "confidence": 95}], "requests": [10]})
         bot = _FakeBot()
         batch = [
             _buffered(10, "@spammer 快来看", user_id=8001, username="bait", mentions=frozenset({"spammer"})),
@@ -550,7 +578,7 @@ class HandleBatchTests(unittest.IsolatedAsyncioTestCase):
         self.ask_mock.return_value = json.dumps({"ads": [{"id": 11, "confidence": 95}]})
         bot = _FakeBot()
         batch = [
-            _buffered(10, "@someoneelse 你好", user_id=8001, username="bait", mentions=frozenset({"someoneelse"})),
+            _buffered(10, "@spammer 你好", user_id=8001, username="bait", mentions=frozenset({"spammer"})),
             _buffered(11, "广告内容"),
         ]
         async with self.sessions() as db:
@@ -558,6 +586,54 @@ class HandleBatchTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(handled, 1)
             self.assertEqual(bot.deleted, [(CHAT_ID, 11)])
             self.assertEqual({item[1] for item in bot.banned}, {SPAMMER_ID})
+
+    async def test_requester_has_three_distinct_warnings_and_fourth_uses_group_warning_action(self):
+        await self._prepare()
+        bot = _FakeBot()
+        for message_id in (10, 10, 11, 12):
+            async with self.sessions() as db:
+                await warn_ad_requester(bot, db, CHAT_ID, MEMBER_ID, "member", message_id)
+        self.assertEqual(len(bot.messages), 3)
+        for count, (_, text) in enumerate(bot.messages, 1):
+            self.assertIn(f"警告 {count}/3", text)
+        self.assertEqual(bot.restricted, [])
+        async with self.sessions() as db:
+            await warn_ad_requester(bot, db, CHAT_ID, MEMBER_ID, "member", 13)
+        self.assertEqual([item[1] for item in bot.restricted], [MEMBER_ID])
+        self.assertIn("已执行禁言", bot.messages[-1][1])
+
+    async def test_expired_requester_warnings_are_ignored_and_deleted(self):
+        await self._prepare()
+        bot = _FakeBot()
+        async with self.sessions() as db:
+            db.add_all([
+                AIAdMentionWarning(
+                    chat_id=CHAT_ID, message_id=message_id, user_id=MEMBER_ID,
+                    expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
+                )
+                for message_id in (10, 11, 12)
+            ])
+            await db.commit()
+            await warn_ad_requester(bot, db, CHAT_ID, MEMBER_ID, "member", 13)
+            self.assertIn("警告 1/3", bot.messages[0][1])
+            await clear_expired_mention_warnings(db)
+            result = await db.scalars(select(AIAdMentionWarning.message_id))
+            self.assertEqual(result.all(), [13])
+        self.assertEqual(bot.restricted, [])
+
+    async def test_own_bot_does_not_send_ad_and_warns_only_explicit_requester(self):
+        group = await self._prepare()
+        bot = _FakeBot()
+        message = _message(20, "@bot 请回答", user_id=MEMBER_ID, username="member")
+        message.bot = bot
+        message.message_thread_id = None
+        async with self.sessions() as db:
+            self.ask_mock.return_value = '{"ads":[{"id":2,"confidence":91}],"requests":[]}'
+            self.assertIn("已拦截", await review_group_ai_reply(message, db, group, "请回答", "广告结果"))
+            self.assertEqual(bot.messages, [])
+            self.ask_mock.return_value = '{"ads":[],"requests":[1]}'
+            self.assertIsNone(await review_group_ai_reply(message, db, group, "替我发推广", "示例"))
+            self.assertIn("警告 1/3", bot.messages[0][1])
 
     async def test_missing_api_key_skips_ai_call(self):
         group = await self._prepare(api_key="")

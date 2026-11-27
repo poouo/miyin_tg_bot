@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import apps.api.app.models.entities  # noqa: F401  (registers tables on Base)
 from apps.api.app.api.v1.ai_routes import router as ai_router
+from apps.api.app.api.v1.runtime_routes import router as runtime_router
 from apps.api.app.core.db import get_db
 from apps.api.app.models.base import Base
 from apps.api.app.services import runtime_config_service as config_service
@@ -386,6 +387,7 @@ class ModelListRouteTests(unittest.IsolatedAsyncioTestCase):
 
         app = FastAPI()
         app.include_router(ai_router, prefix="/api/v1")
+        app.include_router(runtime_router, prefix="/api/v1")
 
         async def override_get_db():
             async with self.sessions() as session:
@@ -433,6 +435,36 @@ class ModelListRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(mocked.await_args.args[0], "https://opencode.ai/inference/openai/v1")
         self.assertEqual(mocked.await_args.args[1], "saved-key")
+
+    async def test_model_list_uses_explicit_empty_draft_key(self):
+        async with self.sessions() as session:
+            await config_service.update_runtime_config(session, {"custom_api_key": "saved-key"})
+        with patch(
+            "apps.api.app.api.v1.ai_routes.fetch_model_ids",
+            AsyncMock(return_value=(["m1"], "https://example.com/v1/models")),
+        ) as mocked:
+            response = await self.client.post(
+                "/api/v1/ai/models",
+                json={"provider": "custom", "api_key": "", "base_url": "https://example.com/v1"},
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(mocked.await_args.args[1], "")
+
+    async def test_runtime_patch_updates_only_submitted_fields(self):
+        async with self.sessions() as session:
+            await config_service.update_runtime_config(
+                session, {"telegram_bot_username": "existing_bot", "deepseek_model": "old-model", "ad_regex": "example"},
+            )
+        with patch("apps.api.app.api.v1.runtime_routes.request_bot_reload", AsyncMock()) as reload_bot:
+            ai_result = await self.client.patch("/api/v1/runtime", json={"deepseek_model": "new-model"})
+            self.assertEqual(ai_result.status_code, 200, ai_result.text)
+            self.assertEqual(ai_result.json()["telegram_bot_username"], "existing_bot")
+            reload_bot.assert_not_awaited()
+            runtime_result = await self.client.patch("/api/v1/runtime", json={"telegram_bot_username": "new_bot"})
+            reload_bot.assert_awaited_once()
+        self.assertEqual(runtime_result.status_code, 200, runtime_result.text)
+        self.assertEqual(runtime_result.json()["deepseek_model"], "new-model")
+        self.assertEqual(runtime_result.json()["ad_regex"], "example")
 
     async def test_route_maps_fetch_errors_to_502(self):
         with patch(

@@ -11,17 +11,17 @@ router = APIRouter(prefix="/updates", tags=["updates"])
 
 
 @router.get("/check")
-async def check_repo_update() -> dict:
+def check_repo_update() -> dict:
     return check_update()
 
 
 @router.post("/online")
-async def start_online_update() -> dict:
+def start_online_update() -> dict:
     return trigger_online_update()
 
 
 @router.get("/online-status")
-async def online_update_status() -> dict:
+def online_update_status() -> dict:
     return get_online_update_status()
 
 

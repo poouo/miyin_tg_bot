@@ -3,6 +3,10 @@ services:
     build:
       context: .
       dockerfile: infra/docker/app.Dockerfile
+      args:
+        MIYIN_DOCKER_SOURCE: source
+        MIYIN_BUILD_REVISION: "${MIYIN_BUILD_REVISION:-}"
+        MIYIN_BUILD_BRANCH: "${MIYIN_BUILD_BRANCH:-main}"
     container_name: miyin-tg-bot
     restart: unless-stopped
     env_file:
@@ -11,3 +15,9 @@ services:
       - ./data:/app/data
     ports:
       - "${WEB_PORT:-9800}:${WEB_PORT:-9800}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.getenv('WEB_PORT', '9800') + '/healthz', timeout=3).close()"]
+      interval: 30s
+      timeout: 5s
+      start_period: 45s
+      retries: 3

@@ -172,6 +172,15 @@ class UserWarning(Base, TimestampMixin):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class AIAdMentionWarning(Base):
+    __tablename__ = "ai_ad_mention_warnings"
+
+    chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    message_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
 class ReportConfig(Base, TimestampMixin):
     __tablename__ = "report_configs"
 

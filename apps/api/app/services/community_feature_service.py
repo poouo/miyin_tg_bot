@@ -1,4 +1,4 @@
-from sqlalchemy import and_, delete, func, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.app.models.entities import (
@@ -12,6 +12,7 @@ from apps.api.app.models.entities import (
     RulesConfig,
     RssSubscription,
     UserWarning,
+    UserSanction,
     UserProfile,
     WarningSetting,
     WelcomeConfig,
@@ -32,29 +33,36 @@ DISABLEABLE_COMMANDS = {
 }
 
 
+async def _save(db: AsyncSession, commit: bool) -> None:
+    if commit:
+        await db.commit()
+    else:
+        await db.flush()
+
+
 async def get_rules(db: AsyncSession, chat_id: int) -> RulesConfig | None:
     result = await db.execute(select(RulesConfig).where(RulesConfig.chat_id == chat_id))
     return result.scalar_one_or_none()
 
 
-async def set_rules(db: AsyncSession, chat_id: int, text: str) -> RulesConfig:
+async def set_rules(db: AsyncSession, chat_id: int, text: str, *, commit: bool = True) -> RulesConfig:
     entity = await get_rules(db, chat_id)
     if entity is None:
         entity = RulesConfig(chat_id=chat_id, rules_text=text)
         db.add(entity)
     else:
         entity.rules_text = text
-    await db.commit()
+    await _save(db, commit)
     await db.refresh(entity)
     return entity
 
 
-async def clear_rules(db: AsyncSession, chat_id: int) -> None:
+async def clear_rules(db: AsyncSession, chat_id: int, *, commit: bool = True) -> None:
     entity = await get_rules(db, chat_id)
     if entity is None:
         return
     await db.delete(entity)
-    await db.commit()
+    await _save(db, commit)
 
 
 def normalize_note_name(name: str) -> str:
@@ -94,14 +102,14 @@ async def delete_note(db: AsyncSession, chat_id: int, name: str) -> bool:
     return bool(result.rowcount)
 
 
-async def get_warning_setting(db: AsyncSession, chat_id: int) -> WarningSetting:
+async def get_warning_setting(db: AsyncSession, chat_id: int, *, commit: bool = True) -> WarningSetting:
     result = await db.execute(select(WarningSetting).where(WarningSetting.chat_id == chat_id))
     entity = result.scalar_one_or_none()
     if entity is not None:
         return entity
     entity = WarningSetting(chat_id=chat_id)
     db.add(entity)
-    await db.commit()
+    await _save(db, commit)
     await db.refresh(entity)
     return entity
 
@@ -167,14 +175,14 @@ async def update_warning_setting(
     return entity
 
 
-async def get_report_config(db: AsyncSession, chat_id: int) -> ReportConfig:
+async def get_report_config(db: AsyncSession, chat_id: int, *, commit: bool = True) -> ReportConfig:
     result = await db.execute(select(ReportConfig).where(ReportConfig.chat_id == chat_id))
     entity = result.scalar_one_or_none()
     if entity is not None:
         return entity
     entity = ReportConfig(chat_id=chat_id, enabled=True)
     db.add(entity)
-    await db.commit()
+    await _save(db, commit)
     await db.refresh(entity)
     return entity
 
@@ -187,14 +195,14 @@ async def set_reports_enabled(db: AsyncSession, chat_id: int, enabled: bool) -> 
     return entity
 
 
-async def get_lock_config(db: AsyncSession, chat_id: int) -> LockConfig:
+async def get_lock_config(db: AsyncSession, chat_id: int, *, commit: bool = True) -> LockConfig:
     result = await db.execute(select(LockConfig).where(LockConfig.chat_id == chat_id))
     entity = result.scalar_one_or_none()
     if entity is not None:
         return entity
     entity = LockConfig(chat_id=chat_id)
     db.add(entity)
-    await db.commit()
+    await _save(db, commit)
     await db.refresh(entity)
     return entity
 
@@ -209,14 +217,14 @@ async def set_lock(db: AsyncSession, chat_id: int, lock_type: str, enabled: bool
     return entity
 
 
-async def get_welcome_config(db: AsyncSession, chat_id: int) -> WelcomeConfig:
+async def get_welcome_config(db: AsyncSession, chat_id: int, *, commit: bool = True) -> WelcomeConfig:
     result = await db.execute(select(WelcomeConfig).where(WelcomeConfig.chat_id == chat_id))
     entity = result.scalar_one_or_none()
     if entity is not None:
         return entity
     entity = WelcomeConfig(chat_id=chat_id)
     db.add(entity)
-    await db.commit()
+    await _save(db, commit)
     await db.refresh(entity)
     return entity
 
@@ -242,14 +250,14 @@ def render_template(text: str, *, chat_title: str, user_id: int, full_name: str,
     )
 
 
-async def get_log_channel(db: AsyncSession, chat_id: int) -> LogChannelConfig:
+async def get_log_channel(db: AsyncSession, chat_id: int, *, commit: bool = True) -> LogChannelConfig:
     result = await db.execute(select(LogChannelConfig).where(LogChannelConfig.chat_id == chat_id))
     entity = result.scalar_one_or_none()
     if entity is not None:
         return entity
     entity = LogChannelConfig(chat_id=chat_id)
     db.add(entity)
-    await db.commit()
+    await _save(db, commit)
     await db.refresh(entity)
     return entity
 
@@ -301,7 +309,15 @@ async def remove_global_ban(db: AsyncSession, user_id: int) -> bool:
 
 
 async def list_global_bans(db: AsyncSession) -> list[GlobalBan]:
-    result = await db.execute(select(GlobalBan).where(GlobalBan.active.is_(True)).order_by(GlobalBan.created_at.desc()))
+    pending = select(UserSanction.id).where(
+        UserSanction.user_id == GlobalBan.user_id,
+        UserSanction.sanction_type == "ban",
+        UserSanction.reason == "global_ban",
+        UserSanction.recovered.is_(False),
+    ).exists()
+    result = await db.execute(
+        select(GlobalBan).where(or_(GlobalBan.active.is_(True), pending)).order_by(GlobalBan.created_at.desc())
+    )
     return list(result.scalars().all())
 
 
@@ -316,7 +332,7 @@ def normalize_command(command: str) -> str:
     return command.strip().lower().lstrip("/").split("@")[0][:64]
 
 
-async def disable_command(db: AsyncSession, chat_id: int, command: str) -> DisabledCommand | None:
+async def disable_command(db: AsyncSession, chat_id: int, command: str, *, commit: bool = True) -> DisabledCommand | None:
     normalized = normalize_command(command)
     if normalized not in DISABLEABLE_COMMANDS:
         return None
@@ -327,17 +343,17 @@ async def disable_command(db: AsyncSession, chat_id: int, command: str) -> Disab
     if entity is None:
         entity = DisabledCommand(chat_id=chat_id, command=normalized)
         db.add(entity)
-        await db.commit()
+        await _save(db, commit)
         await db.refresh(entity)
     return entity
 
 
-async def enable_command(db: AsyncSession, chat_id: int, command: str) -> bool:
+async def enable_command(db: AsyncSession, chat_id: int, command: str, *, commit: bool = True) -> bool:
     normalized = normalize_command(command)
     result = await db.execute(
         delete(DisabledCommand).where(and_(DisabledCommand.chat_id == chat_id, DisabledCommand.command == normalized))
     )
-    await db.commit()
+    await _save(db, commit)
     return bool(result.rowcount)
 
 

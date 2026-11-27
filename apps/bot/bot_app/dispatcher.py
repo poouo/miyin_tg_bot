@@ -1,8 +1,10 @@
 import asyncio
 import logging
 from contextlib import suppress
+from functools import lru_cache
 
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, F
+from aiogram.methods import GetUpdates
 from aiogram.types import (
     BotCommand,
     BotCommandScopeAllChatAdministrators,
@@ -14,11 +16,24 @@ from aiogram.types import (
 from aiogram.utils.token import TokenValidationError, validate_token
 
 from apps.api.app.services.runtime_config_service import get_runtime_config
+from apps.api.app.services.runtime_health import record_bot
 from apps.bot.bot_app.handlers.commands import router as command_router
-from apps.bot.bot_app.handlers.group_events import router as group_router
+from apps.bot.bot_app.handlers.group_events import bot_ad_message_handler, group_lock_middleware, router as group_router
 from apps.bot.bot_app.tasks import ai_ad_flush_task, kick_unverified_task, recover_mute_task, rss_poll_task
 
 logger = logging.getLogger(__name__)
+
+
+async def track_polling(make_request, bot, method):
+    if not isinstance(method, GetUpdates):
+        return await make_request(bot, method)
+    try:
+        result = await make_request(bot, method)
+    except Exception:
+        record_bot("error")
+        raise
+    record_bot("online")
+    return result
 
 
 USER_COMMANDS = [
@@ -67,8 +82,12 @@ async def setup_bot_commands(bot: Bot) -> None:
         await bot.set_my_commands(ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=admin_id))
 
 
+@lru_cache(maxsize=1)
 def build_dispatcher() -> Dispatcher:
     dp = Dispatcher()
+    for observer in (dp.message, dp.edited_message):
+        observer.outer_middleware(group_lock_middleware)
+        observer.register(bot_ad_message_handler, F.from_user.is_bot, lambda message: message.sender_chat is None)
     dp.include_router(command_router)
     dp.include_router(group_router)
     return dp
@@ -89,22 +108,26 @@ class BotSupervisor:
 
     async def run_forever(self) -> None:
         self._reload_event.set()
-        while True:
-            try:
-                await asyncio.wait_for(self._reload_event.wait(), timeout=5.0)
-            except asyncio.TimeoutError:
-                pass
+        try:
+            while True:
+                try:
+                    await asyncio.wait_for(self._reload_event.wait(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    pass
 
-            self._reload_event.clear()
-            async with self._lock:
-                await self._sync_with_runtime()
-                await self._check_polling_health()
+                self._reload_event.clear()
+                async with self._lock:
+                    if not await self._check_polling_health():
+                        await self._sync_with_runtime()
+        finally:
+            await self._stop_polling("shutdown")
 
     async def _sync_with_runtime(self) -> None:
         runtime = await get_runtime_config()
         token = runtime.telegram_bot_token.strip()
 
         if not token or token == "replace_me":
+            record_bot("not_configured")
             await self._stop_polling("token_missing")
             if not self._missing_token_logged:
                 logger.warning("TELEGRAM_BOT_TOKEN is not configured; bot polling is disabled.")
@@ -123,6 +146,7 @@ class BotSupervisor:
         try:
             validate_token(token)
         except TokenValidationError:
+            record_bot("error")
             if token != self._invalid_token:
                 logger.error("TELEGRAM_BOT_TOKEN is invalid; bot polling is disabled.")
             self._invalid_token = token
@@ -132,25 +156,27 @@ class BotSupervisor:
         self._invalid_token = ""
         await self._stop_polling("token_changed")
         self._running_token = token
+        record_bot("starting")
         self._polling_task = asyncio.create_task(self._polling_loop(token), name="tg-bot-polling")
         logger.info("Bot polling started.")
 
-    async def _check_polling_health(self) -> None:
+    async def _check_polling_health(self) -> bool:
         if self._polling_task is None:
-            return
+            return False
         if not self._polling_task.done():
-            return
+            return False
 
         task = self._polling_task
         self._polling_task = None
         self._running_token = ""
+        record_bot("error")
         with suppress(asyncio.CancelledError):
             exc = task.exception()
             if exc:
                 logger.error("Bot polling stopped unexpectedly: %s", exc)
             else:
                 logger.warning("Bot polling task exited.")
-        self._reload_event.set()
+        return True
 
     async def _stop_polling(self, reason: str) -> None:
         task = self._polling_task
@@ -165,6 +191,7 @@ class BotSupervisor:
 
     async def _polling_loop(self, token: str) -> None:
         bot = Bot(token=token)
+        bot.session.middleware(track_polling)
         dp = build_dispatcher()
         recover_task = asyncio.create_task(recover_mute_task(bot), name="recover-mute-task")
         kick_task = asyncio.create_task(kick_unverified_task(bot), name="kick-unverified-task")
@@ -172,7 +199,7 @@ class BotSupervisor:
         ai_ad_task = asyncio.create_task(ai_ad_flush_task(bot), name="ai-ad-flush-task")
         try:
             await setup_bot_commands(bot)
-            await dp.start_polling(bot)
+            await dp.start_polling(bot, handle_signals=False, close_bot_session=False)
         finally:
             recover_task.cancel()
             kick_task.cancel()

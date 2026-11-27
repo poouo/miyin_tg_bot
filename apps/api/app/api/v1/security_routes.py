@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.api.app.core.auth import set_admin_cookie
 from apps.api.app.core.db import get_db
 from apps.api.app.core.i18n import normalize_language
 from apps.api.app.schemas.password import PasswordChangeRequest, PasswordChangeResponse
@@ -40,7 +41,7 @@ async def update_login_security(
 
 
 @router.post("/password", response_model=PasswordChangeResponse)
-async def update_admin_password(payload: PasswordChangeRequest) -> PasswordChangeResponse:
+async def update_admin_password(payload: PasswordChangeRequest, request: Request, response: Response) -> PasswordChangeResponse:
     if payload.new_password != payload.confirm_password:
         raise HTTPException(status_code=400, detail="new password and confirm password do not match")
     if payload.current_password == payload.new_password:
@@ -49,4 +50,5 @@ async def update_admin_password(payload: PasswordChangeRequest) -> PasswordChang
         raise HTTPException(status_code=400, detail="current password is incorrect")
 
     set_admin_password(payload.new_password)
+    set_admin_cookie(request, response)
     return PasswordChangeResponse(ok=True, message="password updated")

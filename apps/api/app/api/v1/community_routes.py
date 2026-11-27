@@ -1,3 +1,5 @@
+from aiogram import Bot
+from aiogram.utils.token import TokenValidationError
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +15,8 @@ from apps.api.app.schemas.community import (
     RssWrite,
 )
 from apps.api.app.services import community_feature_service as community
+from apps.api.app.services.global_ban_sync import release_global_ban
+from apps.api.app.services.runtime_config_service import get_runtime_config
 
 router = APIRouter(prefix="/community", tags=["community"])
 
@@ -29,20 +33,33 @@ async def add_global_ban(payload: GlobalBanWrite, db: AsyncSession = Depends(get
 
 @router.delete("/global-bans/{user_id}")
 async def delete_global_ban(user_id: int, db: AsyncSession = Depends(get_db)) -> dict:
-    ok = await community.remove_global_ban(db, user_id)
-    if not ok:
+    config = await get_runtime_config(db)
+    try:
+        bot = Bot(token=config.telegram_bot_token) if config.telegram_bot_token else None
+    except TokenValidationError:
+        bot = None
+    try:
+        result = await release_global_ban(bot, db, user_id)
+    finally:
+        if bot:
+            await bot.session.close()
+    if not result["found"]:
         raise HTTPException(status_code=404, detail="global ban not found")
-    return {"ok": True}
+    return {"ok": not result["failed"], "failed": result["failed"], "legacy_groups": result["legacy_groups"]}
 
 
 @router.get("/{chat_id}", response_model=CommunityConfigRead)
 async def get_community_config(chat_id: int, db: AsyncSession = Depends(get_db)) -> CommunityConfigRead:
+    return await _read_community_config(chat_id, db, commit=True)
+
+
+async def _read_community_config(chat_id: int, db: AsyncSession, *, commit: bool) -> CommunityConfigRead:
     rules = await community.get_rules(db, chat_id)
-    welcome = await community.get_welcome_config(db, chat_id)
-    warnings = await community.get_warning_setting(db, chat_id)
-    reports = await community.get_report_config(db, chat_id)
-    locks = await community.get_lock_config(db, chat_id)
-    logs = await community.get_log_channel(db, chat_id)
+    welcome = await community.get_welcome_config(db, chat_id, commit=commit)
+    warnings = await community.get_warning_setting(db, chat_id, commit=commit)
+    reports = await community.get_report_config(db, chat_id, commit=commit)
+    locks = await community.get_lock_config(db, chat_id, commit=commit)
+    logs = await community.get_log_channel(db, chat_id, commit=commit)
     disabled = await community.list_disabled_commands(db, chat_id)
     return CommunityConfigRead(
         chat_id=chat_id,
@@ -75,69 +92,54 @@ async def update_community_config(
     db: AsyncSession = Depends(get_db),
 ) -> CommunityConfigRead:
     data = payload.model_dump(exclude_unset=True)
-    if "rules_text" in data:
-        if data["rules_text"]:
-            await community.set_rules(db, chat_id, data["rules_text"])
-        else:
-            await community.clear_rules(db, chat_id)
+    if any(value is None for value in data.values()):
+        raise HTTPException(status_code=422, detail="Community settings cannot be null")
 
-    welcome_keys = {"welcome_enabled", "goodbye_enabled", "clean_welcome", "welcome_text", "goodbye_text"}
-    welcome_values = {key: data[key] for key in welcome_keys if key in data}
-    if welcome_values:
-        await community.update_welcome_config(db, chat_id, **welcome_values)
-
-    if any(key in data for key in ("warn_limit", "warn_action", "warn_mute_minutes", "warn_ban_minutes")):
-        current = await community.get_warning_setting(db, chat_id)
-        warn_action = data.get("warn_action", current.warn_action)
-        warn_minutes = data.get("warn_ban_minutes") if warn_action == "ban" else data.get("warn_mute_minutes")
-        await community.update_warning_setting(
-            db,
-            chat_id,
-            warn_limit=data.get("warn_limit"),
-            warn_action=data.get("warn_action"),
-            minutes=warn_minutes,
-        )
-        current = await community.get_warning_setting(db, chat_id)
-        if "warn_ban_minutes" in data:
-            current.ban_minutes = data["warn_ban_minutes"]
-        if "warn_mute_minutes" in data:
-            current.mute_minutes = data["warn_mute_minutes"]
-        await db.commit()
-
-    if "reports_enabled" in data:
-        await community.set_reports_enabled(db, chat_id, data["reports_enabled"])
-
-    lock_map = {
-        "lock_links": "links",
-        "lock_forwards": "forwards",
-        "lock_media": "media",
-        "lock_stickers": "stickers",
-        "lock_commands": "commands",
-    }
-    for payload_key, lock_key in lock_map.items():
-        if payload_key in data:
-            await community.set_lock(db, chat_id, lock_key, data[payload_key])
-
-    if "log_enabled" in data or "log_chat_id" in data:
-        if data.get("log_enabled") is False:
-            await community.unset_log_channel(db, chat_id)
-        else:
-            log_chat_id = int(data.get("log_chat_id") or 0)
-            if log_chat_id:
-                await community.set_log_channel(db, chat_id, log_chat_id, True)
-            elif data.get("log_enabled"):
+    async with db.begin():
+        if "log_enabled" in data or "log_chat_id" in data:
+            logs = await community.get_log_channel(db, chat_id, commit=False)
+            enabled = data.get("log_enabled", logs.enabled)
+            log_chat_id = data.get("log_chat_id", logs.log_chat_id)
+            if enabled and not log_chat_id:
                 raise HTTPException(status_code=400, detail="log_chat_id is required when log is enabled")
+            logs.enabled = enabled
+            logs.log_chat_id = log_chat_id if enabled else 0
 
-    if "disabled_commands" in data:
-        current = set(await community.list_disabled_commands(db, chat_id))
-        desired = {community.normalize_command(item) for item in data["disabled_commands"] if item.strip()}
-        desired = {item for item in desired if item}
-        for command in current - desired:
-            await community.enable_command(db, chat_id, command)
-        for command in desired - current:
-            await community.disable_command(db, chat_id, command)
+        if "rules_text" in data:
+            if data["rules_text"]:
+                await community.set_rules(db, chat_id, data["rules_text"], commit=False)
+            else:
+                await community.clear_rules(db, chat_id, commit=False)
 
-    return await get_community_config(chat_id, db)
+        field_groups = (
+            (community.get_welcome_config, {
+                key: key for key in ("welcome_enabled", "goodbye_enabled", "clean_welcome", "welcome_text", "goodbye_text")
+            }),
+            (community.get_warning_setting, {
+                "warn_limit": "warn_limit", "warn_action": "warn_action",
+                "warn_mute_minutes": "mute_minutes", "warn_ban_minutes": "ban_minutes",
+            }),
+            (community.get_report_config, {"reports_enabled": "enabled"}),
+            (community.get_lock_config, {f"lock_{key}": key for key in community.LOCK_TYPES}),
+        )
+        for get_entity, fields in field_groups:
+            if fields.keys() & data.keys():
+                entity = await get_entity(db, chat_id, commit=False)
+                for key, field in fields.items():
+                    if key in data:
+                        setattr(entity, field, data[key])
+
+        if "disabled_commands" in data:
+            current = set(await community.list_disabled_commands(db, chat_id))
+            desired = {community.normalize_command(item) for item in data["disabled_commands"]}
+            desired &= community.DISABLEABLE_COMMANDS
+            for command in current - desired:
+                await community.enable_command(db, chat_id, command, commit=False)
+            for command in desired - current:
+                await community.disable_command(db, chat_id, command, commit=False)
+
+        result = await _read_community_config(chat_id, db, commit=False)
+    return result
 
 
 @router.get("/{chat_id}/notes", response_model=list[NoteRead])
