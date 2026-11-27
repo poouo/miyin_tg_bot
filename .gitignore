@@ -15,6 +15,7 @@ __pycache__/
 venv/
 
 # Runtime
+/compose.miyin-image.yaml
 logs/
 data/
 *.db

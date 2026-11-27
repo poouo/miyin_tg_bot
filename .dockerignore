@@ -1,6 +1,7 @@
 .git
 .git-rewrite
 .github
+compose.miyin-image.yaml
 .env
 .env.*
 !.env.example

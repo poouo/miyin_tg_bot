@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_URL="https://github.com/poouo/miyin_tg_bot.git"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="${APP_DIR:-/opt/miyin_tg_bot}"
-BRANCH="${BRANCH:-main}"
-
-echo "[miyin] docker install start"
+IMAGE_TAG="${IMAGE_TAG:-latest}"
+IMAGE="ghcr.io/poouo/miyin_tg_bot:${IMAGE_TAG}"
+RAW_REPO="https://raw.githubusercontent.com/poouo/miyin_tg_bot/main"
+MODE="${1:-}"
+IMAGE_OVERRIDE="compose.miyin-image.yaml"
+IMAGE_MARKER="# Managed by the Miyin Docker installer."
 
 run_privileged() {
   if [[ "${EUID}" -eq 0 ]]; then
@@ -15,88 +18,135 @@ run_privileged() {
   fi
 }
 
-write_default_env_example() {
-  run_privileged tee "${APP_DIR}/.env.example" >/dev/null <<'EOF'
-APP_ENV=prod
-LOG_LEVEL=INFO
-PROJECT_NAME=miyin_tg_bot
-
-DATABASE_URL=sqlite+aiosqlite:///./data/miyin.db
-
-WEB_HOST=0.0.0.0
-WEB_PORT=9800
-WEB_ADMIN_PASSWORD=
-WEB_AUTH_SECRET=
-WEB_TOKEN_EXPIRE_DAYS=10
-EOF
+download() {
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$1" -o "$2"
+  else
+    wget -qO "$2" "$1"
+  fi
 }
 
-ensure_env_example() {
-  if [[ -f "${APP_DIR}/.env.example" ]]; then
-    return 0
+if [[ ! "${IMAGE_TAG}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+  echo "[miyin] invalid IMAGE_TAG" >&2
+  exit 1
+fi
+if ! run_privileged docker compose version >/dev/null 2>&1; then
+  echo "[miyin] Docker with the Compose plugin is required" >&2
+  exit 1
+fi
+if [[ "${MODE}" == "--upgrade" && ! -d "${APP_DIR}" ]]; then
+  echo "[miyin] deployment directory missing: ${APP_DIR}" >&2
+  exit 1
+fi
+
+run_privileged mkdir -p "${APP_DIR}"
+cd "${APP_DIR}"
+APP_DIR="$(pwd -P)"
+work="$(mktemp -d)"
+override_tmp=""
+cleanup() {
+  if [[ -n "${override_tmp}" ]]; then
+    run_privileged rm -f -- "${override_tmp}"
   fi
+  rm -f -- "$work/init_env.sh" "$work/env.example"
+  rmdir -- "$work"
+}
+trap cleanup EXIT
 
-  echo "[miyin] .env.example missing, trying to fetch template from GitHub..."
-  local urls=(
-    "https://raw.githubusercontent.com/poouo/miyin_tg_bot/${BRANCH}/.env.example"
-    "https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/.env.example"
-  )
-  local url
-
-  for url in "${urls[@]}"; do
-    if command -v curl >/dev/null 2>&1; then
-      if run_privileged curl -fsSL "${url}" -o "${APP_DIR}/.env.example"; then
-        echo "[miyin] .env.example downloaded from ${url}"
-        return 0
-      fi
-    elif command -v wget >/dev/null 2>&1; then
-      if run_privileged wget -qO "${APP_DIR}/.env.example" "${url}"; then
-        echo "[miyin] .env.example downloaded from ${url}"
-        return 0
-      fi
+compose_args=()
+if [[ -n "${COMPOSE_FILE:-}" ]]; then
+  IFS="${COMPOSE_PATH_SEPARATOR:-:}" read -r -a files <<< "${COMPOSE_FILE}"
+  for file in "${files[@]}"; do
+    compose_args+=(-f "${file}")
+  done
+else
+  for file in compose.yaml compose.yml docker-compose.yml docker-compose.yaml; do
+    if [[ -f "${file}" ]]; then
+      compose_args+=(-f "${file}")
+      break
     fi
   done
 
-  echo "[miyin] failed to download .env.example, using built-in template"
-  write_default_env_example
-}
-
-if ! command -v docker >/dev/null 2>&1; then
-  echo "docker not found, please install Docker first"
-  exit 1
+  if [[ "${#compose_args[@]}" -eq 0 ]]; then
+    if [[ "${MODE}" == "--upgrade" ]]; then
+      echo "[miyin] no Compose deployment found in ${APP_DIR}" >&2
+      exit 1
+    fi
+    run_privileged tee compose.yaml >/dev/null <<'EOF'
+services:
+  app:
+    image: ghcr.io/poouo/miyin_tg_bot:latest
+    container_name: miyin-tg-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "${WEB_PORT:-9800}:${WEB_PORT:-9800}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.getenv('WEB_PORT', '9800') + '/healthz', timeout=3).close()"]
+      interval: 30s
+      timeout: 5s
+      start_period: 45s
+      retries: 3
+EOF
+    compose_args+=(-f compose.yaml)
+  fi
+  for file in compose.override.yaml compose.override.yml docker-compose.override.yml docker-compose.override.yaml; do
+    if [[ -f "${file}" ]]; then
+      compose_args+=(-f "${file}")
+      break
+    fi
+  done
 fi
 
-if ! docker compose version >/dev/null 2>&1; then
-  echo "docker compose is unavailable"
-  exit 1
+if [[ -n "${COMPOSE_PROJECT_NAME:-}" ]]; then
+  compose_args+=(--project-name "${COMPOSE_PROJECT_NAME}")
 fi
-
-if [[ ! -d "${APP_DIR}/.git" ]]; then
-  run_privileged mkdir -p "${APP_DIR}"
-  run_privileged git clone -b "${BRANCH}" "${REPO_URL}" "${APP_DIR}"
-else
-  cd "${APP_DIR}"
-  current_branch="$(run_privileged git symbolic-ref --short HEAD)"
-  if [[ "${current_branch}" != "${BRANCH}" ]]; then
-    echo "Check out ${BRANCH} before reinstalling."
+if [[ -e "${IMAGE_OVERRIDE}" || -L "${IMAGE_OVERRIDE}" ]]; then
+  if [[ -L "${IMAGE_OVERRIDE}" ]] || ! grep -Fxq "${IMAGE_MARKER}" "${IMAGE_OVERRIDE}"; then
+    echo "[miyin] ${IMAGE_OVERRIDE} is not managed by this installer. Keep a backup and choose a different filename for that override." >&2
     exit 1
   fi
-  run_privileged git pull --ff-only --no-rebase origin "${BRANCH}"
 fi
 
-cd "${APP_DIR}"
+init_script="${SCRIPT_DIR}/../init_env.sh"
+if [[ ! -f "${init_script}" ]]; then
+  init_script="$work/init_env.sh"
+  download "${RAW_REPO}/scripts/linux/init_env.sh" "${init_script}"
+fi
+if [[ ! -e .env && ! -L .env && ! -f .env.example ]]; then
+  template="${SCRIPT_DIR}/../../../.env.example"
+  if [[ ! -f "${template}" ]]; then
+    template="$work/env.example"
+    download "${RAW_REPO}/.env.example" "${template}"
+  fi
+  run_privileged cp -- "${template}" .env.example
+fi
+run_privileged bash "${init_script}" "${APP_DIR}" --repair-auth
 
-if [[ ! -f "docker-compose.yml" ]]; then
-  echo "[miyin] docker-compose.yml missing in ${APP_DIR}, verify APP_DIR or repository content"
+services="$(run_privileged docker compose "${compose_args[@]}" config --services)"
+if ! grep -Fxq app <<< "${services}"; then
+  echo "[miyin] the selected Compose project does not define an app service" >&2
   exit 1
 fi
 
-ensure_env_example
+echo "[miyin] pulling ${IMAGE}"
+run_privileged docker pull "${IMAGE}"
+override_tmp="$(run_privileged mktemp "./.compose.miyin-image.XXXXXX")"
+{
+  printf '%s\n' "${IMAGE_MARKER}"
+  printf 'services:\n  app:\n    image: %s\n    pull_policy: never\n' "${IMAGE}"
+} | run_privileged tee "${override_tmp}" >/dev/null
+run_privileged chmod 644 "${override_tmp}"
+run_privileged mv -f -- "${override_tmp}" "${IMAGE_OVERRIDE}"
+override_tmp=""
 
-run_privileged bash "${APP_DIR}/scripts/linux/init_env.sh" "${APP_DIR}"
-
-run_privileged mkdir -p data logs
-revision="$(run_privileged git rev-parse HEAD)"
-run_privileged env MIYIN_BUILD_REVISION="${revision}" MIYIN_BUILD_BRANCH="${BRANCH}" docker compose up -d --build
-echo "[miyin] docker install done"
-echo "[miyin] web: http://<server-ip>:9800"
+up_args=(up -d --no-build)
+if [[ "$(run_privileged docker compose up --help)" == *"--wait-timeout"* ]]; then
+  up_args+=(--wait --wait-timeout 150)
+fi
+run_privileged docker compose "${compose_args[@]}" -f "${IMAGE_OVERRIDE}" "${up_args[@]}" app
+echo "[miyin] Docker deployment updated to ${IMAGE}"
+run_privileged docker compose "${compose_args[@]}" -f "${IMAGE_OVERRIDE}" ps app

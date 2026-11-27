@@ -28,13 +28,14 @@ class InstallEnvTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def run_init(self, *, fail_random=False):
-        args = [BASH, str(SCRIPT), str(self.app_dir)]
+    def run_init(self, *, fail_random=False, repair=False):
+        trailing = ["--repair-auth"] if repair else []
+        args = [BASH, str(SCRIPT), str(self.app_dir), *trailing]
         if fail_random:
             args = [
                 BASH, "-c",
                 'od() { return 1; }; export -f od; exec bash "$@"',
-                "test-init-env", str(SCRIPT), str(self.app_dir),
+                "test-init-env", str(SCRIPT), str(self.app_dir), *trailing,
             ]
         return subprocess.run(args, capture_output=True, text=True, timeout=15)
 
@@ -100,6 +101,122 @@ class InstallEnvTests(unittest.TestCase):
         result = self.run_init()
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.app_dir / ".env").exists())
+
+    def test_repairs_only_weak_literal_signing_secret_and_preserves_password(self):
+        path = self.app_dir / ".env"
+        path.write_text(
+            "WEB_PORT=9801\nWEB_AUTH_SECRET=old-key\nWEB_ADMIN_PASSWORD='custom-password' # retained\n",
+            encoding="utf-8",
+        )
+        result = self.run_init(repair=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        values = self.read_env()
+        self.assertRegex(values["WEB_AUTH_SECRET"], r"^[0-9a-f]{64}$")
+        self.assertEqual(values["WEB_PORT"], "9801")
+        self.assertEqual(values["WEB_ADMIN_PASSWORD"], "'custom-password' # retained")
+        self.assertNotIn(values["WEB_AUTH_SECRET"], result.stdout + result.stderr)
+        self.assertNotIn("initial admin password:", result.stdout)
+        self.assertEqual(self.run_init(repair=True, fail_random=True).returncode, 0)
+
+    def test_saved_dashboard_password_does_not_get_rotated(self):
+        (self.app_dir / "data").mkdir()
+        (self.app_dir / "data" / "admin_password.json").write_text("{}", encoding="utf-8")
+        (self.app_dir / ".env").write_text("WEB_AUTH_SECRET=old-key\nWEB_ADMIN_PASSWORD=admin\n", encoding="utf-8")
+        result = self.run_init(repair=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertRegex(self.read_env()["WEB_AUTH_SECRET"], r"^[0-9a-f]{64}$")
+        self.assertEqual(self.read_env()["WEB_ADMIN_PASSWORD"], "admin")
+
+    def test_repair_retains_docker_compose_interpolation(self):
+        original = b"WEB_AUTH_SECRET=${SECRET_FROM_ENV}\nWEB_ADMIN_PASSWORD=${PASS_FROM_ENV}\n"
+        path = self.app_dir / ".env"
+        path.write_bytes(original)
+        self.assertEqual(self.run_init(repair=True, fail_random=True).returncode, 0)
+        self.assertEqual(path.read_bytes(), original)
+
+
+@unittest.skipUnless(BASH, "Bash is required to test Docker scripts")
+class DockerDeploymentTests(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(prefix="miyin docker test ")
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        self.app_dir = self.root / "app"
+        self.log = self.root / "commands.txt"
+        self.bin = self.root / "bin"
+        self.bin.mkdir()
+        self.stub("sudo", 'exec "$@"')
+        self.stub("git", 'echo "unexpected Git command" >&2; exit 101')
+        self.stub("docker", """
+printf '%s\n' "$*" >> "$TEST_COMMAND_LOG"
+case "$*" in
+  *"config --services") printf 'app\n' ;;
+  "compose up --help") printf '%s\n' '  --wait-timeout int' ;;
+esac
+""")
+        self.stub("curl", """
+[[ "$1" == "-fsSL" && "$3" == "-o" ]] || exit 102
+relative="${2#https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/}"
+cat "$TEST_REPO/$relative" > "$4"
+""")
+
+    def stub(self, name, body):
+        file = self.bin / name
+        file.write_text("#!/usr/bin/env bash\n" + body.strip() + "\n", encoding="utf-8", newline="\n")
+        file.chmod(0o755)
+
+    def deploy(self, script, *, remote=False, tag="latest"):
+        shell = """
+if command -v cygpath >/dev/null 2>&1; then
+  bin="$(cygpath -u "$1")"; export APP_DIR="$(cygpath -u "$2")"
+  export TEST_COMMAND_LOG="$(cygpath -u "$3")" TEST_REPO="$(cygpath -u "$5")"
+  script="$(cygpath -u "$4")"
+else
+  bin="$1"; export APP_DIR="$2" TEST_COMMAND_LOG="$3" TEST_REPO="$5"; script="$4"
+fi
+export PATH="$bin:$PATH" IMAGE_TAG="$6"
+if [[ "$7" == yes ]]; then
+  bash <(cat "$script")
+else
+  bash "$script"
+fi
+"""
+        return subprocess.run(
+            [BASH, "-c", shell, "test-docker", str(self.bin), str(self.app_dir), str(self.log),
+             str(ROOT / f"scripts/linux/docker/{script}.sh"), str(ROOT), tag, "yes" if remote else "no"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=25,
+        )
+
+    def test_new_install_pulls_image_without_git_checkout(self):
+        result = self.deploy("install")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        commands = self.log.read_text(encoding="utf-8")
+        self.assertIn("pull ghcr.io/poouo/miyin_tg_bot:latest", commands)
+        self.assertIn("up -d --no-build", commands)
+        self.assertNotIn("--build app", commands)
+        self.assertIn("image: ghcr.io/poouo/miyin_tg_bot:latest", (self.app_dir / "compose.yaml").read_text())
+        self.assertTrue((self.app_dir / ".env").is_file())
+        self.assertFalse((self.app_dir / ".git").exists())
+
+    def test_remote_upgrade_migrates_legacy_compose_without_changing_its_files(self):
+        self.app_dir.mkdir()
+        data = self.app_dir / "data"
+        data.mkdir()
+        (data / "existing.db").write_bytes(b"mock database")
+        compose = self.app_dir / "docker-compose.yml"
+        compose.write_text("services:\n  app:\n    build: .\n    volumes: ['./data:/app/data']\n", encoding="utf-8")
+        original = compose.read_bytes()
+        (self.app_dir / "docker-compose.override.yml").write_text("services:\n  app:\n    restart: always\n")
+        (self.app_dir / ".env").write_text("WEB_AUTH_SECRET=legacy\nWEB_ADMIN_PASSWORD=custom-password\n")
+        result = self.deploy("upgrade", remote=True, tag="1.0.07")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        commands = self.log.read_text(encoding="utf-8")
+        self.assertIn("pull ghcr.io/poouo/miyin_tg_bot:1.0.07", commands)
+        self.assertIn("-f docker-compose.yml -f docker-compose.override.yml -f compose.miyin-image.yaml up -d --no-build", commands)
+        self.assertEqual(compose.read_bytes(), original)
+        self.assertEqual((data / "existing.db").read_bytes(), b"mock database")
+        self.assertIn("WEB_ADMIN_PASSWORD=custom-password", (self.app_dir / ".env").read_text())
+        self.assertNotIn("WEB_AUTH_SECRET=legacy", (self.app_dir / ".env").read_text())
 
 
 if __name__ == "__main__":

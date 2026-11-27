@@ -1,28 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="${APP_DIR:-/opt/miyin_tg_bot}"
-
-run_privileged() {
-  if [[ "${EUID}" -eq 0 ]]; then
-    "$@"
-  else
-    sudo "$@"
-  fi
-}
-
-if [[ ! -e "${APP_DIR}/.git" ]]; then
-  echo "project directory not found: ${APP_DIR}, run install.sh first"
-  exit 1
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/install.sh" ]]; then
+  exec bash "${SCRIPT_DIR}/install.sh" --upgrade
 fi
 
-cd "${APP_DIR}"
-branch="$(run_privileged git symbolic-ref --short HEAD)"
-if [[ -n "${BRANCH:-}" && "${BRANCH}" != "${branch}" ]]; then
-  echo "Check out ${BRANCH} before upgrading."
-  exit 1
+url="https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/docker/install.sh"
+installer="$(mktemp)"
+trap 'rm -f -- "$installer"' EXIT
+if command -v curl >/dev/null 2>&1; then
+  curl -fsSL "$url" -o "$installer"
+else
+  wget -qO "$installer" "$url"
 fi
-run_privileged git pull --ff-only --no-rebase origin "${branch}"
-revision="$(run_privileged git rev-parse HEAD)"
-run_privileged env MIYIN_BUILD_REVISION="${revision}" MIYIN_BUILD_BRANCH="${branch}" docker compose up -d --build
-echo "[miyin] docker upgrade done"
+bash "$installer" --upgrade

@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -25,6 +26,32 @@ from apps.bot.bot_app.handlers.group_events import _message_lock_types
 
 
 class ProjectRegressionTests(unittest.TestCase):
+    def test_docker_recovers_from_legacy_secret_and_keeps_the_same_key_after_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            env = {"MIYIN_DEPLOYMENT": "docker"}
+            settings = admin_password_service.settings.model_copy(update={
+                "app_env": "prod", "web_auth_secret": "legacy-key", "web_admin_password": "preserved-password",
+            })
+            with (
+                patch.object(admin_password_service, "settings", settings),
+                patch.object(auth, "settings", settings),
+                patch.object(admin_password_service, "_repo_root", return_value=root),
+                patch.object(admin_password_service.os, "getenv", side_effect=lambda key, default=None: env.get(key, default)),
+            ):
+                old_token = auth.create_admin_token()
+                admin_password_service.validate_admin_credentials()
+                key_file = root / "data" / "admin_session_secret"
+                self.assertRegex(key_file.read_text(), r"^[0-9a-f]{64}$")
+                if os.name != "nt":
+                    self.assertEqual(key_file.stat().st_mode & 0o777, 0o600)
+                self.assertFalse(auth.verify_admin_token(old_token))
+                new_token = auth.create_admin_token()
+                settings.web_auth_secret = "legacy-key"
+                admin_password_service.validate_admin_credentials()
+                self.assertTrue(auth.verify_admin_token(new_token))
+                self.assertTrue(admin_password_service.verify_admin_password("preserved-password"))
+
     def test_dispatcher_can_restart_in_same_process(self):
         self.assertIs(build_dispatcher(), build_dispatcher())
 

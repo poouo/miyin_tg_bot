@@ -1,6 +1,6 @@
 # Miyin TG Group Manager Bot
 
-Current version: `V1.0.06`
+Current version: `V1.0.07`
 
 Default Web language: Chinese (switchable to English in admin panel).
 Installers generate a random signing secret and admin password, and display the initial password in the terminal. Existing `.env` files are preserved; rotate default credentials separately on existing deployments.
@@ -57,7 +57,9 @@ python -m apps.runner.main
 
 Default web URL: `http://127.0.0.1:9800`
 
-## Docker (Single Container + SQLite)
+## Manual Docker Source Build (Optional)
+
+The one-click Docker scripts below pull the published image directly from GHCR and preserve the existing Compose configuration and data.
 
 ```bash
 docker compose up -d --build

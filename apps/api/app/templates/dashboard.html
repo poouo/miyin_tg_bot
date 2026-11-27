@@ -499,6 +499,11 @@
               <p id="upgrade-status" class="upgrade-status" role="status" aria-live="polite"></p>
               {% if update_deployment.mode == "docker" %}
               <div id="docker-update-instructions" class="docker-upgrade" hidden>
+                <div class="docker-upgrade-option">
+                  <p>{{ t.update_docker_managed }}</p>
+                  <pre><code id="docker-upgrade-managed">bash &lt;(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/docker/upgrade.sh)</code></pre>
+                  <button type="button" class="btn subtle" data-copy-update="docker-upgrade-managed"><i class="ri-file-copy-line" aria-hidden="true"></i>{{ t.update_copy_command }}</button>
+                </div>
                 {% if update_deployment.docker_source != "image" %}
                 <div class="docker-upgrade-option">
                   <p>{{ t.update_docker_source }}</p>
@@ -512,7 +517,7 @@ MIYIN_BUILD_REVISION="$revision" MIYIN_BUILD_BRANCH="$branch" docker compose up 
                 {% if update_deployment.docker_source != "source" %}
                 <div class="docker-upgrade-option">
                   <p>{{ t.update_docker_image }}</p>
-                  <pre><code id="docker-upgrade-image">docker compose pull &amp;&amp; docker compose up -d</code></pre>
+                  <pre><code id="docker-upgrade-image">docker compose pull &amp;&amp; docker compose up -d --no-build</code></pre>
                   <button type="button" class="btn subtle" data-copy-update="docker-upgrade-image"><i class="ri-file-copy-line" aria-hidden="true"></i>{{ t.update_copy_command }}</button>
                   <p>{{ t.update_docker_run }}</p>
                 </div>

@@ -1,6 +1,6 @@
 # Miyin TG 群组管理机器人
 
-当前版本：`V1.0.06`
+当前版本：`V1.0.07`
 
 默认 Web 语言：中文（可在后台切换英文）。
 一键安装自动生成随机签名密钥和后台密码，初始密码显示在安装终端。已有 `.env` 不会覆盖，旧部署需单独更换默认密钥和密码。
@@ -53,7 +53,9 @@ python -m apps.runner.main
 
 Web 后台默认地址：`http://127.0.0.1:9800`
 
-## Docker（单容器 + SQLite）
+## Docker 手动源码构建（可选）
+
+下方 Docker 一键安装和升级脚本默认直接拉取官方 GHCR 镜像。已有数据和 Compose 配置会保留。
 
 ```bash
 docker compose up -d --build

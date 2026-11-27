@@ -1,11 +1,16 @@
 import hashlib
 import hmac
 import json
+import logging
+import os
 import secrets
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from packages.shared.shared.config.settings import settings
+
+logger = logging.getLogger(__name__)
+DEFAULT_SIGNING_SECRETS = {"change_me_to_a_long_random_string", "replace_with_long_random_string"}
 
 
 def _repo_root() -> Path:
@@ -14,6 +19,41 @@ def _repo_root() -> Path:
 
 def _password_file() -> Path:
     return _repo_root() / "data" / "admin_password.json"
+
+
+def _session_secret_file() -> Path:
+    return _repo_root() / "data" / "admin_session_secret"
+
+
+def _valid_signing_secret(secret: str) -> bool:
+    value = secret.strip()
+    return len(value) >= 32 and value not in DEFAULT_SIGNING_SECRETS
+
+
+def _persistent_docker_signing_secret() -> str:
+    path = _session_secret_file()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.exists():
+            file = NamedTemporaryFile(mode="w", encoding="ascii", dir=path.parent, delete=False)
+            temporary = Path(file.name)
+            try:
+                with file:
+                    file.write(secrets.token_hex(32))
+                try:
+                    os.link(temporary, path)
+                except FileExistsError:
+                    pass
+                else:
+                    logger.warning("Initialized a persistent admin session signing key in %s.", path)
+            finally:
+                temporary.unlink(missing_ok=True)
+        value = path.read_text(encoding="ascii").strip()
+    except (OSError, UnicodeError) as exc:
+        raise RuntimeError("Cannot read or save the Docker admin session signing key in /app/data.") from exc
+    if not _valid_signing_secret(value):
+        raise RuntimeError("Stored Docker signing key is invalid. Set a valid WEB_AUTH_SECRET in the container environment.")
+    return value
 
 
 def _hash_password(password: str, salt_hex: str) -> str:
@@ -45,8 +85,10 @@ def validate_admin_credentials() -> None:
     loopback = settings.web_host.strip().lower() in {"127.0.0.1", "localhost", "::1"}
     if not production and loopback:
         return
-    if len(settings.web_auth_secret.strip()) < 32 or settings.web_auth_secret == "change_me_to_a_long_random_string":
-        raise RuntimeError("Set a unique WEB_AUTH_SECRET of at least 32 characters before starting production.")
+    if not _valid_signing_secret(settings.web_auth_secret):
+        if os.getenv("MIYIN_DEPLOYMENT") != "docker":
+            raise RuntimeError("Set a unique WEB_AUTH_SECRET of at least 32 characters before starting production.")
+        settings.web_auth_secret = _persistent_docker_signing_secret()
     payload = _read_password_payload()
     if payload is None:
         if len(settings.web_admin_password.strip()) < 8:

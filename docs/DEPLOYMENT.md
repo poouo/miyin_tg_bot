@@ -2,25 +2,23 @@
 
 ## Docker (Single Container + SQLite)
 
-1. Run `bash scripts/linux/init_env.sh .` to generate `.env` with random credentials, then edit web/db/base settings if needed
-2. Run `docker compose up -d --build`
-3. Open `http://<ip>:9800`
-4. Log in with the initial admin password printed when `.env` was generated
-5. Configure TG Bot and AI provider (DeepSeek / OpenCode / custom) parameters in dashboard
+1. Run the Docker install command below on the host. It pulls the official image from GHCR and uses `/opt/miyin_tg_bot` by default.
+2. Open `http://<ip>:9800` and log in with the initial admin password printed by the installer.
+3. Configure the Telegram bot and AI provider in the dashboard.
 
-Both one-click installers use the same credential generator. It creates a 64-character random signing secret and an independent random admin password, saves `.env` with permissions `600`, and never prints the signing secret. Existing `.env` files are preserved. Existing deployments must rotate default credentials separately; upgrading code alone does not replace them.
+Both installers use the same credential generator. Docker install and upgrade repair outdated literal signing secrets in `.env` and generate a new initial password only if it is weak or missing and there is no saved password in `data/admin_password.json`. Other settings and the database are preserved. An existing dashboard password still takes precedence. If a Docker container still receives an invalid signing secret, it generates a private fallback key at `/app/data/admin_session_secret`. Keep this file in the persistent data volume. Rotating the key invalidates older web sessions.
 
-Set unique credentials before running with `APP_ENV=prod` or listening beyond localhost. The signing secret must have at least 32 characters and the initial admin password at least 8 characters. If you terminate HTTPS at a reverse proxy, set `WEB_TRUSTED_PROXIES` to the proxy addresses so Uvicorn can resolve the client IP and HTTPS scheme. Keep the proxy list limited to proxies you control.
+Set unique credentials for manual deployments. A supplied signing secret must have at least 32 characters and an initial admin password at least 8 characters. If you terminate HTTPS at a reverse proxy, set `WEB_TRUSTED_PROXIES` to the proxy addresses so Uvicorn can resolve the client IP and HTTPS scheme. Keep the proxy list limited to proxies you control.
 
 Environment variables such as `TELEGRAM_BOT_TOKEN` initialize missing runtime settings on first startup. Settings already saved in the database take precedence.
 
 ## Docker Image Builds
 
-GitHub Actions runs tests and publishes `linux/amd64` and `linux/arm64` images to `ghcr.io/poouo/miyin_tg_bot` on pushes to `main`, version tag pushes, and manual workflow runs. Main builds publish `latest`, the version from `VERSION` (for example `1.0.04`), and a `sha-` tag. Version tag builds publish the version and `sha-` tags. The supplied Compose file continues to build from source.
+GitHub Actions runs tests and publishes `linux/amd64` and `linux/arm64` images to `ghcr.io/poouo/miyin_tg_bot` on pushes to `main`, version tag pushes, and manual workflow runs. Main builds publish `latest`, the version from `VERSION`, and a `sha-` tag. The repository's `docker-compose.yml` also supports optional manual source builds.
 
 The Docker build context excludes `.env`, runtime data, databases, and Git metadata. Configure runtime credentials through `.env` and keep persistent data mounted at `/app/data`.
 
-The dashboard checks the published `latest` image in GHCR for image deployments and the GitHub source branch for Compose source builds. If a deployment pins a specific image tag, update that tag before running Compose. Published images and the Docker installer record the build commit. When building from a Git checkout manually, pass the commit and branch so the dashboard can detect updates even when `VERSION` stays the same.
+The dashboard checks the published `latest` image in GHCR for image deployments and the GitHub source branch for Compose source builds. The one-click scripts default to `latest`. Set `IMAGE_TAG` when running the script to pin a published version. When building from a Git checkout manually, pass the commit and branch so the dashboard can detect updates even when `VERSION` stays the same.
 
 ```bash
 MIYIN_BUILD_REVISION="$(git rev-parse HEAD)" MIYIN_BUILD_BRANCH="$(git symbolic-ref --short HEAD)" docker compose up -d --build
@@ -41,7 +39,7 @@ Images built without commit metadata compare their `VERSION` file with GitHub.
 
 ### scripts/linux/docker/install.sh
 
-- Purpose: first-time Docker deployment.
+- Purpose: install from the published GHCR image.
 - Command:
 
 ```bash
@@ -50,12 +48,14 @@ bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scri
 
 ### scripts/linux/docker/upgrade.sh
 
-- Purpose: pull latest code and rebuild containers.
+- Purpose: pull the published image and recreate the `app` service without building it. Legacy installs keep their existing Compose files, ports, volumes, and data. The script adds `compose.miyin-image.yaml` as an override.
 - Command:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/poouo/miyin_tg_bot/main/scripts/linux/docker/upgrade.sh)
 ```
+
+Set `APP_DIR` before the command if your deployment lives outside `/opt/miyin_tg_bot`. For custom deployments, set `COMPOSE_FILE` and `COMPOSE_PROJECT_NAME` to match the original project if you used them. To manage an upgraded deployment manually, include `-f compose.miyin-image.yaml` as the last Compose file, with your original Compose files first.
 
 ### scripts/linux/docker/uninstall.sh
 
